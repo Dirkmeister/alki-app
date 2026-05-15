@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import StackIntelligence, { analyzeStack } from "./StackIntelligence";
+import AlkiProtocolQA from "./AlkiProtocolQA";
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — ἀλκή — The AI-Powered Peptide Intelligence Platform
@@ -846,7 +847,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
   );
 }
 
-function Dashboard({ profile, onReset }) {
+function Dashboard({ profile, onReset, onQA }) {
   const [selectedCompounds, setSelectedCompounds] = useState([]);
   const [showTransform, setShowTransform] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
@@ -972,9 +973,14 @@ function Dashboard({ profile, onReset }) {
             <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
           </span>
         </div>
-        <button onClick={onReset} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-          Reset
-        </button>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button onClick={onQA} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Protocol Q&amp;A
+          </button>
+          <button onClick={onReset} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+            Reset
+          </button>
+        </div>
       </div>
 
       {/* Profile summary */}
@@ -1081,7 +1087,14 @@ export default function AlkiApp() {
       {screen === "blocked" && <AgeBlocked />}
       {screen === "onboarding" && <Onboarding onComplete={(p) => { setProfile(p); setScreen("dashboard"); }} />}
       {screen === "dashboard" && profile && (
-        <Dashboard profile={profile} onReset={() => { setProfile(null); setScreen("splash"); }} />
+        <Dashboard
+          profile={profile}
+          onReset={() => { setProfile(null); setScreen("splash"); }}
+          onQA={() => setScreen("qa")}
+        />
+      )}
+      {screen === "qa" && (
+        <AlkiProtocolQA onBack={() => setScreen("dashboard")} />
       )}
     </div>
   );
