@@ -559,7 +559,7 @@ function scoreColor(score) {
   return RED;
 }
 
-export default function StackIntelligence({ stackIds = [], userProfile = {}, onRemoveCompound }) {
+export default function StackIntelligence({ stackIds = [], userProfile = {}, onRemoveCompound, mode = "full" }) {
   const analysis = useMemo(
     () => analyzeStack(stackIds, userProfile),
     [stackIds, userProfile]
@@ -567,6 +567,21 @@ export default function StackIntelligence({ stackIds = [], userProfile = {}, onR
 
   if (analysis.compounds.length === 0) {
     return null;
+  }
+
+  // Compact mode: render ONLY the critical contraindication banner.
+  // Used on the Dashboard so the selection flow stays clean.
+  // Full analysis lives on the Transform screen.
+  if (mode === "compact") {
+    if (analysis.contraindications.length === 0) return null;
+    return (
+      <div style={styles.container}>
+        <ContraindicationBanner
+          contraindications={analysis.contraindications}
+          onRemoveCompound={onRemoveCompound}
+        />
+      </div>
+    );
   }
 
   return (

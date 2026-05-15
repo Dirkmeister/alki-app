@@ -949,6 +949,13 @@ function Dashboard({ profile, onReset }) {
           })}
         </div>
 
+        {/* Stack Intelligence — full analysis */}
+        <StackIntelligence
+          stackIds={selectedCompounds}
+          userProfile={profile}
+          onRemoveCompound={toggleCompound}
+        />
+
         <p style={S.disclaimer}>
           Projections are estimates based on published research data and population averages. Individual results vary significantly based on genetics, training, nutrition, and adherence. This is not medical advice.
         </p>
@@ -1015,11 +1022,13 @@ function Dashboard({ profile, onReset }) {
         </button>
       )}
 
-      {/* Stack Intelligence Engine */}
+      {/* Stack Intelligence — compact mode on dashboard shows only critical
+          contraindication blocks. Full analysis renders on Transform screen. */}
       <StackIntelligence
         stackIds={selectedCompounds}
         userProfile={profile}
         onRemoveCompound={toggleCompound}
+        mode="compact"
       />
 
       {/* Recommended */}
