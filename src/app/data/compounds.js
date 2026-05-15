@@ -1,3 +1,15 @@
+// ─────────────────────────────────────────────────────────────
+// EXPANDED COMPOUND DATABASE INTEGRATION
+// The line below imports the 63-compound expansion from
+// `./compounds-expanded.js`. To revert to the original 8 compounds:
+//   1. Delete `./compounds-expanded.js`
+//   2. Remove this import line
+//   3. Remove the `...EXPANDED_COMPOUNDS` spread at the bottom of
+//      the COMPOUNDS array
+// The original 8 compounds below remain completely untouched.
+// ─────────────────────────────────────────────────────────────
+import { EXPANDED_COMPOUNDS } from "./compounds-expanded";
+
 export const COMPOUNDS = [
   {
     id: "bpc157",
@@ -134,5 +146,10 @@ export const COMPOUNDS = [
     suitability: { minBf: 0, maxBf: 100, goals: ["performance"] },
     contraindications: [],
     visualChange: false
-  }
+  },
+  // ─────────────────────────────────────────────────────────
+  // Expansion compounds (63 additions). See `compounds-expanded.js`.
+  // To revert: remove the line below and the import at the top.
+  // ─────────────────────────────────────────────────────────
+  ...EXPANDED_COMPOUNDS
 ];
