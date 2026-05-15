@@ -848,8 +848,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
   );
 }
 
-function Dashboard({ profile, onReset, onQA, onTimeline }) {
-  const [selectedCompounds, setSelectedCompounds] = useState([]);
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, onReset, onQA, onTimeline }) {
   const [showTransform, setShowTransform] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
@@ -1032,7 +1031,7 @@ function Dashboard({ profile, onReset, onQA, onTimeline }) {
       {/* Cycle Timeline CTA */}
       {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
         <button
-          onClick={() => onTimeline(selectedCompounds)}
+          onClick={onTimeline}
           style={{
             ...S.btnOutline,
             marginBottom: 16,
@@ -1096,7 +1095,7 @@ function Dashboard({ profile, onReset, onQA, onTimeline }) {
 export default function AlkiApp() {
   const [screen, setScreen] = useState("splash");
   const [profile, setProfile] = useState(null);
-  const [timelineStack, setTimelineStack] = useState([]);
+  const [selectedCompounds, setSelectedCompounds] = useState([]);
 
   return (
     <div style={S.app}>
@@ -1108,9 +1107,11 @@ export default function AlkiApp() {
       {screen === "dashboard" && profile && (
         <Dashboard
           profile={profile}
-          onReset={() => { setProfile(null); setScreen("splash"); }}
+          selectedCompounds={selectedCompounds}
+          setSelectedCompounds={setSelectedCompounds}
+          onReset={() => { setProfile(null); setSelectedCompounds([]); setScreen("splash"); }}
           onQA={() => setScreen("qa")}
-          onTimeline={(stack) => { setTimelineStack(stack); setScreen("timeline"); }}
+          onTimeline={() => setScreen("timeline")}
         />
       )}
       {screen === "qa" && (
@@ -1118,7 +1119,7 @@ export default function AlkiApp() {
       )}
       {screen === "timeline" && (
         <CycleTimeline
-          stack={timelineStack}
+          stack={selectedCompounds}
           initialCycleLength={12}
           onBack={() => setScreen("dashboard")}
         />
