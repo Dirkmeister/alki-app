@@ -1067,6 +1067,97 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
   );
 }
 
+function StatTile({ label, current, projected, delta, unit, goodDirection = "up", isScore = false, note = null }) {
+  // Determine if the delta is favorable based on the metric's direction.
+  const hasDelta = typeof delta === "number" && delta !== 0;
+  const isFavorable = hasDelta && (goodDirection === "up" ? delta > 0 : delta < 0);
+  const deltaColor = !hasDelta
+    ? "rgba(255,255,255,0.35)"
+    : isFavorable
+    ? "#22d68a"
+    : "#ef4444";
+
+  // Display value: prefer projected absolute when provided, otherwise show delta.
+  const showAbsolute = current && projected;
+  const formattedDelta = hasDelta
+    ? `${delta > 0 ? "+" : ""}${Math.round(delta * 10) / 10}${unit}`
+    : `0${unit}`;
+
+  return (
+    <div style={{
+      padding: "12px 14px",
+      borderRadius: 10,
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.05)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+        {label}
+      </div>
+      {showAbsolute ? (
+        <>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>
+            {projected}
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+            from <span style={{ color: "rgba(255,255,255,0.6)" }}>{current}</span>{" "}
+            <span style={{ color: deltaColor, fontWeight: 600 }}>({formattedDelta})</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: 22, fontWeight: 800, color: deltaColor, lineHeight: 1.1 }}>
+            {hasDelta ? formattedDelta : (isScore ? "—" : `0${unit}`)}
+          </div>
+          {note && (
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+              {note}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BiomarkerRow({ projection }) {
+  const { label, unit, current, delta, projected, positive } = projection;
+  const hasDelta = delta !== 0;
+  const deltaColor = !hasDelta
+    ? "rgba(255,255,255,0.35)"
+    : positive
+    ? "#22d68a"
+    : "#ef4444";
+  const deltaStr = `${delta > 0 ? "+" : ""}${delta}${unit}`;
+
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "10px 12px",
+      borderRadius: 8,
+      background: "rgba(255,255,255,0.03)",
+      border: "1px solid rgba(255,255,255,0.05)",
+      gap: 12
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)", flexShrink: 0 }}>
+        {label}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ color: "rgba(255,255,255,0.45)" }}>{current}{unit}</span>
+        <span style={{ color: "rgba(255,255,255,0.2)" }}>→</span>
+        <span style={{ color: "#fff", fontWeight: 700 }}>{projected}{unit}</span>
+        <span style={{ color: deltaColor, fontWeight: 600, fontSize: 11, minWidth: 50, textAlign: "right" }}>
+          {hasDelta ? deltaStr : "—"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
@@ -1091,17 +1182,150 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
 
   // Calculate projected changes for display
   const projectedChanges = useMemo(() => {
-    let bfChange = 0, muscleNote = [], timeline = 12;
+    const timeline = 12;
+
+    // Aggregate raw effect sums from selected compounds
+    let bfChange = 0;
+    let muscleChange = 0;
+    let skinChange = 0;
+    let recoveryChange = 0;
+    let hasGHAxis = false;
+    let hasGLP1 = false;
+    let hasVisceralTarget = false;
+    let hasECM = false;
+
     for (const cid of selectedCompounds) {
       const c = COMPOUNDS.find(x => x.id === cid);
-      if (c) {
-        bfChange += c.effects.bf;
-        if (c.effects.muscle > 1) muscleNote.push(`+${c.effects.muscle}% lean mass`);
-        if (c.effects.muscle < 0) muscleNote.push(`${c.effects.muscle}% lean mass risk`);
-      }
+      if (!c) continue;
+      bfChange       += c.effects.bf       || 0;
+      muscleChange   += c.effects.muscle   || 0;
+      skinChange     += c.effects.skin     || 0;
+      recoveryChange += c.effects.recovery || 0;
+
+      if (c.category === "Growth Hormone") hasGHAxis = true;
+      if (c.category === "Weight Loss")    hasGLP1 = true;
+      if (c.id === "tesamorelin" || c.id === "fragment176") hasVisceralTarget = true;
+      if (c.id === "ghkcu")                hasECM = true;
     }
-    return { bfChange, muscleNote, timeline };
-  }, [selectedCompounds]);
+
+    // ── Advanced biomarker projections (only when user provided a baseline) ──
+    // Conservative 12-week projections derived from effect sums + mechanism flags.
+    const adv = profile.adv || {};
+    const advProjections = [];
+
+    const skelBase = parseFloat(adv.skelMuscle);
+    if (!isNaN(skelBase) && skelBase > 0) {
+      // GH axis raises skeletal muscle %; GLP-1 without GH support lowers it
+      let delta = muscleChange * 0.18;
+      if (hasGHAxis) delta += 0.6;
+      if (hasGLP1 && !hasGHAxis) delta -= 1.2;
+      delta = Math.round(delta * 10) / 10;
+      advProjections.push({
+        label: "Skeletal Muscle",
+        unit: "%",
+        current: skelBase,
+        delta,
+        projected: Math.round((skelBase + delta) * 10) / 10,
+        positive: delta > 0
+      });
+    }
+
+    const muscleMassBase = parseFloat(adv.muscleMass);
+    if (!isNaN(muscleMassBase) && muscleMassBase > 0) {
+      // Lean mass in lbs — scaled from muscle effect sum
+      let delta = muscleChange * 0.9;
+      if (hasGLP1 && !hasGHAxis) delta -= 4;
+      delta = Math.round(delta * 10) / 10;
+      advProjections.push({
+        label: "Muscle Mass",
+        unit: "lbs",
+        current: muscleMassBase,
+        delta,
+        projected: Math.round((muscleMassBase + delta) * 10) / 10,
+        positive: delta > 0
+      });
+    }
+
+    const visceralBase = parseFloat(adv.visceralFat);
+    if (!isNaN(visceralBase) && visceralBase > 0) {
+      let delta = 0;
+      if (hasVisceralTarget) delta -= 2;
+      if (hasGLP1)           delta -= 1.5;
+      if (hasGHAxis && !hasVisceralTarget) delta -= 0.5;
+      delta = Math.round(delta * 10) / 10;
+      advProjections.push({
+        label: "Visceral Fat",
+        unit: "lvl",
+        current: visceralBase,
+        delta,
+        projected: Math.max(1, Math.round((visceralBase + delta) * 10) / 10),
+        positive: delta < 0
+      });
+    }
+
+    const subFatBase = parseFloat(adv.subFat);
+    if (!isNaN(subFatBase) && subFatBase > 0) {
+      // Subcutaneous fat tracks roughly with total BF change
+      let delta = bfChange * 0.8;
+      if (hasECM) delta -= 0.2;
+      delta = Math.round(delta * 10) / 10;
+      advProjections.push({
+        label: "Subcutaneous Fat",
+        unit: "%",
+        current: subFatBase,
+        delta,
+        projected: Math.max(0, Math.round((subFatBase + delta) * 10) / 10),
+        positive: delta < 0
+      });
+    }
+
+    const ffmBase = parseFloat(adv.fatFreeMass);
+    if (!isNaN(ffmBase) && ffmBase > 0) {
+      let delta = muscleChange * 0.7;
+      if (hasGLP1 && !hasGHAxis) delta -= 3;
+      delta = Math.round(delta * 10) / 10;
+      advProjections.push({
+        label: "Fat-Free Mass",
+        unit: "lbs",
+        current: ffmBase,
+        delta,
+        projected: Math.round((ffmBase + delta) * 10) / 10,
+        positive: delta > 0
+      });
+    }
+
+    const bmrBase = parseFloat(adv.bmr);
+    if (!isNaN(bmrBase) && bmrBase > 0) {
+      // GH axis raises BMR; GLP-1 alone modestly lowers it via lean mass loss
+      let delta = muscleChange * 8;
+      if (hasGHAxis) delta += 40;
+      if (hasGLP1 && !hasGHAxis) delta -= 60;
+      delta = Math.round(delta);
+      advProjections.push({
+        label: "BMR",
+        unit: "kcal",
+        current: bmrBase,
+        delta,
+        projected: Math.round(bmrBase + delta),
+        positive: delta > 0
+      });
+    }
+
+    // Backward-compat note string (kept so anything else reading it still works)
+    const muscleNote = [];
+    if (muscleChange > 1)  muscleNote.push(`+${muscleChange}% lean mass`);
+    if (muscleChange < 0)  muscleNote.push(`${muscleChange}% lean mass risk`);
+
+    return {
+      bfChange,
+      muscleChange,
+      skinChange,
+      recoveryChange,
+      muscleNote,
+      timeline,
+      advProjections
+    };
+  }, [selectedCompounds, profile]);
 
   // ── Recommended-for-you filter ────────────────────────────────────────
   // Strict match: (goal overlap OR advanced-biomarker match) + BF range
@@ -1211,27 +1435,58 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats — core projections */}
         <div style={S.card}>
-          <div style={{ ...S.label, marginBottom: 12 }}>Projected Outcomes</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.04)", textAlign: "center" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: projectedChanges.bfChange < 0 ? "#22d68a" : "#fff" }}>
-                {projectedChanges.bfChange > 0 ? "+" : ""}{projectedChanges.bfChange}%
-              </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>Body Fat</div>
+          <div style={{ ...S.label, marginBottom: 12 }}>Projected Outcomes · {projectedChanges.timeline} weeks</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <StatTile
+              label="Body Fat"
+              current={`${profile.bodyFat}%`}
+              projected={`${Math.max(0, Math.round((profile.bodyFat + projectedChanges.bfChange) * 10) / 10)}%`}
+              delta={projectedChanges.bfChange}
+              unit="%"
+              goodDirection="down"
+            />
+            <StatTile
+              label="Lean Mass"
+              delta={projectedChanges.muscleChange}
+              unit="%"
+              goodDirection="up"
+              note={projectedChanges.muscleChange === 0 ? "No change" : null}
+            />
+            <StatTile
+              label="Skin Quality"
+              delta={projectedChanges.skinChange}
+              unit=""
+              goodDirection="up"
+              isScore
+              note={projectedChanges.skinChange === 0 ? "No change" : null}
+            />
+            <StatTile
+              label="Recovery"
+              delta={projectedChanges.recoveryChange}
+              unit=""
+              goodDirection="up"
+              isScore
+              note={projectedChanges.recoveryChange === 0 ? "No change" : null}
+            />
+          </div>
+        </div>
+
+        {/* Advanced biomarker projections — only when user provided baselines */}
+        {projectedChanges.advProjections.length > 0 && (
+          <div style={S.card}>
+            <div style={{ ...S.label, marginBottom: 4 }}>Advanced Biomarker Projections</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 14, lineHeight: 1.5 }}>
+              Based on the body composition data you provided during onboarding. Projections are population estimates; individual response varies.
             </div>
-            <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.04)", textAlign: "center" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{profile.bodyFat + projectedChanges.bfChange}%</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>Projected BF%</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {projectedChanges.advProjections.map((p, i) => (
+                <BiomarkerRow key={i} projection={p} />
+              ))}
             </div>
           </div>
-          {projectedChanges.muscleNote.length > 0 && (
-            <div style={{ marginTop: 12, fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
-              {projectedChanges.muscleNote.join("; ")}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Selected Stack */}
         <div style={S.card}>
