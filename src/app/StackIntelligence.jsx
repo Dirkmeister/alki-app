@@ -462,7 +462,7 @@ function analyzeStack(stackIds, userProfile = {}) {
 
   const overall = Math.round((suppression + liver + cardio + interaction) / 4);
 
-  const isBlocked = contraindications.some((c) => c.severity === "critical");
+  const isBlocked = false; // Contraindications inform; they never block the user.
 
   const activeAxes = Object.keys(axisCoverage)
     .map((a) => AXES[a]?.short || a)
@@ -649,8 +649,8 @@ function ContraindicationBanner({ contraindications, onRemoveCompound }) {
           <div style={styles.contraBlockHeader}>
             <span style={styles.contraBlockIcon}>⨯</span>
             <span>
-              STACK BLOCKED — {critical.length} CRITICAL CONTRAINDICATION
-              {critical.length === 1 ? "" : "S"}
+              {critical.length} HIGH-RISK ADVISORY
+              {critical.length === 1 ? "" : " FLAGS"}
             </span>
           </div>
           {critical.map((contra, i) => (
@@ -670,7 +670,7 @@ function ContraindicationBanner({ contraindications, onRemoveCompound }) {
             </div>
           ))}
           <div style={styles.contraBlockFooter}>
-            Resolve all critical contraindications to proceed with this stack.
+            Proceed with caution. You understand the trade-offs.
           </div>
         </div>
       )}
@@ -1005,15 +1005,15 @@ const styles = {
     gap: 10,
   },
   contraBlockBox: {
-    border: `1px solid ${RED}`,
-    backgroundColor: "rgba(239,68,68,0.06)",
+    border: `1px solid ${AMBER}`,
+    backgroundColor: "rgba(245,158,11,0.06)",
     borderRadius: 12,
     overflow: "hidden",
   },
   contraBlockHeader: {
     padding: "12px 16px",
-    backgroundColor: RED,
-    color: "#fff",
+    backgroundColor: AMBER,
+    color: "#0a0a0a",
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: "0.08em",
@@ -1046,9 +1046,9 @@ const styles = {
   contraRemoveBtn: {
     fontSize: 12,
     fontWeight: 500,
-    color: RED,
+    color: AMBER,
     backgroundColor: "transparent",
-    border: `1px solid ${RED}`,
+    border: `1px solid ${AMBER}`,
     borderRadius: 6,
     padding: "4px 10px",
     cursor: "pointer",
@@ -1056,15 +1056,15 @@ const styles = {
   },
   contraItemMessage: {
     fontSize: 13,
-    color: "#fca5a5",
+    color: "#fcd34d",
     lineHeight: 1.5,
   },
   contraBlockFooter: {
     padding: "10px 16px",
     fontSize: 11,
-    color: "#fca5a5",
+    color: "#fbbf24",
     letterSpacing: "0.04em",
-    backgroundColor: "rgba(239,68,68,0.04)",
+    backgroundColor: "rgba(245,158,11,0.04)",
   },
 
   contraWarnBox: {
