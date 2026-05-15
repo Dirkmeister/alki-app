@@ -848,8 +848,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, onReset, onQA, onTimeline }) {
-  const [showTransform, setShowTransform] = useState(false);
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline }) {
   const [animateIn, setAnimateIn] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
   const stackAnalysis = useMemo(() => analyzeStack(selectedCompounds, profile), [selectedCompounds, profile]);
@@ -956,6 +955,22 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, onReset, 
           userProfile={profile}
           onRemoveCompound={toggleCompound}
         />
+
+        {/* Cycle Timeline CTA — also reachable from the Transformation view */}
+        <button
+          onClick={onTimeline}
+          style={{
+            ...S.btnOutline,
+            marginTop: 8,
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }}
+        >
+          View Cycle Timeline →
+        </button>
 
         <p style={S.disclaimer}>
           Projections are estimates based on published research data and population averages. Individual results vary significantly based on genetics, training, nutrition, and adherence. This is not medical advice.
@@ -1096,6 +1111,7 @@ export default function AlkiApp() {
   const [screen, setScreen] = useState("splash");
   const [profile, setProfile] = useState(null);
   const [selectedCompounds, setSelectedCompounds] = useState([]);
+  const [showTransform, setShowTransform] = useState(false);
 
   return (
     <div style={S.app}>
@@ -1109,7 +1125,9 @@ export default function AlkiApp() {
           profile={profile}
           selectedCompounds={selectedCompounds}
           setSelectedCompounds={setSelectedCompounds}
-          onReset={() => { setProfile(null); setSelectedCompounds([]); setScreen("splash"); }}
+          showTransform={showTransform}
+          setShowTransform={setShowTransform}
+          onReset={() => { setProfile(null); setSelectedCompounds([]); setShowTransform(false); setScreen("splash"); }}
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
         />
