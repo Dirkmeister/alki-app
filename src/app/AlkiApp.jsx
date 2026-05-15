@@ -219,15 +219,23 @@ function getRecommendations(profile) {
 
     // ── Advanced body stats signals (only fire when user provided the value) ──
 
-    // High visceral fat → Tesamorelin is FDA-approved specifically for this mechanism
+    // High visceral fat → fat-loss-targeting compounds
     if (visceralFat !== null) {
       if (visceralFat >= 10 && compound.id === "tesamorelin") {
         score += 25;
         flags.push(`High visceral fat (level ${visceralFat}) — Tesamorelin's FDA-approved mechanism targets visceral adipose specifically.`);
       }
+      if (visceralFat >= 10 && compound.id === "fragment176") {
+        score += 15;
+        if (!flags.some(f => f.includes("visceral"))) flags.push(`High visceral fat (level ${visceralFat}) — Fragment 176-191 targets fat oxidation.`);
+      }
       if (visceralFat >= 12 && compound.category === "Weight Loss") {
         score += 12;
         if (!flags.some(f => f.includes("visceral"))) flags.push(`Visceral fat level ${visceralFat} supports GLP-1 prioritization.`);
+      }
+      if (visceralFat >= 12 && (compound.category === "Fat Loss" || compound.category === "Metabolic")) {
+        score += 10;
+        if (!flags.some(f => f.includes("visceral"))) flags.push(`Visceral fat level ${visceralFat} — fat-loss and metabolic compounds prioritized.`);
       }
     }
 
@@ -238,9 +246,14 @@ function getRecommendations(profile) {
       if (skelMuscle < lowThreshold) {
         if (compound.id === "ipacjc") { score += 20; flags.push(`Low skeletal muscle % (${skelMuscle}%) — GH stack prioritized to support lean mass.`); }
         if (compound.id === "tesamorelin") score += 10;
+        if (compound.category === "Growth Hormone" && compound.id !== "ipacjc") {
+          score += 12;
+          if (!flags.some(f => f.includes("skeletal muscle"))) flags.push(`Low skeletal muscle % (${skelMuscle}%) — GH-axis peptides prioritized.`);
+        }
       }
       if (skelMuscle > (sex === "female" ? 42 : 46)) {
         if (compound.id === "bpc157" || compound.id === "tb500") score += 8;
+        if (compound.category === "Recovery" && compound.id !== "bpc157" && compound.id !== "tb500") score += 5;
       }
     }
 
@@ -250,6 +263,9 @@ function getRecommendations(profile) {
       if (musclePct < 40 && (compound.id === "ipacjc" || compound.id === "tesamorelin")) {
         score += 10;
         if (!flags.some(f => f.includes("muscle"))) flags.push("Low muscle mass ratio — GH peptides prioritized.");
+      }
+      if (musclePct < 40 && compound.category === "Growth Hormone" && compound.id !== "ipacjc") {
+        score += 7;
       }
     }
 
@@ -266,6 +282,9 @@ function getRecommendations(profile) {
         score += 8;
         flags.push(`Low body water % (${bodyWater}%) — GH axis support relevant for tissue quality.`);
       }
+      if (bodyWater < lowWater && compound.category === "Growth Hormone" && compound.id !== "ipacjc") {
+        score += 5;
+      }
     }
 
     // Low bone mass → GH peptides (IGF-1 is a key signal for bone density maintenance)
@@ -274,12 +293,19 @@ function getRecommendations(profile) {
         score += 10;
         flags.push(`Low bone mass (${boneMass} lbs) — IGF-1 stimulation from GH peptides supports bone density.`);
       }
+      if (compound.category === "Growth Hormone" && compound.id !== "ipacjc") {
+        score += 7;
+      }
     }
 
     // Low BMR → metabolic compounds and GH peptides to support resting metabolism
     if (bmr !== null && bmr < 1400) {
       if (compound.id === "tesamorelin") { score += 12; flags.push(`Low BMR (${bmr} kcal/day) — Tesamorelin's GH stimulation supports metabolic rate.`); }
       if (compound.category === "Weight Loss") score += 8;
+      if (compound.category === "Metabolic" || compound.category === "Fat Loss") {
+        score += 7;
+        if (!flags.some(f => f.includes("BMR"))) flags.push(`Low BMR (${bmr} kcal/day) — metabolic compounds support resting energy expenditure.`);
+      }
     }
 
     // ── End advanced signals ──────────────────────────────────────────────────
@@ -1042,6 +1068,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
 
 function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline }) {
   const [animateIn, setAnimateIn] = useState(false);
+  const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
   const stackAnalysis = useMemo(() => analyzeStack(selectedCompounds, profile), [selectedCompounds, profile]);
 
@@ -1075,8 +1102,86 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
     return { bfChange, muscleNote, timeline };
   }, [selectedCompounds]);
 
-  const recommended = recommendations.filter(r => !r.blocked);
-  const blocked = recommendations.filter(r => r.blocked);
+  // ── Recommended-for-you filter ────────────────────────────────────────
+  // Strict match: (goal overlap OR advanced-biomarker match) + BF range
+  // + no triggered contraindications + not experimental/educational-only.
+  // Everything else falls to the collapsible "Browse all" section below.
+
+  // Parse advanced biomarkers from the profile (same fields as the engine reads)
+  const _adv = profile.adv || {};
+  const _advVF   = parseFloat(_adv.visceralFat) || null;
+  const _advSM   = parseFloat(_adv.skelMuscle)  || null;
+  const _advMMlb = parseFloat(_adv.muscleMass)  || null;
+  const _advSubF = parseFloat(_adv.subFat)      || null;
+  const _advBW   = parseFloat(_adv.bodyWater)   || null;
+  const _advBM   = parseFloat(_adv.boneMass)    || null;
+  const _advBMR  = parseFloat(_adv.bmr)         || null;
+  const _sex     = profile.sex;
+  const _wt      = profile.weight;
+
+  // Does the user's biomarker profile specifically call for this compound?
+  // Mirrors the engine's advanced-stat scoring blocks above.
+  const isAdvStatMatch = (c) => {
+    // High visceral fat → fat-loss / metabolic compounds
+    if (_advVF !== null) {
+      if (_advVF >= 10 && (c.id === "tesamorelin" || c.id === "fragment176")) return true;
+      if (_advVF >= 12 && (c.category === "Weight Loss" || c.category === "Fat Loss" || c.category === "Metabolic")) return true;
+    }
+    // Low skeletal muscle → GH axis
+    if (_advSM !== null) {
+      const lowT = _sex === "female" ? 34 : 38;
+      if (_advSM < lowT && (c.category === "Growth Hormone" || c.id === "tesamorelin")) return true;
+      const highT = _sex === "female" ? 42 : 46;
+      if (_advSM > highT && c.category === "Recovery") return true;
+    }
+    // Low muscle mass ratio → GH axis
+    if (_advMMlb !== null && _wt) {
+      const pct = (_advMMlb / _wt) * 100;
+      if (pct < 40 && (c.category === "Growth Hormone" || c.id === "tesamorelin")) return true;
+    }
+    // High subQ fat → GHK-Cu (skin/collagen mechanism)
+    if (_advSubF !== null && _advSubF > 20 && c.id === "ghkcu") return true;
+    // Low body water → GH axis
+    if (_advBW !== null) {
+      const lowW = _sex === "female" ? 45 : 50;
+      if (_advBW < lowW && c.category === "Growth Hormone") return true;
+    }
+    // Low bone mass → GH peptides (IGF-1)
+    if (_advBM !== null && _advBM < 6 && (c.category === "Growth Hormone" || c.id === "tesamorelin")) return true;
+    // Low BMR → metabolic compounds
+    if (_advBMR !== null && _advBMR < 1400) {
+      if (c.id === "tesamorelin") return true;
+      if (c.category === "Weight Loss" || c.category === "Metabolic" || c.category === "Fat Loss") return true;
+    }
+    return false;
+  };
+
+  const recommended = recommendations.filter(r => {
+    const c = r.compound;
+    const bf = profile.bodyFat;
+
+    // Must have a goal match OR an advanced-biomarker match
+    const hasGoalMatch = r.goalOverlap && r.goalOverlap.length > 0;
+    const hasAdvMatch  = isAdvStatMatch(c);
+    if (!hasGoalMatch && !hasAdvMatch) return false;
+
+    // BF must be inside the compound's stated suitability range
+    if (bf < c.suitability.minBf) return false;
+    if (bf > c.suitability.maxBf) return false;
+
+    // Skip compounds whose contraindications fire for this user
+    if (c.contraindications && c.contraindications.includes("below15bf") && bf < 15) return false;
+    if (c.contraindications && c.contraindications.includes("below22bf_glp1") && bf < 22) return false;
+
+    // Skip experimental-only and warning-flagged compounds (need explicit opt-in)
+    if (c.experienceLevel === "experimental_only") return false;
+    if (c.displayWarning) return false;
+
+    return true;
+  });
+
+  const recommendedIds = new Set(recommended.map(r => r.compound.id));
+  const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
 
   if (showTransform) {
     return (
@@ -1263,8 +1368,13 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
 
       {/* Recommended */}
       <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
-        Recommended for You — {recommended.length} compounds
+        Recommended for You — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
       </div>
+      {recommended.length === 0 && (
+        <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
+          No compounds match your current profile and goals. Try adjusting your goals via Reset, or browse the full library below.
+        </div>
+      )}
       {recommended.map(rec => (
         <CompoundCard
           key={rec.compound.id}
@@ -1274,20 +1384,40 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         />
       ))}
 
-      {/* Blocked */}
-      {blocked.length > 0 && (
+      {/* Browse all — collapsible */}
+      {otherCompounds.length > 0 && (
         <>
-          <div style={{ ...S.label, marginBottom: 12, marginTop: 20, color: "rgba(255,255,255,0.25)" }}>
-            Not Recommended at Your Profile
-          </div>
-          {blocked.map(rec => (
-            <CompoundCard
-              key={rec.compound.id}
-              rec={rec}
-              isSelected={false}
-              onToggle={() => {}}
-            />
-          ))}
+          <button
+            onClick={() => setShowOtherCompounds(v => !v)}
+            style={{
+              ...S.btnOutline,
+              marginTop: 20,
+              marginBottom: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "13px 16px",
+              fontSize: 13
+            }}
+          >
+            <span>{showOtherCompounds ? "Hide" : "Browse"} all compounds ({otherCompounds.length} more)</span>
+            <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: showOtherCompounds ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+          </button>
+          {showOtherCompounds && (
+            <>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>
+                These compounds fall outside your goals, body fat range, or experience tier. Some are educational reference only — read the full profile before considering.
+              </p>
+              {otherCompounds.map(rec => (
+                <CompoundCard
+                  key={rec.compound.id}
+                  rec={rec}
+                  isSelected={selectedCompounds.includes(rec.compound.id)}
+                  onToggle={() => toggleCompound(rec.compound.id)}
+                />
+              ))}
+            </>
+          )}
         </>
       )}
 
