@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import StackIntelligence, { analyzeStack } from "./StackIntelligence";
+import StackGenerator from "./StackGenerator";
 import AlkiProtocolQA from "./AlkiProtocolQA";
 import CycleTimeline from "./CycleTimeline";
 import { EXPANDED_COMPOUNDS } from "./data/compounds-expanded";
@@ -1318,6 +1319,16 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </div>
         </div>
       </div>
+
+      {/* Stack Generator — compose fresh stacks for the user's profile */}
+      <StackGenerator
+        profile={profile}
+        compoundCatalog={COMPOUNDS}
+        onLoadStack={(compoundIds) => {
+          setSelectedCompounds(compoundIds);
+          setShowTransform(false);
+        }}
+      />
 
       {/* Transform CTA */}
       {selectedCompounds.length > 0 && (
