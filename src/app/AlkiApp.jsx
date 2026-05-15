@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import StackIntelligence, { analyzeStack } from "./StackIntelligence";
 import AlkiProtocolQA from "./AlkiProtocolQA";
+import CycleTimeline from "./CycleTimeline";
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — ἀλκή — The AI-Powered Peptide Intelligence Platform
@@ -847,7 +848,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
   );
 }
 
-function Dashboard({ profile, onReset, onQA }) {
+function Dashboard({ profile, onReset, onQA, onTimeline }) {
   const [selectedCompounds, setSelectedCompounds] = useState([]);
   const [showTransform, setShowTransform] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
@@ -1015,7 +1016,7 @@ function Dashboard({ profile, onReset, onQA }) {
           style={{
             ...S.btn,
             ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
-            marginBottom: 16,
+            marginBottom: 12,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -1025,6 +1026,23 @@ function Dashboard({ profile, onReset, onQA }) {
           {stackAnalysis.isBlocked
             ? "Resolve Contraindications to Continue"
             : `View Transformation (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
+        </button>
+      )}
+
+      {/* Cycle Timeline CTA */}
+      {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
+        <button
+          onClick={() => onTimeline(selectedCompounds)}
+          style={{
+            ...S.btnOutline,
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }}
+        >
+          View Cycle Timeline →
         </button>
       )}
 
@@ -1078,6 +1096,7 @@ function Dashboard({ profile, onReset, onQA }) {
 export default function AlkiApp() {
   const [screen, setScreen] = useState("splash");
   const [profile, setProfile] = useState(null);
+  const [timelineStack, setTimelineStack] = useState([]);
 
   return (
     <div style={S.app}>
@@ -1091,10 +1110,18 @@ export default function AlkiApp() {
           profile={profile}
           onReset={() => { setProfile(null); setScreen("splash"); }}
           onQA={() => setScreen("qa")}
+          onTimeline={(stack) => { setTimelineStack(stack); setScreen("timeline"); }}
         />
       )}
       {screen === "qa" && (
         <AlkiProtocolQA onBack={() => setScreen("dashboard")} />
+      )}
+      {screen === "timeline" && (
+        <CycleTimeline
+          stack={timelineStack}
+          initialCycleLength={12}
+          onBack={() => setScreen("dashboard")}
+        />
       )}
     </div>
   );
