@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
+import StackIntelligence, { analyzeStack } from "./StackIntelligence";
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — ἀλκή — The AI-Powered Peptide Intelligence Platform
@@ -850,6 +851,7 @@ function Dashboard({ profile, onReset }) {
   const [showTransform, setShowTransform] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
+  const stackAnalysis = useMemo(() => analyzeStack(selectedCompounds, profile), [selectedCompounds, profile]);
 
   useEffect(() => { setTimeout(() => setAnimateIn(true), 100); }, []);
 
@@ -994,17 +996,31 @@ function Dashboard({ profile, onReset }) {
 
       {/* Transform CTA */}
       {selectedCompounds.length > 0 && (
-        <button onClick={() => setShowTransform(true)} style={{
-          ...S.btn,
-          marginBottom: 16,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8
-        }}>
-          View Transformation ({selectedCompounds.length} compound{selectedCompounds.length > 1 ? "s" : ""}) →
+        <button
+          onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+          disabled={stackAnalysis.isBlocked}
+          style={{
+            ...S.btn,
+            ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }}
+        >
+          {stackAnalysis.isBlocked
+            ? "Resolve Contraindications to Continue"
+            : `View Transformation (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
         </button>
       )}
+
+      {/* Stack Intelligence Engine */}
+      <StackIntelligence
+        stackIds={selectedCompounds}
+        userProfile={profile}
+        onRemoveCompound={toggleCompound}
+      />
 
       {/* Recommended */}
       <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
