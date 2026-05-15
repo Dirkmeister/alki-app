@@ -163,7 +163,18 @@ const GOALS = [
 // No blocking. Every compound is always available. Ranked by relevance.
 // Advisories inform; they never gatekeep.
 function getRecommendations(profile) {
-  const { sex, age, heightFt, heightIn, weight, bodyFat, goals } = profile;
+  const { sex, age, heightFt, heightIn, weight, bodyFat, goals, adv = {} } = profile;
+
+  // Parse optional advanced body stats — only applied when user actually entered them
+  const visceralFat  = parseFloat(adv.visceralFat)  || null;
+  const skelMuscle   = parseFloat(adv.skelMuscle)   || null;
+  const muscleMassLb = parseFloat(adv.muscleMass)   || null;
+  const fatFreeMass  = parseFloat(adv.fatFreeMass)  || null;
+  const subFat       = parseFloat(adv.subFat)       || null;
+  const bodyWater    = parseFloat(adv.bodyWater)    || null;
+  const boneMass     = parseFloat(adv.boneMass)     || null;
+  const bmr          = parseFloat(adv.bmr)          || null;
+
   const results = [];
 
   for (const compound of COMPOUNDS) {
@@ -193,6 +204,73 @@ function getRecommendations(profile) {
     if (goals.includes("anti_aging") && compound.id === "ghkcu") score += 20;
     if (goals.includes("skin") && compound.id === "ghkcu") score += 25;
     if (goals.includes("muscle") && compound.id === "ipacjc") score += 15;
+
+    // ── Advanced body stats signals (only fire when user provided the value) ──
+
+    // High visceral fat → Tesamorelin is FDA-approved specifically for this mechanism
+    if (visceralFat !== null) {
+      if (visceralFat >= 10 && compound.id === "tesamorelin") {
+        score += 25;
+        flags.push(`High visceral fat (level ${visceralFat}) — Tesamorelin's FDA-approved mechanism targets visceral adipose specifically.`);
+      }
+      if (visceralFat >= 12 && compound.category === "Weight Loss") {
+        score += 12;
+        if (!flags.some(f => f.includes("visceral"))) flags.push(`Visceral fat level ${visceralFat} supports GLP-1 prioritization.`);
+      }
+    }
+
+    // Low skeletal muscle % → prioritize GH peptides for lean mass
+    // Sex-adjusted: men optimal 38–44%, women 34–40%
+    if (skelMuscle !== null) {
+      const lowThreshold = sex === "female" ? 34 : 38;
+      if (skelMuscle < lowThreshold) {
+        if (compound.id === "ipacjc") { score += 20; flags.push(`Low skeletal muscle % (${skelMuscle}%) — GH stack prioritized to support lean mass.`); }
+        if (compound.id === "tesamorelin") score += 10;
+      }
+      if (skelMuscle > (sex === "female" ? 42 : 46)) {
+        if (compound.id === "bpc157" || compound.id === "tb500") score += 8;
+      }
+    }
+
+    // Low muscle mass ratio relative to body weight
+    if (muscleMassLb !== null && weight !== null) {
+      const musclePct = (muscleMassLb / weight) * 100;
+      if (musclePct < 40 && (compound.id === "ipacjc" || compound.id === "tesamorelin")) {
+        score += 10;
+        if (!flags.some(f => f.includes("muscle"))) flags.push("Low muscle mass ratio — GH peptides prioritized.");
+      }
+    }
+
+    // High subcutaneous fat → GHK-Cu for skin quality
+    if (subFat !== null && subFat > 20 && compound.id === "ghkcu") {
+      score += 12;
+      flags.push(`Elevated subcutaneous fat (${subFat}%) — GHK-Cu supports collagen and skin quality.`);
+    }
+
+    // Low body water % → GH axis support (GH influences cellular hydration/tissue quality)
+    if (bodyWater !== null) {
+      const lowWater = sex === "female" ? 45 : 50;
+      if (bodyWater < lowWater && compound.id === "ipacjc") {
+        score += 8;
+        flags.push(`Low body water % (${bodyWater}%) — GH axis support relevant for tissue quality.`);
+      }
+    }
+
+    // Low bone mass → GH peptides (IGF-1 is a key signal for bone density maintenance)
+    if (boneMass !== null && boneMass < 6) {
+      if (compound.id === "ipacjc" || compound.id === "tesamorelin") {
+        score += 10;
+        flags.push(`Low bone mass (${boneMass} lbs) — IGF-1 stimulation from GH peptides supports bone density.`);
+      }
+    }
+
+    // Low BMR → metabolic compounds and GH peptides to support resting metabolism
+    if (bmr !== null && bmr < 1400) {
+      if (compound.id === "tesamorelin") { score += 12; flags.push(`Low BMR (${bmr} kcal/day) — Tesamorelin's GH stimulation supports metabolic rate.`); }
+      if (compound.category === "Weight Loss") score += 8;
+    }
+
+    // ── End advanced signals ──────────────────────────────────────────────────
 
     // Stack synergy notes
     let stackNotes = [];
@@ -581,9 +659,14 @@ function AgeBlocked() {
 
 function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0);
-  const [data, setData] = useState({ sex: "", age: "", heightFt: "5", heightIn: "10", weight: "", bodyFat: "", goals: [] });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [data, setData] = useState({
+    sex: "", age: "", heightFt: "5", heightIn: "10", weight: "", bodyFat: "", goals: [],
+    adv: { skelMuscle: "", fatFreeMass: "", subFat: "", visceralFat: "", bodyWater: "", muscleMass: "", boneMass: "", bmr: "" }
+  });
 
   const set = (k, v) => setData(prev => ({ ...prev, [k]: v }));
+  const setAdv = (k, v) => setData(prev => ({ ...prev, adv: { ...prev.adv, [k]: v } }));
   const toggleGoal = (g) => setData(prev => ({
     ...prev,
     goals: prev.goals.includes(g) ? prev.goals.filter(x => x !== g) : [...prev.goals, g]
@@ -649,18 +732,92 @@ function Onboarding({ onComplete }) {
       </button>
     </div>,
 
-    // Step 2: Body fat
+    // Step 2: Body fat + Advanced accordion
     <div key="bf">
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Body Fat Percentage</h2>
-      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>Your body fat percentage is the single most important variable for compound selection. Estimate as accurately as possible.</p>
-      <input type="number" placeholder="18" value={data.bodyFat} onChange={e => set("bodyFat", e.target.value)} style={{ ...S.input, fontSize: 28, textAlign: "center", fontWeight: 700 }} min="3" max="60" />
+      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>The single most important variable for compound selection. Estimate as accurately as possible.</p>
+      <input type="number" placeholder="18" value={data.bodyFat} onChange={e => set("bodyFat", e.target.value)} style={{ ...S.input, fontSize: 32, textAlign: "center", fontWeight: 700 }} min="3" max="60" />
       <div style={{ textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 6 }}>%</div>
       {bfFeedback && (
         <div style={{ marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "rgba(255,255,255,0.04)", borderLeft: `3px solid ${bfFeedback.color}`, fontSize: 13, lineHeight: 1.6, color: "rgba(255,255,255,0.7)" }}>
           {bfFeedback.text}
         </div>
       )}
-      <button style={{ ...S.btn, marginTop: 24, ...(!data.bodyFat ? S.btnDisabled : {}) }} disabled={!data.bodyFat} onClick={() => setStep(3)}>
+
+      {/* ── Advanced body stats accordion ── */}
+      {(() => {
+        const advFields = [
+          { key: "skelMuscle",  label: "Skeletal Muscle",  unit: "%",    placeholder: "42.3", hint: "From InBody / DEXA" },
+          { key: "fatFreeMass", label: "Fat Free Mass",    unit: "lbs",  placeholder: "148",  hint: "Body weight minus fat" },
+          { key: "subFat",      label: "Subcutaneous Fat", unit: "%",    placeholder: "14.2", hint: "Fat under the skin" },
+          { key: "visceralFat", label: "Visceral Fat",     unit: "lvl",  placeholder: "8",    hint: "Organ fat (1–20 scale)" },
+          { key: "bodyWater",   label: "Body Water",       unit: "%",    placeholder: "57.4", hint: "Total body water %" },
+          { key: "muscleMass",  label: "Muscle Mass",      unit: "lbs",  placeholder: "138",  hint: "Skeletal muscle weight" },
+          { key: "boneMass",    label: "Bone Mass",        unit: "lbs",  placeholder: "7.2",  hint: "Bone mineral content" },
+          { key: "bmr",         label: "BMR",              unit: "kcal", placeholder: "1840", hint: "Basal metabolic rate / day" },
+        ];
+        const filledCount = Object.values(data.adv).filter(Boolean).length;
+        return (
+          <div style={{ marginTop: 20 }}>
+            <button
+              onClick={() => setAdvancedOpen(v => !v)}
+              style={{
+                width: "100%", padding: "13px 16px",
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: advancedOpen ? "10px 10px 0 0" : 10,
+                color: "rgba(255,255,255,0.45)",
+                fontFamily: "inherit", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "space-between"
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span>⚗️</span>
+                <span>Advanced body stats</span>
+                {filledCount > 0 && (
+                  <span style={{ background: "rgba(34,214,138,0.15)", color: "#22d68a", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
+                    {filledCount}/8
+                  </span>
+                )}
+              </span>
+              <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: advancedOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+            </button>
+            <div style={{
+              overflow: "hidden",
+              maxHeight: advancedOpen ? 700 : 0,
+              transition: "max-height 0.35s ease"
+            }}>
+              <div style={{
+                border: "1px solid rgba(255,255,255,0.1)", borderTop: "none",
+                borderRadius: "0 0 10px 10px", padding: "16px 14px 14px"
+              }}>
+                <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, margin: "0 0 14px", lineHeight: 1.5 }}>
+                  Optional — from an InBody machine, DEXA scan, or smart scale. Each field you fill in sharpens your recommendations.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {advFields.map(({ key, label, unit, placeholder, hint }) => (
+                    <div key={key}>
+                      <label style={{ ...S.label, fontSize: 10, marginBottom: 4 }}>
+                        {label} <span style={{ color: "rgba(255,255,255,0.2)" }}>{unit}</span>
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={placeholder}
+                        value={data.adv[key]}
+                        onChange={e => setAdv(key, e.target.value)}
+                        style={{ ...S.input, padding: "10px 12px", fontSize: 14 }}
+                      />
+                      <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginTop: 3 }}>{hint}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <button style={{ ...S.btn, marginTop: 20, ...(!data.bodyFat ? S.btnDisabled : {}) }} disabled={!data.bodyFat} onClick={() => setStep(3)}>
         Continue
       </button>
     </div>,
@@ -692,7 +849,8 @@ function Onboarding({ onComplete }) {
           heightIn: parseInt(data.heightIn),
           weight: parseFloat(data.weight),
           bodyFat: parseFloat(data.bodyFat),
-          goals: data.goals
+          goals: data.goals,
+          adv: data.adv
         };
         onComplete(profile);
       }}>
