@@ -3,6 +3,13 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import StackIntelligence, { analyzeStack } from "./StackIntelligence";
 import AlkiProtocolQA from "./AlkiProtocolQA";
 import CycleTimeline from "./CycleTimeline";
+import { EXPANDED_COMPOUNDS } from "./data/compounds-expanded";
+// ─────────────────────────────────────────────────────────────
+// The import above adds 63 compounds via `data/compounds-expanded.js`.
+// The original 8 compounds remain inline below, untouched.
+// To revert: remove this import line AND remove the
+// `...EXPANDED_COMPOUNDS` spread at the end of the COMPOUNDS array.
+// ─────────────────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — ἀλκή — The AI-Powered Peptide Intelligence Platform
@@ -146,7 +153,12 @@ const COMPOUNDS = [
     suitability: { minBf: 0, maxBf: 100, goals: ["performance"] },
     contraindications: [],
     visualChange: false
-  }
+  },
+  // ─────────────────────────────────────────────────────────
+  // Expansion (63 compounds). Source: ./data/compounds-expanded.js
+  // To revert: remove the line below and the import at the top.
+  // ─────────────────────────────────────────────────────────
+  ...EXPANDED_COMPOUNDS
 ];
 
 const GOALS = [
@@ -657,10 +669,19 @@ function AgeBlocked() {
   );
 }
 
-function Onboarding({ onComplete }) {
-  const [step, setStep] = useState(0);
+function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 }) {
+  const [step, setStep] = useState(initialStep);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [data, setData] = useState({
+  const [data, setData] = useState(prefill ? {
+    sex: prefill.sex || "",
+    age: prefill.age != null ? String(prefill.age) : "",
+    heightFt: prefill.heightFt != null ? String(prefill.heightFt) : "5",
+    heightIn: prefill.heightIn != null ? String(prefill.heightIn) : "10",
+    weight: prefill.weight != null ? String(prefill.weight) : "",
+    bodyFat: prefill.bodyFat != null ? String(prefill.bodyFat) : "",
+    goals: prefill.goals || [],
+    adv: prefill.adv || { skelMuscle: "", fatFreeMass: "", subFat: "", visceralFat: "", bodyWater: "", muscleMass: "", boneMass: "", bmr: "" }
+  } : {
     sex: "", age: "", heightFt: "5", heightIn: "10", weight: "", bodyFat: "", goals: [],
     adv: { skelMuscle: "", fatFreeMass: "", subFat: "", visceralFat: "", bodyWater: "", muscleMass: "", boneMass: "", bmr: "" }
   });
@@ -865,14 +886,24 @@ function Onboarding({ onComplete }) {
     <div style={S.inner}>
       {/* Progress bar */}
       <div style={{ padding: "16px 0 8px", flexShrink: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          {step > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
+          {step > 0 ? (
             <button onClick={() => setStep(step - 1)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 14, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
               ← Back
             </button>
-          )}
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>
-            Step {step + 1} of {steps.length}
+          ) : <span />}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginLeft: "auto" }}>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+              Step {step + 1} of {steps.length}
+            </div>
+            {onExitHome && (
+              <button
+                onClick={onExitHome}
+                style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.5)", fontSize: 11, cursor: "pointer", padding: "5px 10px", borderRadius: 8, fontFamily: "inherit", fontWeight: 600, letterSpacing: "0.02em" }}
+              >
+                Exit to Home
+              </button>
+            )}
           </div>
         </div>
         <div style={{ height: 2, background: "rgba(255,255,255,0.08)", borderRadius: 1 }}>
@@ -898,7 +929,13 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
     "Fat Loss": "#f59e0b",
     "Weight Loss": "#ef4444",
     "Anti-Aging": "#ec4899",
-    Performance: "#06b6d4"
+    Performance: "#06b6d4",
+    SARM: "#ea580c",
+    Nootropic: "#6366f1",
+    "Cycle Support": "#10b981",
+    "Hair Support": "#14b8a6",
+    Metabolic: "#eab308",
+    Hormonal: "#f43f5e"
   };
   const catColor = catColors[c.category] || "#888";
 
@@ -1274,7 +1311,14 @@ export default function AlkiApp() {
       {screen === "splash" && <SplashScreen onEnter={() => setScreen("agegate")} />}
       {screen === "agegate" && <AgeGate onConfirm={() => setScreen("onboarding")} onDeny={() => setScreen("blocked")} />}
       {screen === "blocked" && <AgeBlocked />}
-      {screen === "onboarding" && <Onboarding onComplete={(p) => { setProfile(p); setScreen("dashboard"); }} />}
+      {screen === "onboarding" && (
+        <Onboarding
+          onComplete={(p) => { setProfile(p); setScreen("dashboard"); }}
+          onExitHome={() => { setProfile(null); setSelectedCompounds([]); setShowTransform(false); setScreen("splash"); }}
+          prefill={profile}
+          initialStep={profile ? 3 : 0}
+        />
+      )}
       {screen === "dashboard" && profile && (
         <Dashboard
           profile={profile}
@@ -1282,7 +1326,7 @@ export default function AlkiApp() {
           setSelectedCompounds={setSelectedCompounds}
           showTransform={showTransform}
           setShowTransform={setShowTransform}
-          onReset={() => { setProfile(null); setSelectedCompounds([]); setShowTransform(false); setScreen("splash"); }}
+          onReset={() => { setSelectedCompounds([]); setShowTransform(false); setScreen("onboarding"); }}
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
         />
