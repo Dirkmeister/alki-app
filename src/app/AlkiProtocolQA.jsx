@@ -5,10 +5,15 @@ import { useState, useMemo } from "react";
 // ALKI — PROTOCOL Q&A ENGINE
 // Contextual FAQ surface: per-compound, per-goal, stack-aware, general
 // Drop in as a screen from Dashboard or Transform view.
+//
 // Props:
 //   onBack         — () => void   — back navigation callback
 //   activeCompound — string|null  — pre-select a compound tab
 //   activeGoal     — string|null  — pre-select a goal tab
+//
+// Updated: reflects 71-compound database (original 8 + 63 expanded),
+// new SARMs/nootropics/cycle support/hair/metabolic categories,
+// MK-677, CycleTimeline, StackGenerator, Body3DAvatar additions.
 // ═══════════════════════════════════════════════════════════
 
 const DISCLAIMER =
@@ -16,6 +21,8 @@ const DISCLAIMER =
 
 // ── COMPOUND FAQ DATA ──────────────────────────────────────
 const COMPOUND_FAQS = {
+
+  // ── PEPTIDES ───────────────────────────────────────────
   "BPC-157": {
     category: "Recovery",
     tagline: "Tissue repair, gut healing, tendon regeneration",
@@ -31,35 +38,27 @@ const COMPOUND_FAQS = {
       },
       {
         q: "Do I need to cycle BPC-157, or can I run it continuously?",
-        a: "BPC-157 is non-suppressive, non-hormonal, and has no known dependency or tolerance mechanism. Continuous use during an active injury or recovery phase is the common approach. Many users run it for 4–8 weeks, take a break, and reassess. There is no established clinical reason a cycle break is mandatory — this is a protocol preference, not a safety requirement. Extended continuous use has not been studied in humans at therapeutic doses, so periodic breaks are a reasonable precaution.",
+        a: "BPC-157 is non-suppressive, non-hormonal, and has no known dependency or tolerance mechanism. Continuous use during an active injury or recovery phase is the common approach. Many users run it for 4–8 weeks, take a break, and reassess. There is no established clinical reason a cycle break is mandatory — this is a protocol preference, not a safety requirement.",
       },
       {
-        q: "SubQ or intramuscular (IM) injection — which is better?",
+        q: "SubQ or IM injection — which is better?",
         a: "SubQ injection into the fat layer near the injury site is the standard and preferred route. It's lower-risk, less painful, and clinically adequate. IM may theoretically deliver faster local concentration but carries higher discomfort and minor complication risk. Insulin needles (27–31g, 0.5 inch) are standard for SubQ. For gut applications, oral administration is a viable alternative.",
       },
       {
         q: "Can I stack BPC-157 with TB-500?",
-        a: "Yes — this is one of the most well-regarded peptide combinations. BPC-157 provides localized angiogenesis and tissue repair at the injury site. TB-500 provides systemic healing, stem cell mobilization, and anti-inflammatory signaling throughout the body. They hit different biological targets with no receptor overlap. The combination is particularly effective for stubborn tendon, ligament, and joint injuries where both local and systemic healing support is beneficial.",
+        a: "Yes — this is one of the most well-regarded combinations. BPC-157 provides localized angiogenesis and tissue repair at the injury site. TB-500 provides systemic healing, stem cell mobilization, and anti-inflammatory signaling throughout the body. They hit different biological targets with no receptor overlap. The BPC/TB blend pre-mix is also available and simplifies dosing.",
       },
       {
-        q: "Does BPC-157 need to be reconstituted? How do I do that?",
-        a: "Yes. BPC-157 is lyophilized (freeze-dried powder) and must be reconstituted with bacteriostatic water before injection. Add bacteriostatic water slowly along the inside wall of the vial — not directly onto the powder. Gently swirl (do not shake). Example: 2mL bacteriostatic water into a 5mg vial gives 2,500 mcg/mL; drawing 0.2mL gives a 500 mcg dose. Refrigerate reconstituted peptide; use within 30 days.",
+        q: "How does BPC-157 interact with a SARM cycle?",
+        a: "BPC-157 is one of the most universally recommended additions to any SARM cycle. SARMs increase training intensity and load, which puts significant stress on tendons and ligaments that lag behind the rapid strength gains. BPC-157 specifically addresses connective tissue integrity via angiogenesis, reducing injury risk during the cycle. It has no interaction with androgen receptors and does not affect the HPG axis. It runs throughout the cycle and does not require stopping during PCT.",
       },
       {
         q: "Should I get any bloodwork before starting BPC-157?",
-        a: "BPC-157 is non-hormonal and non-suppressive, so a full hormone panel is not required. Basic pre-protocol bloodwork worth considering: CMP (comprehensive metabolic panel) for liver and kidney baselines, and a CBC. This is precautionary due diligence. If you're stacking BPC-157 with suppressive compounds, bloodwork requirements are driven by those compounds, not BPC-157 itself.",
+        a: "BPC-157 is non-hormonal and non-suppressive, so a full hormone panel is not required. Basic pre-protocol bloodwork worth considering: CMP (comprehensive metabolic panel) for liver and kidney baselines, and a CBC. If you're stacking BPC-157 with suppressive compounds (SARMs, etc.), bloodwork requirements are driven by those compounds, not BPC-157 itself.",
       },
       {
         q: "Is BPC-157 liver-toxic?",
-        a: "No liver toxicity has been documented with BPC-157 at standard doses. Preclinical data actually suggests hepatoprotective properties. It does not share the liver-stress profile of oral SARMs like YK-11 or LGD-4033. Standard liver support compounds (TUDCA, NAC) are not indicated for BPC-157 use alone.",
-      },
-      {
-        q: "Are there any documented contraindications or safety concerns?",
-        a: "No human clinical trials have been completed for BPC-157. All evidence is preclinical or anecdotal. Key consideration: some theoretical concern about angiogenesis in individuals with active cancers or pre-cancerous conditions, since new blood vessel formation could theoretically support tumor growth. Individuals with active malignancy should not use BPC-157 without physician guidance. Not appropriate for pregnant or breastfeeding individuals.",
-      },
-      {
-        q: "Will BPC-157 show up on a drug test?",
-        a: "BPC-157 is not currently on the WADA prohibited list (unlike TB-500, which is WADA-banned). For standard employment or legal drug testing, BPC-157 is not screened for. Athletes subject to sports drug testing should verify their specific sport's governing body rules, as lists evolve.",
+        a: "No liver toxicity has been documented with BPC-157 at standard doses. Preclinical data actually suggests hepatoprotective properties. It does not share the liver-stress profile of oral SARMs like YK-11 or LGD-4033. Standard liver support compounds (TUDCA, NAC) are not indicated for BPC-157 use alone, though they are required if the stack includes hepatotoxic compounds.",
       },
     ],
   },
@@ -75,7 +74,7 @@ const COMPOUND_FAQS = {
       },
       {
         q: "How is TB-500 dosed and how often?",
-        a: "Standard research dosing: a loading phase of 4–8mg per week (split into two injections of 2–2.5mg each) for the first 4–6 weeks, followed by a maintenance phase of 2–4mg per week. Some protocols use front-loaded weekly dosing (4–5mg/week) during loading. Subcutaneous injection is standard. The twice-weekly split is preferred for more consistent plasma levels.",
+        a: "Standard research dosing: loading phase of 4–8mg per week (two injections of 2–2.5mg each) for 4–6 weeks, followed by a maintenance phase of 2–4mg per week. Subcutaneous injection is standard. The twice-weekly split is preferred for more consistent plasma levels during the critical initial repair window.",
       },
       {
         q: "Can TB-500 be used alone, or does it need BPC-157?",
@@ -83,19 +82,11 @@ const COMPOUND_FAQS = {
       },
       {
         q: "Is TB-500 WADA-banned?",
-        a: "Yes. TB-500 (Thymosin Beta-4) is on the WADA prohibited list under peptide hormones and growth factors. Competitive athletes subject to anti-doping testing should not use it. Note that WADA bans extend to substances used both in and out of competition for certain categories. Always verify current prohibited list status with your sport's governing body.",
+        a: "Yes. TB-500 (Thymosin Beta-4) is on the WADA prohibited list under peptide hormones and growth factors. Competitive athletes subject to anti-doping testing should not use it. Always verify current prohibited list status with your sport's governing body.",
       },
       {
-        q: "How long before TB-500 produces noticeable effects?",
-        a: "Most users report noticeable improvement in mobility, flexibility, and reduced inflammation within 2–4 weeks of consistent use. More significant structural repair — tendon integrity, muscle tear recovery — typically shows clear progress by weeks 4–8. TB-500's systemic nature means it can simultaneously improve multiple areas, which is one of its most valued properties.",
-      },
-      {
-        q: "Are there cancer concerns with TB-500?",
-        a: "This is a legitimate consideration. Thymosin Beta-4 plays a role in cell migration and angiogenesis — mechanisms that, in the context of malignant cells, could theoretically support tumor growth or metastasis. This has not been demonstrated in clinical practice at research peptide doses, but the theoretical mechanism exists. Individuals with active cancer or a recent cancer diagnosis should not use TB-500 without oncology consultation.",
-      },
-      {
-        q: "Can TB-500 help with neurological injury?",
-        a: "There is preclinical (animal) research suggesting Thymosin Beta-4 has neuroprotective and neurogenic properties — including research in TBI and stroke models. This is an emerging research area with no human clinical data. Users exploring TB-500 for neurological injury should be aware this is extrapolation from animal models.",
+        q: "Does TB-500 run through a SARM cycle and PCT?",
+        a: "Yes — TB-500 is non-suppressive, non-hormonal, and has no interaction with the HPG axis. It can run throughout a SARM cycle, into PCT, and beyond. Many users treat the BPC-157/TB-500 stack as a continuous recovery layer that operates independently of whatever primary compound cycle they are running.",
       },
     ],
   },
@@ -107,15 +98,15 @@ const COMPOUND_FAQS = {
     faqs: [
       {
         q: "Why take Ipamorelin and CJC-1295 together instead of separately?",
-        a: "They work through complementary, synergistic mechanisms. CJC-1295 (No DAC) is a GHRH analog — it signals the pituitary to be ready to release GH. Ipamorelin is a GHRP (ghrelin receptor agonist) that directly triggers the GH pulse. Combined, the resulting GH release is 5–10x larger than either compound produces alone. It's a two-key system: GHRH loads the gun, GHRP pulls the trigger. The CJC/Ipamorelin stack at 100/100–200/200 mcg pre-sleep is the gold standard GH peptide protocol.",
+        a: "They work through complementary, synergistic mechanisms. CJC-1295 No DAC is a GHRH analog — it signals the pituitary to be ready to release GH. Ipamorelin is a GHRP that directly triggers the GH pulse. Combined, the resulting GH release is 5–10x larger than either compound produces alone. It's a two-key system: GHRH loads the gun, GHRP pulls the trigger. The CJC/Ipamorelin stack at 100/100–200/200 mcg pre-sleep is the gold standard GH peptide protocol.",
       },
       {
         q: "CJC-1295 with DAC vs. without DAC — which should I use?",
-        a: "For most users: CJC-1295 No DAC. No DAC produces sharp, physiological GH pulses that mimic natural pulsatile release — more effective for body composition and better for long-term pituitary health. CJC-1295 with DAC has an ~8-day half-life providing sustained GH elevation, but can lead to pituitary desensitization with extended use. No DAC is dosed pre-sleep; DAC is weekly. Default to No DAC.",
+        a: "For most users: CJC-1295 No DAC. No DAC produces sharp, physiological GH pulses that mimic natural pulsatile release — more effective for body composition and better for long-term pituitary health. CJC-1295 with DAC has an ~8-day half-life providing sustained GH elevation, but can lead to pituitary desensitization with extended use. No DAC is dosed pre-sleep (or 2–3x daily for more aggressive protocols). DAC is weekly — simpler schedule, but inferior physiology long-term.",
       },
       {
-        q: "What is Ipamorelin's advantage over other GHRPs like GHRP-6?",
-        a: "Ipamorelin is the cleanest GHRP available. Unlike GHRP-6 and GHRP-2, which stimulate cortisol and prolactin alongside GH release, Ipamorelin selectively triggers GH release with minimal to no impact on cortisol or prolactin. No unwanted stress hormone elevation, no prolactin-related side effects, no excessive hunger. For a standard recomp or recovery stack, Ipamorelin's selectivity makes it the preferred GHRP.",
+        q: "Can I stack this with MK-677?",
+        a: "Yes — MK-677 and CJC/Ipamorelin are a well-matched combination. MK-677 provides sustained baseline IGF-1 elevation 24 hours/day via oral dosing. CJC/Ipamorelin adds sharp, amplified GH pulses during the sleep window. These hit the GH axis through independent mechanisms with no receptor conflict: MK-677 acts on the ghrelin receptor continuously; CJC/Ipamorelin acts via GHRH + ghrelin pulsatile stimulation. The combined IGF-1 and GH output is meaningfully higher than either protocol alone.",
       },
       {
         q: "When should I take the stack and why pre-sleep?",
@@ -123,19 +114,55 @@ const COMPOUND_FAQS = {
       },
       {
         q: "How long does it take to notice effects?",
-        a: "GH peptide effects are not acute — they accumulate over weeks as GH and IGF-1 levels rise. Most users report improved sleep quality and vivid dreams within 1–2 weeks. Body composition changes typically become noticeable at 6–12 weeks. The full effect of a GH peptide stack requires 3–6 months to fully evaluate. Patience is required; this is not a compound with a rapid acute response.",
+        a: "GH peptide effects are not acute — they accumulate over weeks as GH and IGF-1 levels rise. Most users report improved sleep quality and vivid dreams within 1–2 weeks. Body composition changes typically become noticeable at 6–12 weeks. The full effect of a GH peptide stack requires 3–6 months to fully evaluate. Patience is required.",
       },
       {
         q: "Does the stack suppress natural GH production?",
         a: "No — GH peptides stimulate your own pituitary to release GH. They do not suppress the HPG or hypothalamic-pituitary-GH axis. When you stop the stack, your pituitary returns to baseline. This is a significant safety advantage over exogenous HGH, which suppresses pituitary output. GH peptides enhance what you already produce; they don't replace it.",
       },
       {
-        q: "What bloodwork should I run?",
-        a: "Pre-stack baseline: IGF-1 is the most useful marker — it reflects cumulative GH output and will rise with an effective protocol. Also run fasting glucose and HbA1c, as GH elevation can transiently reduce insulin sensitivity. After 8–12 weeks, repeat IGF-1 to confirm the protocol is working. If IGF-1 remains unchanged, assess dosing, timing, and compound quality.",
+        q: "Can I run this stack alongside a SARM cycle?",
+        a: "Yes — the GH stack is non-suppressive and has no interaction with androgen receptors. Running CJC/Ipamorelin alongside a SARM cycle adds IGF-1 elevation, improved recovery, and better sleep architecture to the anabolic environment created by the SARM. It continues through PCT without interruption. This is one of the most effective additions to a SARM protocol for users who want to maximize lean mass gains.",
+      },
+    ],
+  },
+
+  "MK-677": {
+    category: "GH Stack",
+    tagline: "The oral GH path — no injections, sustained IGF-1 elevation",
+    catColor: "#a855f7",
+    faqs: [
+      {
+        q: "What is MK-677 and how is it different from GH peptides?",
+        a: "MK-677 (Ibutamoren) is an orally active ghrelin receptor agonist — not a peptide, not a SARM, and not exogenous GH. It stimulates the pituitary to release GH and drives sustained 24-hour IGF-1 elevation. The key distinction from injectable GH peptides: MK-677 produces a more sustained, continuous IGF-1 signal rather than sharp pulsatile GH spikes. The key distinction from exogenous HGH: it works through your own pituitary and does not suppress natural GH output.",
       },
       {
-        q: "Can I use this stack while on a caloric deficit for fat loss?",
-        a: "Yes — GH is strongly lipolytic (fat-mobilizing), making GH peptide stacks particularly effective during fat loss phases. More importantly, GH is anti-catabolic to muscle tissue, helping preserve lean mass during a caloric deficit. Combining a GLP-1 (for appetite suppression) with a GH stack (for lean mass preservation) is the recommended body recomposition approach in the Alki protocol.",
+        q: "Is MK-677 a SARM?",
+        a: "No. MK-677 is commonly grouped with SARMs in the research compound market, but it has no interaction with androgen receptors. It is a ghrelin receptor agonist — a GH secretagogue. It does not cause HPG axis suppression, does not require PCT, and does not affect testosterone, LH, or FSH. The grouping is commercial convenience, not pharmacological accuracy.",
+      },
+      {
+        q: "Does MK-677 require PCT?",
+        a: "No. MK-677 is non-suppressive. It does not affect the HPG axis in any direction. It can be run continuously through SARM cycles, through PCT, and as a long-term standalone. This is one of its most valued properties — it is the one GH-axis compound that runs through everything without complicating post-cycle recovery.",
+      },
+      {
+        q: "What are the main side effects?",
+        a: "Significant appetite increase is the most prominent and consistent side effect — MK-677 elevates ghrelin, the primary hunger hormone. This is advantageous during a bulk, problematic during a cut. Water retention in the first 2 weeks is common as IGF-1 levels rise. Mild fasting glucose elevation occurs — individuals with pre-diabetes or insulin resistance should monitor glucose. Vivid dreams and improved sleep depth are commonly reported positives. Lethargy in the first few weeks as the body adapts is reported by some users.",
+      },
+      {
+        q: "What dose and timing work best?",
+        a: "25mg/day oral is the standard dose. Evening or pre-sleep administration is preferred — it aligns the ghrelin-driven GH pulse with the natural sleep-window GH release, and the elevated appetite from the ghrelin agonism is less disruptive at night. Effects take 4–8 weeks to fully develop as IGF-1 levels stabilize. Some users respond adequately at 12.5mg/day with fewer appetite and water retention side effects.",
+      },
+      {
+        q: "Can I stack MK-677 with SARMs?",
+        a: "Yes — this is one of the most popular and well-regarded combinations. MK-677 provides the GH/IGF-1 anabolic axis; SARMs (particularly RAD-140 or MK-2866) provide the androgen receptor anabolic axis. They hit completely independent mechanisms with no receptor conflict and no additive suppression (MK-677 adds zero suppression). MK-677 also runs through PCT while the SARM requires a recovery protocol — it bridges the cycle without interruption.",
+      },
+      {
+        q: "How does MK-677 compare to CJC-1295 + Ipamorelin?",
+        a: "Both drive GH/IGF-1 elevation. The key differences: MK-677 is oral (no injections), produces sustained 24-hour IGF-1 elevation, and is non-suppressive — it runs indefinitely. CJC/Ipamorelin is injectable, produces sharp physiological GH pulses aligned with sleep, and is more effective for sleep architecture improvement. Many advanced users combine both: MK-677 as the sustained IGF-1 baseline, CJC/Ipamorelin for sleep-window pulse amplification. The combination is meaningfully more effective than either alone.",
+      },
+      {
+        q: "What bloodwork should I run on MK-677?",
+        a: "IGF-1 is the primary marker — test baseline before starting and retest at 8–12 weeks to confirm the compound is working and quantify your response. IGF-1 should rise meaningfully; if unchanged, reassess dose or compound quality. Fasting glucose and HbA1c are worth monitoring given MK-677's insulin-opposing GH effects. Annual lipid panel is reasonable for any long-running protocol.",
       },
     ],
   },
@@ -147,11 +174,11 @@ const COMPOUND_FAQS = {
     faqs: [
       {
         q: "Is Tesamorelin actually FDA-approved?",
-        a: "Yes — Tesamorelin (brand name Egrifta) is FDA-approved for the reduction of excess abdominal fat (lipodystrophy) in HIV-infected patients. It is the only GHRH analog in this class with completed clinical trials and FDA approval. This is significant: Tesamorelin has more human safety and efficacy data than any other GH peptide, though that data is from an HIV lipodystrophy population, not healthy fitness users.",
+        a: "Yes — Tesamorelin (brand name Egrifta) is FDA-approved for the reduction of excess abdominal fat (lipodystrophy) in HIV-infected patients. It is the only GHRH analog in this class with completed clinical trials and FDA approval. This gives it more human safety and efficacy data than any other GH peptide, though that data is from an HIV lipodystrophy population.",
       },
       {
         q: "How does Tesamorelin differ from CJC-1295?",
-        a: "Both are GHRH analogs that stimulate pituitary GH release, but Tesamorelin is specifically engineered for stability and has documented effects specifically on visceral fat reduction. CJC-1295 is a broader GH stimulator used for overall recomp. Tesamorelin's clinical evidence for visceral fat is stronger than any other peptide in this category. It doesn't require co-administration with a GHRP, though the combination can be used.",
+        a: "Both are GHRH analogs that stimulate pituitary GH release, but Tesamorelin is specifically engineered for stability and has documented effects specifically on visceral fat reduction. CJC-1295 is a broader GH stimulator used for overall recomp. Tesamorelin's clinical evidence for visceral fat is stronger than any other peptide in this category.",
       },
       {
         q: "What dose and protocol should I use?",
@@ -159,15 +186,11 @@ const COMPOUND_FAQS = {
       },
       {
         q: "How quickly does visceral fat reduction occur?",
-        a: "Clinical trial data shows measurable visceral fat reduction by CT scan at 12 weeks, with continued reduction through 26 weeks of daily dosing. Subjective waistline changes are typically reported by users around 6–8 weeks. Tesamorelin's fat reduction is sustained during use but visceral fat may partially return after cessation — maintenance dosing or re-cycling is common.",
+        a: "Clinical trial data shows measurable visceral fat reduction by CT scan at 12 weeks, with continued reduction through 26 weeks of daily dosing. Subjective waistline changes are typically reported around 6–8 weeks. Visceral fat may partially return after cessation — maintenance dosing or re-cycling is common.",
       },
       {
         q: "Does Tesamorelin affect insulin sensitivity?",
-        a: "Yes — all GH-elevating compounds have the potential to transiently reduce insulin sensitivity, since GH antagonizes insulin signaling. Fasting glucose and HbA1c should be monitored before and during a Tesamorelin protocol. Individuals with pre-diabetes, Type 2 diabetes, or significant insulin resistance should approach GH-elevating peptides cautiously and with physician oversight.",
-      },
-      {
-        q: "Should I run bloodwork while using Tesamorelin?",
-        a: "Yes. Pre-protocol: IGF-1, fasting glucose, HbA1c, lipid panel. During protocol (every 8–12 weeks): IGF-1 to confirm efficacy, fasting glucose to monitor insulin sensitivity. IGF-1 should rise meaningfully — if it doesn't, the compound may be underdosed or improperly stored. If IGF-1 rises above the upper reference range, reduce dose.",
+        a: "Yes — all GH-elevating compounds have the potential to transiently reduce insulin sensitivity. Fasting glucose and HbA1c should be monitored before and during a Tesamorelin protocol. Individuals with pre-diabetes, Type 2 diabetes, or significant insulin resistance should approach GH-elevating peptides cautiously.",
       },
     ],
   },
@@ -179,59 +202,47 @@ const COMPOUND_FAQS = {
     faqs: [
       {
         q: "What body fat percentage is appropriate for Semaglutide?",
-        a: "Semaglutide is appropriate for individuals at or above approximately 22% body fat. It is contraindicated — and genuinely inappropriate — for lean individuals (below ~12% body fat). In lean users, the appetite suppression mechanism causes muscle catabolism alongside any remaining fat loss. The compound is clinically approved for obesity (BMI 30+) and overweight with comorbidities (BMI 27+).",
+        a: "Semaglutide is appropriate for individuals at or above approximately 22% body fat. It is contraindicated for lean individuals (below ~12% body fat). In lean users, the appetite suppression mechanism causes muscle catabolism alongside any remaining fat loss. The compound is clinically approved for obesity (BMI 30+) and overweight with comorbidities (BMI 27+).",
       },
       {
         q: "How is Semaglutide dosed and how does titration work?",
-        a: "Semaglutide is administered as a weekly subcutaneous injection. Standard titration: start at 0.25mg/week for weeks 1–4, increase to 0.5mg/week for weeks 5–8. Continue escalating by 0.5mg increments every 4 weeks up to target dose (1mg/week for body composition; 2.4mg/week is the clinical obesity dose). The gradual titration is essential to minimize GI side effects. Rushing the titration causes avoidable misery.",
+        a: "Semaglutide is administered as a weekly subcutaneous injection. Standard titration: start at 0.25mg/week for weeks 1–4, increase to 0.5mg/week for weeks 5–8, continue escalating by 0.5mg increments every 4 weeks up to target dose. The gradual titration is essential to minimize GI side effects. Rushing the titration causes avoidable misery.",
       },
       {
         q: "Will I lose muscle mass on Semaglutide?",
-        a: "This is the most important practical concern. Rapid weight loss from caloric restriction causes muscle catabolism alongside fat loss — typically 25–40% of weight lost is lean mass, not fat. Mitigating muscle loss requires: high protein intake (1g+ per lb of lean body mass daily), progressive resistance training throughout the protocol, and co-administration of lean mass-preserving compounds — most effectively a GH peptide stack (CJC/Ipamorelin or Tesamorelin).",
+        a: "This is the most important practical concern. Rapid weight loss from caloric restriction causes muscle catabolism — typically 25–40% of weight lost is lean mass, not fat. Mitigating muscle loss requires: high protein intake (1g+ per lb of lean body mass daily), progressive resistance training throughout the protocol, and co-administration of lean mass-preserving compounds — most effectively a GH peptide stack (CJC/Ipamorelin, MK-677, or Tesamorelin).",
       },
       {
         q: "What happens when I stop taking Semaglutide?",
         a: "Weight regain after cessation is well-documented — the majority of users regain a significant portion of lost weight within 12 months of stopping. This is because GLP-1 receptor agonism artificially suppresses appetite; when the compound is removed, appetite returns to or above baseline. Long-term use, very gradual dose tapering, and permanent lifestyle changes are strategies to manage this.",
       },
       {
-        q: "What are the most common side effects and how do I manage them?",
-        a: "Nausea and GI distress during dose escalation are the primary side effects. Management: eat smaller, lower-fat meals; avoid strong smells and rich foods during the first days after injection; time injection strategically (some prefer evening injection so peak nausea occurs during sleep). Constipation and delayed gastric emptying are common at maintenance doses — adequate hydration and fiber are important.",
-      },
-      {
         q: "What bloodwork should I run before and during a Semaglutide protocol?",
         a: "Pre-protocol: HbA1c, fasting glucose, lipid panel, comprehensive metabolic panel, thyroid panel (TSH + T4). Note: GLP-1 receptor agonists carry a black-box warning for thyroid C-cell tumors in rodents; personal or family history of medullary thyroid carcinoma or MEN-2 is an absolute contraindication. During protocol: repeat HbA1c and fasting glucose every 12 weeks.",
-      },
-      {
-        q: "Can Semaglutide be combined with Ipamorelin/CJC-1295?",
-        a: "Yes — this is specifically recommended in the Alki protocol. Semaglutide drives weight loss through appetite suppression. GH peptides (CJC/Ipamorelin or Tesamorelin) are anti-catabolic and lipolytic, supporting lean mass preservation during the caloric deficit induced by GLP-1 therapy. The combination is mechanistically complementary with no known receptor interaction.",
       },
     ],
   },
 
   "Retatrutide (GLP-3)": {
     category: "Weight Loss",
-    tagline: "Triple agonist: GLP-1, GIP, and Glucagon — most powerful GLP agent",
+    tagline: "Triple agonist: GLP-1, GIP, Glucagon — most powerful GLP agent",
     catColor: "#ef4444",
     faqs: [
       {
         q: "What makes Retatrutide different from Semaglutide?",
-        a: "Retatrutide is a triple agonist: it activates GLP-1 (appetite suppression, insulin secretion), GIP (glucose-dependent insulin release, fat cell signaling), and Glucagon (energy expenditure, fat mobilization) receptors simultaneously. Semaglutide is a single GLP-1 agonist. Phase 2 clinical trial data showed average weight loss of ~24% body weight in 48 weeks, substantially exceeding Semaglutide's clinical results.",
+        a: "Retatrutide is a triple agonist: it activates GLP-1 (appetite suppression, insulin secretion), GIP (glucose-dependent insulin release, fat cell signaling), and Glucagon (energy expenditure, fat mobilization) receptors simultaneously. Semaglutide is a single GLP-1 agonist. Phase 2 clinical trial data showed average weight loss of ~24% body weight in 48 weeks — substantially exceeding Semaglutide's clinical results.",
       },
       {
         q: "Is Retatrutide approved or still in trials?",
-        a: "As of early 2026, Retatrutide is in Phase 3 clinical trials (Eli Lilly). It has not received FDA approval for any indication. Phase 2 data (NEJM, 2023) showed remarkable efficacy. Research-grade Retatrutide is available from gray-market suppliers, but users are extrapolating from Phase 2 data — there is no FDA-validated manufacturing pipeline. This is the most experimental compound in the GLP category.",
-      },
-      {
-        q: "What are the expected side effects compared to Semaglutide?",
-        a: "The side effect profile is broadly similar: GI distress during dose escalation, injection site reactions. Because Retatrutide includes Glucagon receptor agonism — which directly increases metabolic rate — there is also potential for elevated heart rate and hypoglycemia risk in combination with insulin or other glucose-lowering agents. Careful titration is mandatory.",
+        a: "As of early 2026, Retatrutide is in Phase 3 clinical trials (Eli Lilly). It has not received FDA approval. Phase 2 data (NEJM, 2023) showed remarkable efficacy. Research-grade Retatrutide is available from gray-market suppliers, but users are extrapolating from Phase 2 data — there is no FDA-validated manufacturing pipeline. This is the most experimental compound in the GLP category.",
       },
       {
         q: "How does Retatrutide affect muscle mass?",
-        a: "Retatrutide's Glucagon component increases energy expenditure and fat mobilization — but Glucagon also has catabolic signaling properties. In Phase 2 trials, lean mass loss was observed alongside fat loss, consistent with the broader GLP class. Lean mass preservation strategies are critical: high protein intake, resistance training, and co-administration of GH peptides. The muscle loss risk may be proportionally higher than with Semaglutide given the Glucagon arm.",
+        a: "Retatrutide's Glucagon component increases energy expenditure and fat mobilization — but Glucagon also has catabolic signaling properties. In Phase 2 trials, lean mass loss was observed alongside fat loss, consistent with the broader GLP class. Lean mass preservation strategies are critical: high protein intake, resistance training, and co-administration of GH peptides (CJC/Ipamorelin or MK-677). The muscle loss risk may be proportionally higher than with Semaglutide given the Glucagon arm.",
       },
       {
         q: "Is Retatrutide appropriate for leaner users?",
-        a: "No. Like Semaglutide, Retatrutide is inappropriate for lean individuals — and given its greater potency, it carries higher risk. In a lean individual with limited adipose tissue, the triple agonist mechanism could drive significant lean mass catabolism. Alki blocks GLP agents for users below 22% body fat and flags Retatrutide as the highest-risk GLP option.",
+        a: "No. Like Semaglutide, Retatrutide is inappropriate for lean individuals — and given its greater potency, it carries higher risk for lean users. Alki blocks GLP agents for users below 22% body fat and flags Retatrutide as the highest-risk GLP option.",
       },
     ],
   },
@@ -243,7 +254,7 @@ const COMPOUND_FAQS = {
     faqs: [
       {
         q: "What is GHK-Cu and why is it relevant for anti-aging?",
-        a: "GHK-Cu (Glycyl-L-histidyl-L-lysine:copper) is a naturally occurring copper peptide found in human plasma, saliva, and urine. It has been shown to activate approximately 4,000 human genes — many involved in tissue repair, collagen synthesis, anti-inflammatory signaling, and antioxidant defense. Plasma GHK-Cu levels decline significantly with age (from 200 ng/mL at age 20 to 80 ng/mL by age 60), making supplementation a plausible anti-aging intervention.",
+        a: "GHK-Cu (Glycyl-L-histidyl-L-lysine:copper) is a naturally occurring copper peptide found in human plasma, saliva, and urine. It has been shown to activate approximately 4,000 human genes — many involved in tissue repair, collagen synthesis, anti-inflammatory signaling, and antioxidant defense. Plasma GHK-Cu levels decline significantly with age (from ~200 ng/mL at age 20 to ~80 ng/mL by age 60).",
       },
       {
         q: "What are the most effective administration routes?",
@@ -251,15 +262,15 @@ const COMPOUND_FAQS = {
       },
       {
         q: "How long should a GHK-Cu cycle run?",
-        a: "30-day cycles are the common framework for injectable or intranasal GHK-Cu, followed by a break before reassessment. Topical cosmetic use can be daily and continuous — it's in skincare products used indefinitely at low concentrations. There is no documented receptor downregulation or dependence mechanism that mandates cycling.",
+        a: "30-day cycles are the common framework for injectable or intranasal GHK-Cu, followed by a break before reassessment. Topical cosmetic use can be daily and continuous. There is no documented receptor downregulation or dependence mechanism that mandates cycling.",
       },
       {
         q: "Does GHK-Cu promote hair growth?",
-        a: "Yes — this is one of GHK-Cu's most documented effects. It has been studied in clinical contexts for androgenetic alopecia with positive results in improving follicle size and hair diameter. The mechanism involves stimulation of hair follicle cells and collagen remodeling in the scalp. Topical application (scalp serum with GHK-Cu) is the most direct route.",
+        a: "Yes — this is one of GHK-Cu's most documented effects. It has been studied for androgenetic alopecia with positive results in improving follicle size and hair diameter. It pairs naturally with other hair support compounds (finasteride, minoxidil) as a complementary mechanism focused on scalp tissue health rather than DHT blockade.",
       },
       {
         q: "Are there any safety concerns with copper peptides?",
-        a: "GHK-Cu is generally regarded as very low risk at standard doses. Copper is an essential nutrient and GHK-Cu is a naturally occurring peptide. At very high doses, excess copper accumulation is theoretically possible, but this has not been documented at standard peptide dosing. Individuals with Wilson's disease (copper metabolism disorder) should not use copper-containing compounds.",
+        a: "GHK-Cu is generally regarded as very low risk at standard doses. Copper is an essential nutrient and GHK-Cu is a naturally occurring peptide. Individuals with Wilson's disease (copper metabolism disorder) should not use copper-containing compounds.",
       },
     ],
   },
@@ -271,27 +282,194 @@ const COMPOUND_FAQS = {
     faqs: [
       {
         q: "How does PT-141 work differently from PDE-5 inhibitors like Cialis?",
-        a: "PDE-5 inhibitors work peripherally — they enhance blood flow to erectile tissue by blocking cGMP breakdown. They don't affect desire or arousal at the neurological level. PT-141 works centrally — it activates melanocortin 3 and 4 receptors (MC3R/MC4R) in the brain, directly stimulating sexual motivation and arousal at the neurological level. It addresses desire and arousal rather than just vascular mechanics. This makes it effective in cases where PDE-5 inhibitors fail.",
+        a: "PDE-5 inhibitors work peripherally — they enhance blood flow to erectile tissue by blocking cGMP breakdown. They don't affect desire or arousal at the neurological level. PT-141 works centrally — it activates melanocortin 3 and 4 receptors (MC3R/MC4R) in the brain, directly stimulating sexual motivation and arousal. It addresses desire and arousal rather than just vascular mechanics. This makes it effective in cases where PDE-5 inhibitors fail.",
       },
       {
         q: "Is PT-141 FDA-approved?",
-        a: "Yes — PT-141 (Bremelanotide) is FDA-approved as Vyleesi for hypoactive sexual desire disorder (HSDD) in premenopausal women. This makes it one of the few compounds in this database with a formal FDA approval pathway. The compound has meaningful human safety data from the clinical trial program supporting this approval.",
+        a: "Yes — PT-141 (Bremelanotide) is FDA-approved as Vyleesi for hypoactive sexual desire disorder (HSDD) in premenopausal women. This makes it one of the few compounds in this database with a formal FDA approval pathway. The compound has meaningful human safety data from the clinical trial program.",
       },
       {
         q: "What is the correct dose and timing?",
-        a: "Standard research dosing: 1–2mg SubQ administered 45–90 minutes before desired activity. The window of effect is approximately 6–12 hours. Start at 0.5–1mg to assess individual sensitivity — some users are highly responsive at lower doses. Maximum 2x/week is the recommended frequency ceiling. Nausea is the primary side effect and is dose-dependent; lower doses significantly reduce nausea risk.",
-      },
-      {
-        q: "What are the main side effects?",
-        a: "Nausea is the most common side effect, particularly at doses above 1mg. Transient facial flushing and mild increases in blood pressure are documented. Hyperpigmentation with repeated use has been reported from the MC1R activation pathway — at standard doses and frequencies, this effect is mild. Pre-dose anti-nausea strategies and staying horizontal can help.",
-      },
-      {
-        q: "Can PT-141 be combined with Tadalafil?",
-        a: "Yes — this is an effective combination. PT-141 addresses the central/neurological arousal component; Tadalafil addresses the peripheral vascular component. They work through completely independent mechanisms with no pharmacological conflict. Combining 1mg PT-141 with 5–10mg Tadalafil covers both axes effectively. Note: PT-141 can cause mild blood pressure elevation — monitor for hypotension when combined with PDE-5 inhibitors.",
+        a: "Standard research dosing: 1–2mg SubQ administered 45–90 minutes before desired activity. The window of effect is approximately 6–12 hours. Start at 0.5–1mg to assess individual sensitivity. Maximum 2x/week is the recommended frequency ceiling. Nausea is the primary side effect and is dose-dependent; lower doses significantly reduce nausea risk.",
       },
       {
         q: "Does PT-141 work for both men and women?",
         a: "Yes — the FDA approval is for women (HSDD), but the compound works via MC3R/MC4R receptors present and active in both sexes. The neurological arousal mechanism is not sex-specific. Clinical trial data exists for both male and female populations.",
+      },
+    ],
+  },
+
+  // ── SARMs ──────────────────────────────────────────────
+  "SARMs — Overview": {
+    category: "SARM",
+    tagline: "What they are, how they work, what to know before starting",
+    catColor: "#f97316",
+    faqs: [
+      {
+        q: "What is a SARM and how does it differ from anabolic steroids?",
+        a: "SARM stands for Selective Androgen Receptor Modulator. SARMs bind to androgen receptors (AR) with varying degrees of selectivity for muscle and bone tissue over other androgen-sensitive tissues (prostate, scalp, sebaceous glands). Traditional anabolic steroids activate AR broadly and also aromatize to estrogen. SARMs attempt to deliver anabolic effects (muscle, bone) while reducing androgenic side effects (hair, skin, prostate). In practice, no SARM achieves complete tissue selectivity — all suppressive SARMs affect the HPG axis to varying degrees.",
+      },
+      {
+        q: "Do all SARMs require PCT?",
+        a: "Yes — all androgen receptor-active SARMs suppress the HPG axis to some degree. The suppression varies: MK-2866 (Ostarine) at 20mg has mild suppression; RAD-140 and LGD-4033 are significantly suppressive; YK-11 and S-23 approach near-complete shutdown. All AR-active SARMs require post-cycle therapy (PCT) using a SERM (Nolvadex or Enclomiphene) for 4–6 weeks after the cycle. MK-677 is grouped with SARMs commercially but is not AR-active and does not require PCT.",
+      },
+      {
+        q: "What bloodwork is required for a SARM cycle?",
+        a: "At minimum: pre-cycle full hormone panel (total testosterone, free testosterone, LH, FSH, estradiol, SHBG), ALT/AST (liver enzymes), lipid panel (HDL/LDL), and CBC. Repeat at mid-cycle (week 6) and 4 weeks post-PCT. The post-PCT check is critical — it confirms LH, FSH, and testosterone have returned to baseline before considering another cycle. Running another cycle before HPG axis recovery is confirmed is the most common mistake in SARM use.",
+      },
+      {
+        q: "What is PCT and how do I run it?",
+        a: "PCT (Post-Cycle Therapy) is the protocol used after a suppressive compound cycle to restart natural testosterone production. The goal is to stimulate LH and FSH secretion, which then signals the testes to resume testosterone synthesis. Standard PCT protocols: Nolvadex (Tamoxifen) 20mg/day for 4–6 weeks, or Enclomiphene 12.5mg/day for 4–6 weeks. Enclomiphene is the cleaner option — it contains only the active trans-isomer without the zuclomiphene component responsible for mood and visual side effects in racemic Clomid.",
+      },
+      {
+        q: "What liver support is required for SARMs?",
+        a: "For mild SARMs (MK-2866, S-4): basic liver support — NAC 600mg/day and periodic liver enzyme monitoring. For more suppressive or potentially hepatotoxic SARMs (LGD-4033, YK-11, RAD-140): TUDCA 500mg/day + NAC 600mg/day throughout the cycle and 2 weeks after. TUDCA (Tauroursodeoxycholic acid) is the primary hepatoprotective agent. Never run YK-11 without TUDCA/NAC. Bloodwork (ALT/AST) before starting and at mid-cycle is the only objective safety net.",
+      },
+      {
+        q: "Can I stack SARMs with peptides?",
+        a: "Yes — SARM + peptide combinations are among the most well-regarded protocols in this space. The three most effective additions to any SARM cycle: (1) BPC-157 + TB-500 for connective tissue protection — SARMs increase training load faster than tendons and ligaments adapt. (2) MK-677 for GH/IGF-1 — non-suppressive, runs through PCT, adds an independent anabolic axis. (3) CJC/Ipamorelin for sleep window GH pulse amplification. None of these peptides interact with androgen receptors or add to HPG suppression.",
+      },
+      {
+        q: "How long should I wait between SARM cycles?",
+        a: "The standard guideline: time off equals time on. If a cycle was 10 weeks, wait 10 weeks before starting the next. This includes the PCT period. More conservatively: wait until bloodwork confirms LH, FSH, and testosterone have returned to pre-cycle baseline — which should occur within 4–8 weeks post-PCT for most users. Starting a new cycle before confirming HPG axis recovery risks compounding suppression.",
+      },
+    ],
+  },
+
+  "MK-2866 (Ostarine)": {
+    category: "SARM",
+    tagline: "The mildest SARM — best entry point, clinical data, body recomposition",
+    catColor: "#f97316",
+    faqs: [
+      {
+        q: "Why is MK-2866 recommended as the best starting SARM?",
+        a: "MK-2866 (Ostarine) is a partial AR agonist with the most extensive human clinical data of any SARM — it has been through multiple Phase II clinical trials, which is unusual in this class. Its suppression is mild compared to RAD-140 or LGD-4033, its side effect profile is well-characterized, and its dose-response is well-understood. For a first SARM cycle, it provides a meaningful performance benchmark while minimizing risk. The data-to-risk ratio is better than any other SARM.",
+      },
+      {
+        q: "What results can I realistically expect?",
+        a: "At 20mg/day for 8–12 weeks with proper training and nutrition: 4–8 lbs of lean mass gain with simultaneous modest fat loss (body recomposition). Strength improvements typically begin within 2 weeks. Users who go into a Ostarine cycle expecting the aggressive results of LGD-4033 or RAD-140 will be underwhelmed — that is by design. The milder result and milder risk are the same feature.",
+      },
+      {
+        q: "What does the suppression profile look like?",
+        a: "MK-2866 at 20mg/day produces mild HPG axis suppression — testosterone levels typically drop by 20–40% from baseline, with corresponding LH/FSH reduction. This is meaningful but significantly less than RAD-140 or LGD-4033. A 4-week Nolvadex or Enclomiphene PCT is standard. Most users fully recover by 4 weeks post-PCT confirmed on bloodwork. Running Ostarine at high doses (30mg+) increases suppression substantially without proportional benefit.",
+      },
+      {
+        q: "Does MK-2866 help with joint and tendon health?",
+        a: "Yes — this is a distinctive property of Ostarine that most other SARMs lack. It was originally developed for muscle wasting and bone density conditions, and has documented effects on connective tissue. Many users report significant joint comfort improvement. This is one of the reasons it is recommended for users with pre-existing joint issues as a first SARM — the connective tissue benefits combined with mild muscle anabolism is a well-suited profile for recovery-focused users.",
+      },
+      {
+        q: "Does MK-2866 require liver support (TUDCA/NAC)?",
+        a: "At standard doses (20mg/day), TUDCA is not mandatory — mild liver enzyme elevation is possible but typically modest and transient. NAC 600mg/day throughout the cycle is a low-cost, low-risk precaution worth taking. Get an ALT/AST baseline before starting. If you're stacking MK-2866 with other compounds (particularly any oral or methylated compound), liver support requirements are driven by the more hepatotoxic compound in the stack.",
+      },
+    ],
+  },
+
+  "RAD-140 (Testolone)": {
+    category: "SARM",
+    tagline: "Fastest strength onset in SARM class — most popular intermediate compound",
+    catColor: "#f97316",
+    faqs: [
+      {
+        q: "Why is RAD-140 considered the most popular SARM?",
+        a: "RAD-140 produces the fastest visible strength and lean mass gains of any commonly used SARM — users typically report noticeable strength increases within 10–14 days. At 10–15mg/day it drives rapid body recomposition with no estrogenic side effects (it does not aromatize). The cost-to-effect ratio is favorable, and dosing is simple (single daily dose). It has become the most commonly used intermediate SARM largely because the results are immediately tangible, which reinforces compliance.",
+      },
+      {
+        q: "What are the main risks and side effects?",
+        a: "High HPG axis suppression is the primary concern — testosterone levels drop significantly during the cycle, producing the expected hormonal side effects: mid-cycle libido decline, mood flatness, and sometimes lethargy. Full SERM PCT is non-negotiable. Lipid impact is meaningful — HDL typically drops 20–30%. Hair loss acceleration in genetically predisposed users is real. Some users report aggressive or irritable mood. Bloodwork before, mid-cycle, and post-PCT is the only objective safety net.",
+      },
+      {
+        q: "What PCT protocol does RAD-140 require?",
+        a: "RAD-140 requires a full SERM PCT: Nolvadex 20mg/day or Enclomiphene 12.5mg/day for 4–6 weeks post-cycle. Enclomiphene is preferred for its cleaner side effect profile. MK-677 (if running it) continues through PCT without interruption. BPC-157/TB-500 continues through PCT. Wait for bloodwork to confirm testosterone and LH/FSH recovery before considering the next cycle.",
+      },
+      {
+        q: "How does RAD-140 interact with hair loss?",
+        a: "RAD-140, as a full AR agonist, can accelerate androgenetic alopecia (male pattern hair loss) in individuals with genetic predisposition. It does not aromatize to estrogen, but AR activation at scalp follicles in susceptible users can trigger or accelerate thinning. Mitigation options: RU58841 topical (scalp AR antagonist) applied during the cycle, or finasteride — though 5α-reductase inhibitors are less effective for SARMs than for testosterone (SARMs don't convert to DHT via 5AR). RU58841 is the more mechanistically appropriate hair protection tool for SARM cycles.",
+      },
+      {
+        q: "What does RAD-140 + peptides look like as a complete stack?",
+        a: "The most effective complete intermediate stack using Alki's database: RAD-140 10–15mg/day (AR anabolism) + MK-677 25mg/day (GH/IGF-1 axis, non-suppressive) + BPC-157 250–500mcg/day SubQ (connective tissue protection) + CJC/Ipamorelin pre-sleep (GH pulse amplification). Support layer: Tadalafil 5mg/day (cardiovascular), TUDCA optional at this dose range, bloodwork panel. This covers three independent anabolic axes with a recovery foundation.",
+      },
+      {
+        q: "Should I run RAD-140 as my first SARM?",
+        a: "It depends on context. RAD-140 has significantly higher suppression and side effect potential than MK-2866 (Ostarine). For users who have never run a SARM: Ostarine is the more appropriate first cycle — it establishes your individual response profile, suppression pattern, and side effect sensitivity with lower risk. For users who have run Ostarine successfully and have their bloodwork and PCT infrastructure in place: RAD-140 is a logical next step.",
+      },
+    ],
+  },
+
+  "LGD-4033 (Ligandrol)": {
+    category: "SARM",
+    tagline: "Highest raw lean mass gain — the mass builder",
+    catColor: "#f97316",
+    faqs: [
+      {
+        q: "How does LGD-4033 compare to RAD-140 for muscle gain?",
+        a: "LGD-4033 is the superior mass builder in the core SARM category — it produces higher raw lean mass gain per cycle than RAD-140, particularly for users in a caloric surplus. First-time users at 5–10mg/day for 8–10 weeks typically report 8–12 lbs of lean mass. RAD-140 delivers faster visible strength onset but LGD-4033's mass accumulation over the full cycle is greater. The trade-off: LGD-4033's water retention, suppression severity, and lipid impact are meaningfully higher.",
+      },
+      {
+        q: "What dose should I use?",
+        a: "5mg/day is effective for most first-time LGD-4033 users and represents the best risk-to-benefit entry point. 10mg/day produces a meaningfully stronger anabolic signal but also stronger suppression, water retention, and lipid impact. The clinical trial data actually used 1–22mg/day — 5mg landed in the effective range with better tolerability. Doses above 10mg do not produce proportionally stronger results and increase side effects without justification.",
+      },
+      {
+        q: "Does LGD-4033 require liver support?",
+        a: "Yes — TUDCA 500mg/day + NAC 600mg/day throughout the cycle and 2 weeks after. LGD-4033 has documented hepatotoxicity reports and liver enzyme elevation in clinical trials, more so than RAD-140 or MK-2866. This is not optional. Get ALT/AST bloodwork before starting and at mid-cycle (week 5–6).",
+      },
+      {
+        q: "What's the water retention situation with LGD-4033?",
+        a: "Water retention is significant during the first 2–3 weeks as IGF-1 rises and the anabolic environment establishes. Some of the early 'weight gain' on LGD-4033 is intracellular water, not muscle — users often see a meaningful deflation in the first 1–2 weeks post-cycle. The actual lean mass gain, once water clears, is typically still substantial. Tracking body weight alone during an LGD cycle is misleading — use body fat measurements or waist circumference to track real composition changes.",
+      },
+      {
+        q: "How does the suppression compare to RAD-140?",
+        a: "LGD-4033 and RAD-140 are broadly comparable in suppression severity — both require full SERM PCT. LGD-4033 tends to produce more pronounced libido decline during cycle in some users. Both compounds typically restore testosterone to baseline within 4–8 weeks of a standard PCT. The post-PCT bloodwork check is non-negotiable for both.",
+      },
+    ],
+  },
+
+  // ── GH AXIS EXTRAS ─────────────────────────────────────
+  "HGH Fragment 176-191": {
+    category: "Fat Loss",
+    tagline: "Targeted fat oxidation without glucose or anabolic effects",
+    catColor: "#f59e0b",
+    faqs: [
+      {
+        q: "What makes Fragment 176-191 different from other fat loss compounds?",
+        a: "Fragment 176-191 is the C-terminal fragment of human GH that retains the lipolytic (fat-burning) activity while losing the anabolic and glucose-regulating effects of full GH. This means: fat oxidation without IGF-1 elevation, no blood sugar impact, no muscle growth, no receptor tolerance buildup. It is the cleanest targeted fat loss peptide in the database — appropriate for users who specifically want fat reduction without the broader GH-axis effects of Tesamorelin or CJC/Ipamorelin.",
+      },
+      {
+        q: "How is it dosed and when?",
+        a: "Standard dosing: 300mcg/day SubQ. Morning administration in a fasted state is preferred — GH fragment's lipolytic activity is amplified in low-insulin conditions. Injecting after carbohydrate consumption significantly blunts the fat-burning signal. Some users split into two 150mcg doses (AM and pre-workout). Cycle lengths of 8–16 weeks are typical.",
+      },
+      {
+        q: "Can it be stacked with GLP-1 compounds?",
+        a: "Yes — Fragment 176-191 and GLP-1s (Semaglutide, Retatrutide) target fat loss through completely different mechanisms. GLP-1s work via appetite suppression and metabolic improvement; Fragment 176-191 works via direct lipolysis at the adipocyte. They are mechanistically complementary with no known receptor conflict. This combination can be appropriate for high-body-fat users seeking aggressive fat loss, but the GLP-1's muscle catabolism concern remains and requires the same lean mass preservation countermeasures.",
+      },
+    ],
+  },
+
+  // ── CYCLE SUPPORT ──────────────────────────────────────
+  "Cycle Support — Overview": {
+    category: "Cycle Support",
+    tagline: "PCT, SERMs, AIs, liver support — the infrastructure layer",
+    catColor: "#64748b",
+    faqs: [
+      {
+        q: "What is the difference between Nolvadex, Enclomiphene, and Clomid for PCT?",
+        a: "All three are SERMs that block estrogen receptors at the hypothalamus, removing estrogen's negative feedback and stimulating LH/FSH → testosterone production. The key differences: Nolvadex (Tamoxifen) is the most validated, cheapest, and most widely available — the standard PCT choice. Enclomiphene is the cleaner, preferred option: it is the pure active isomer of clomiphene without the zuclomiphene component responsible for mood crashes and vision disturbances in racemic Clomid. Clomid (racemic clomiphene) works but has a worse side effect profile than either alternative. If Enclomiphene is available, use it over Clomid.",
+      },
+      {
+        q: "Do I need an aromatase inhibitor (AI) on a SARM cycle?",
+        a: "For most SARM-only cycles: no. True SARMs (RAD-140, LGD-4033, MK-2866) do not aromatize to estrogen the way testosterone does, so aromatase inhibitors have limited applicability. Estrogen elevation on a SARM cycle is typically minimal. The exception: if bloodwork shows elevated estradiol causing gynecomastia symptoms, a low-dose AI (Anastrozole 0.25mg EOD) is appropriate. Never take an AI speculatively — crashing E2 causes joint pain, libido loss, and mood disruption that is worse than mild estrogen elevation.",
+      },
+      {
+        q: "What does TUDCA do and when is it actually required?",
+        a: "TUDCA (Tauroursodeoxycholic acid) is a bile acid with documented hepatoprotective properties — it reduces liver cell stress, supports bile flow, and protects against hepatocyte damage from hepatotoxic compounds. It is required for: YK-11 (non-negotiable), LGD-4033 (strongly recommended), RAD-140 at higher doses, and any other compound with documented liver enzyme elevation. Standard dose: 500mg/day throughout cycle and 2 weeks after. NAC 600mg/day is paired with TUDCA as a complementary mechanism (glutathione precursor). Together they are the standard liver protection stack for any hepatotoxic compound.",
+      },
+      {
+        q: "Why is Tadalafil recommended as cycle support?",
+        a: "Tadalafil at 5mg/day (low-dose daily protocol) is one of the most underrated cycle support compounds. It provides: cardiovascular protection and blood pressure management during the cycle, sexual function preservation during HPG suppression, and sustained vascularity and pump. The clinical safety record at this dose is excellent — it is used indefinitely in men with pulmonary arterial hypertension and BPH at this dose range. For most SARM users, the sexual function and cardiovascular benefits during suppression justify inclusion in the support layer.",
+      },
+      {
+        q: "What is Cabergoline and when is it needed?",
+        a: "Cabergoline is a long-acting dopamine D2 agonist that suppresses prolactin. In the Alki compound context, prolactin elevation is primarily a concern with GHRP-6 and Hexarelin (prolactin-stimulating GHRPs not in the core database). Ipamorelin — the GHRP in the Alki core stack — does not cause prolactin elevation, making Cabergoline unnecessary for Ipamorelin protocols. If the user expands to 19-nor compounds or prolactin-elevating GHRPs as the database grows, Cabergoline becomes relevant. Dose: 0.25mg twice weekly.",
       },
     ],
   },
@@ -304,19 +482,19 @@ const GOAL_FAQS = {
     faqs: [
       {
         q: "Which peptides are best for fat loss, and in what order of priority?",
-        a: "Priority hierarchy for fat loss: (1) Semaglutide or Retatrutide for users above 22% BF — appetite suppression is the most powerful fat loss tool in the database. (2) Tesamorelin for visceral fat specifically, or as a complement to GLP-1 therapy. (3) Ipamorelin + CJC-1295 for lean mass preservation during deficit — GH is lipolytic and anti-catabolic, making it essential when running a GLP-1. For users below 22% BF, GLP-1s are contraindicated; the stack focuses on GH peptides and Tesamorelin for body recomposition.",
+        a: "Priority hierarchy for fat loss: (1) Semaglutide or Retatrutide for users above 22% BF — appetite suppression is the most powerful fat loss tool in the database. (2) Tesamorelin for visceral fat specifically. (3) HGH Fragment 176-191 for direct lipolysis without GH-axis systemic effects. (4) Ipamorelin + CJC-1295 or MK-677 for lean mass preservation during deficit — GH is lipolytic and anti-catabolic, essential when running a GLP-1. For users below 22% BF, GLP-1s are contraindicated; the stack focuses on GH peptides and Tesamorelin for recomposition.",
       },
       {
         q: "How do I preserve muscle during a GLP-1 fat loss protocol?",
-        a: "Four strategies, in priority order: (1) Protein intake — target 1g per pound of lean body mass daily. Non-negotiable. (2) Resistance training — maintain progressive overload throughout the protocol. You cannot preserve muscle with cardio alone. (3) GH peptide co-administration — CJC/Ipamorelin or Tesamorelin alongside the GLP-1. GH is anti-catabolic and lipolytic simultaneously. (4) Monitor composition — track body composition with DEXA, not just scale weight.",
+        a: "Four strategies, in priority order: (1) Protein intake — target 1g per pound of lean body mass daily. Non-negotiable. (2) Resistance training — maintain progressive overload throughout the protocol. You cannot preserve muscle with cardio alone. (3) GH peptide co-administration — CJC/Ipamorelin, MK-677, or Tesamorelin alongside the GLP-1. GH is anti-catabolic and lipolytic simultaneously. (4) Monitor composition — track body composition, not just scale weight.",
+      },
+      {
+        q: "Do SARMs help with fat loss?",
+        a: "SARMs are primarily anabolic (muscle-building) tools, but several produce meaningful body recomposition effects — simultaneous fat loss and lean mass gain. MK-2866 (Ostarine) and S-4 (Andarine) have the strongest recomposition profiles. RAD-140 and LGD-4033 are primarily mass-builders. SARMs are not appropriate fat loss tools for users above 22% BF who should prioritize GLP-1s. For leaner users (12–20% BF) targeting recomposition, SARMs are more relevant than GLP-1s.",
       },
       {
         q: "What body fat percentage should I aim for before transitioning off GLP-1s?",
         a: "A reasonable framework: reach a body fat level that is sustainable with lifestyle intervention (typically 12–18% for men, 18–25% for women), have established the dietary and training habits that will maintain that composition, then taper the GLP-1 gradually rather than stopping abruptly. Abrupt cessation leads to rapid appetite rebound.",
-      },
-      {
-        q: "Can I lose fat without injectable peptides?",
-        a: "The most powerful fat loss peptides require subcutaneous injection — Semaglutide, Retatrutide, and Tesamorelin are all injectable. There is no oral peptide equivalent to GLP-1 efficacy. If needles are an absolute barrier, the honest answer is you're leaving significant efficacy on the table. If it's anxiety or technique, insulin needles (31g, 0.5 inch) are essentially painless with proper technique.",
       },
     ],
   },
@@ -324,16 +502,20 @@ const GOAL_FAQS = {
     icon: "💪",
     faqs: [
       {
-        q: "What's the best peptide stack for lean muscle gain?",
-        a: "For peptides specifically: CJC-1295 + Ipamorelin is the foundation. GH peptides drive IGF-1 elevation, which is the downstream anabolic signal for muscle hypertrophy. Add BPC-157 to protect connective tissue during progressive loading — tendons and ligaments lag behind muscle strength gains, and BPC-157 reduces injury risk during high-volume training. TB-500 complements BPC-157 for systemic recovery support.",
+        q: "What's the best stack for lean muscle gain?",
+        a: "The most effective lean mass stack using Alki's full compound database: MK-2866 (Ostarine) or RAD-140 (AR anabolism, SARM tier) + MK-677 25mg/day (GH/IGF-1, oral, non-suppressive) + CJC/Ipamorelin pre-sleep (GH pulse amplification) + BPC-157 + TB-500 (connective tissue protection under increasing load). This covers three independent anabolic axes (AR, GH pulsatile, GH sustained) with a recovery foundation. Support layer: Nolvadex/Enclomiphene PCT after the SARM cycle; MK-677 and peptides continue through PCT.",
       },
       {
-        q: "How do GH peptides build muscle — what's the mechanism?",
-        a: "GH peptides stimulate the pituitary to release GH in larger, more frequent pulses. GH signals the liver to produce IGF-1, which binds to IGF-1 receptors on muscle cells, activating mTOR and muscle protein synthesis pathways. GH also has direct lipolytic effects, mobilizing fat for fuel and enabling simultaneous muscle gain and fat loss (body recomposition) at caloric maintenance.",
+        q: "What's the difference between SARM-based and peptide-only muscle gain?",
+        a: "SARM-based protocols produce more rapid, dramatic lean mass gains than peptide-only approaches — SARMs directly activate androgen receptors, the primary muscle protein synthesis signaling pathway. The trade-off is HPG axis suppression and PCT requirement. Peptide-only protocols (GH peptides + MK-677) are non-suppressive, run indefinitely, and produce gradual, sustained lean mass improvement — but the magnitude of gain per cycle is significantly lower than a SARM cycle. The choice depends on goals, experience, and how the user values the suppression/PCT trade-off.",
       },
       {
-        q: "How important is training and diet alongside the peptide protocol?",
-        a: "They are the primary drivers — peptides are the multiplier, not the engine. GH peptides amplify the anabolic signal, but there must be a training stimulus for that signal to act on and adequate protein to build with. Without progressive resistance training and sufficient protein (1g+/lb lean mass), GH peptides will produce minimal body composition changes.",
+        q: "How do GH peptides and SARMs interact?",
+        a: "They are mechanistically independent and highly complementary. SARMs activate androgen receptors to drive muscle protein synthesis via the mTOR pathway. GH peptides (CJC/Ipamorelin, MK-677) elevate IGF-1, which activates a separate but parallel muscle protein synthesis pathway. Running both simultaneously covers two independent anabolic axes. Importantly: MK-677 and injectable GH peptides do not add to SARM-related HPG suppression — they are non-suppressive and continue through PCT without complicating recovery.",
+      },
+      {
+        q: "How important is training and diet alongside the protocol?",
+        a: "They are the primary drivers — compounds are the multiplier, not the engine. SARMs amplify the anabolic signal, but there must be a progressive training stimulus for that signal to act on and adequate protein to build with. Without 1g+/lb lean mass protein intake and progressive resistance training, even aggressive SARM stacks produce suboptimal results. The user who optimizes training, diet, sleep, and then adds compounds sees dramatically better results than the one relying on compounds to compensate for lifestyle deficits.",
       },
     ],
   },
@@ -342,11 +524,11 @@ const GOAL_FAQS = {
     faqs: [
       {
         q: "What's the fastest peptide protocol for an acute injury?",
-        a: "For an acute injury: BPC-157 + TB-500 is the first-line combination. BPC-157 at 250–500mcg/day SubQ near the injury site for local angiogenesis and tissue repair. TB-500 at 2.5mg 2x/week for systemic healing and stem cell mobilization. Adding a GH peptide stack (CJC/Ipamorelin pre-sleep) amplifies the repair window during sleep. Expect meaningful functional improvement at 3–6 weeks, with continued benefit through 8–12 weeks.",
+        a: "For an acute injury: BPC-157 + TB-500 is the first-line combination. BPC-157 at 250–500mcg/day SubQ near the injury site for local angiogenesis and tissue repair. TB-500 at 2.5mg 2x/week for systemic healing and stem cell mobilization. Adding a GH peptide stack (CJC/Ipamorelin pre-sleep or MK-677 oral) amplifies the repair window during sleep. Expect meaningful functional improvement at 3–6 weeks, with continued benefit through 8–12 weeks.",
       },
       {
-        q: "Can peptides help with chronic pain or old injuries?",
-        a: "Yes — this is one of the most commonly reported applications. BPC-157's angiogenic effect can reopen blood supply to chronically damaged tissues. Many chronic injuries are characterized by poor vascular supply to damaged tissue, which is exactly what BPC-157 addresses. Chronic injuries may require longer treatment windows (8–12 weeks) than acute ones.",
+        q: "Does MK-677 help with recovery?",
+        a: "Yes — MK-677's sustained IGF-1 elevation has meaningful recovery benefits. IGF-1 drives tissue repair at the cellular level, improves collagen synthesis in connective tissue, and supports joint health. Many users report significant joint comfort improvement on MK-677. It also dramatically improves sleep depth, which is the primary recovery window. For injury recovery, MK-677 pairs well with BPC-157/TB-500 as a systemic IGF-1 foundation.",
       },
       {
         q: "Do I need to stop training while using recovery peptides?",
@@ -359,15 +541,15 @@ const GOAL_FAQS = {
     faqs: [
       {
         q: "What's the best anti-aging peptide stack?",
-        a: "A comprehensive anti-aging protocol typically combines: GHK-Cu (topical and/or injectable) for collagen, skin quality, and gene activation. Ipamorelin + CJC-1295 for GH/IGF-1 restoration (GH declines ~14% per decade after 30). Epithalon for telomerase stimulation and pineal/melatonin regulation (outside core Alki 8). The longevity stack is about maintaining function across multiple aging mechanisms simultaneously, not maximizing any single anabolic axis.",
+        a: "A comprehensive anti-aging protocol targets multiple aging mechanisms simultaneously: GHK-Cu (topical and/or injectable) for collagen, skin quality, and gene activation. Ipamorelin + CJC-1295 or MK-677 for GH/IGF-1 restoration (GH declines ~14% per decade after 30). Epitalon for telomerase stimulation and pineal/melatonin regulation. Enclomiphene (if testosterone optimization needed) to maintain HPG axis without suppression. Pregnenolone for neurosteroid support and hormone precursor replenishment. The longevity stack is about maintaining function across multiple aging mechanisms simultaneously.",
+      },
+      {
+        q: "Is MK-677 relevant for anti-aging?",
+        a: "Yes — MK-677 is one of the most accessible and effective anti-aging tools in the database, specifically because it is oral, non-suppressive, and can be run indefinitely. GH/IGF-1 decline is one of the primary contributors to age-related body composition change (muscle loss, fat gain), joint degradation, and sleep disruption. MK-677 directly addresses the GH axis. For users over 35 who are uncomfortable with injectable GH peptides, MK-677 is the practical starting point for GH optimization.",
       },
       {
         q: "At what age is anti-aging peptide use appropriate?",
-        a: "GH secretion begins declining in the late 20s–early 30s. GHK-Cu plasma levels begin declining measurably in the 30s. Practical guideline: GHK-Cu and collagen-focused compounds from the 30s onward; GH peptides most relevant from 35+ when natural output has declined meaningfully. Younger users with optimal natural hormone levels get minimal marginal benefit from GH peptides.",
-      },
-      {
-        q: "Do anti-aging peptides actually extend lifespan?",
-        a: "No human longevity data exists. Animal model data is promising but cannot be directly extrapolated to humans. The realistic claims for anti-aging peptides are: improved biomarkers associated with aging, better functional health maintenance, and quality-of-life improvements that are measurable in the present. The longevity benefit is speculative; the functional maintenance benefit is more grounded.",
+        a: "GH secretion begins declining in the late 20s–early 30s. GHK-Cu plasma levels begin declining measurably in the 30s. Practical guideline: GHK-Cu and collagen-focused compounds from the 30s onward; GH peptides most relevant from 35+ when natural output has declined meaningfully. Younger users with optimal natural hormone levels get minimal marginal benefit from GH peptides and some of the GH axis optimization is better served by sleep, training, and body composition optimization first.",
       },
     ],
   },
@@ -375,8 +557,8 @@ const GOAL_FAQS = {
     icon: "✨",
     faqs: [
       {
-        q: "Which peptides specifically improve skin quality?",
-        a: "GHK-Cu is the primary compound for skin quality — it directly stimulates collagen synthesis, elastin production, and has antioxidant properties. Topical GHK-Cu serums are backed by cosmetic research demonstrating measurable improvements in skin thickness, wrinkle depth, and elasticity. Tesamorelin and GH peptides improve skin indirectly via IGF-1 elevation — GH is a major regulator of collagen turnover throughout the body.",
+        q: "Which compounds specifically improve skin quality?",
+        a: "GHK-Cu is the primary compound for skin quality — it directly stimulates collagen synthesis, elastin production, and has antioxidant properties. Topical GHK-Cu serums are backed by cosmetic research demonstrating measurable improvements in skin thickness, wrinkle depth, and elasticity. Tesamorelin and GH peptides (CJC/Ipamorelin, MK-677) improve skin indirectly via IGF-1 elevation — GH is a major regulator of collagen turnover throughout the body. Epithalon has documented effects on skin regeneration in aging biology research.",
       },
       {
         q: "Is topical GHK-Cu as effective as injectable for skin?",
@@ -388,8 +570,12 @@ const GOAL_FAQS = {
     icon: "⚡",
     faqs: [
       {
-        q: "Which peptides in the Alki database most affect energy levels?",
-        a: "GH peptides (CJC/Ipamorelin) indirectly improve energy by improving sleep architecture — GH secretion during deep sleep is a key driver of next-day energy and recovery quality. Users on GH peptide protocols consistently report better sleep quality and improved daytime energy. BPC-157 has reported effects on mitochondrial function and gut health that some users associate with improved energy. No compound in the core Alki 8 is a direct energy stimulant — energy benefits are downstream of improved recovery, sleep, and GH output.",
+        q: "Which compounds most directly improve energy levels?",
+        a: "MK-677 has the most prominent energy-relevant effects in the database: it dramatically improves sleep architecture (GH-mediated deep sleep enhancement), and sustained IGF-1 elevation supports daytime energy and recovery quality. Users consistently report this as the most subjectively noticeable benefit. CJC/Ipamorelin produces similar sleep benefits via pre-sleep GH pulse amplification. For more direct CNS energy, the nootropic compounds in the expanded database (Flmodafinil, Bromantane, NALT) are purpose-built — but are outside the core peptide stack.",
+      },
+      {
+        q: "Does MK-677 cause fatigue or improve energy?",
+        a: "Both, depending on the phase. In the first 2–4 weeks, MK-677 causes lethargy in many users as the body adapts to higher GH/IGF-1 levels — this is temporary. After adaptation, the primary energy-relevant experience is improved sleep quality, which produces better next-day energy. The appetite increase from ghrelin agonism can also be disorienting initially. Most users report net positive energy and well-being after the initial adaptation period.",
       },
     ],
   },
@@ -398,7 +584,11 @@ const GOAL_FAQS = {
     faqs: [
       {
         q: "What's the best stack for athletic performance and recovery?",
-        a: "BPC-157 + TB-500 for connective tissue durability and systemic recovery. Ipamorelin + CJC-1295 for sleep quality, lean mass accrual, and repair signal amplification. This combination — the gold standard recovery stack plus the gold standard GH stack — covers the full performance support spectrum: injury prevention (BPC-157), systemic healing (TB-500), body recomposition (GH peptides), and sleep-window optimization (pre-sleep GH dosing).",
+        a: "BPC-157 + TB-500 for connective tissue durability and systemic recovery. Ipamorelin + CJC-1295 for sleep quality, lean mass accrual, and repair signal amplification. MK-677 as a non-suppressive GH/IGF-1 foundation that runs continuously. For more aggressive anabolic enhancement: MK-2866 (Ostarine) adds AR-mediated anabolism with mild suppression profile. This combination covers the full performance support spectrum: injury prevention (BPC-157), systemic healing (TB-500), body recomposition (GH peptides), sleep optimization (pre-sleep GH dosing), and sustained IGF-1 baseline (MK-677).",
+      },
+      {
+        q: "Which compounds are WADA-banned for tested athletes?",
+        a: "WADA-banned compounds in the Alki database: TB-500 (Thymosin Beta-4), all SARMs (MK-2866, RAD-140, LGD-4033, YK-11, S-23, S-4 etc.), GW-501516 (Cardarine), SR-9009/SR-9011, AICAR, IGF-1 LR3, HGH Fragment 176-191, Melanotan II. GH peptides (BPC-157, Ipamorelin, CJC-1295, Sermorelin, Tesamorelin) may also be prohibited under peptide hormone and growth factor categories depending on the sport and governing body. Tested athletes should assume any performance-enhancing compound is prohibited until verified otherwise with their specific governing body.",
       },
     ],
   },
@@ -418,15 +608,55 @@ const STACK_FAQS = [
       },
       {
         q: "Do I inject them at the same site or separately?",
-        a: "They can be injected at the same site (many users use a pre-mixed blend for convenience) or separately. BPC-157 benefits from injection near the injury site — local application directly in the tissue region being repaired. TB-500's systemic mechanism means site doesn't matter for its effects — abdominal SubQ is convenient. If using separately: BPC-157 near the injury site daily, TB-500 anywhere SubQ twice weekly.",
-      },
-      {
-        q: "How long should I run this stack for a specific injury?",
-        a: "For acute injuries: 8–12 weeks as the primary protocol. For chronic injuries: some users run 12–16 weeks or longer. Neither compound is suppressive or has a known tolerance mechanism. Reassess functional improvement at 6–8 weeks. If significant improvement is occurring, continue. If no change after 8 weeks, evaluate dosing, administration site, and compound storage quality.",
+        a: "They can be injected at the same site (the pre-mixed blend is available for this reason) or separately. BPC-157 benefits from injection near the injury site. TB-500's systemic mechanism means site doesn't matter — abdominal SubQ is convenient. If using separately: BPC-157 near the injury site daily, TB-500 anywhere SubQ twice weekly.",
       },
       {
         q: "Can I add a GH stack to this combination for maximum recovery?",
-        a: "Yes — this is the most comprehensive peptide recovery stack: BPC-157 (local) + TB-500 (systemic) + CJC-1295/Ipamorelin (GH pulse during sleep). GH is a key signal in tissue repair — it amplifies IGF-1, which drives protein synthesis in all tissues including connective tissue. The pre-sleep GH stack specifically targets the primary repair window (deep sleep).",
+        a: "Yes — this is the most comprehensive peptide recovery stack: BPC-157 (local) + TB-500 (systemic) + CJC-1295/Ipamorelin (GH pulse during sleep) + MK-677 (sustained IGF-1 all day). GH and IGF-1 are key signals in tissue repair — they amplify protein synthesis in all tissues including connective tissue. The GH stack targets the sleep window; MK-677 maintains the IGF-1 environment throughout the day.",
+      },
+      {
+        q: "Does this stack run through a SARM cycle?",
+        a: "Yes — this is one of the most recommended additions to any SARM cycle. SARMs increase training load and strength faster than tendons and ligaments adapt, making connective tissue injury a meaningful risk. BPC-157/TB-500 running throughout the cycle, into PCT, and beyond is standard protocol for responsible SARM users. Neither compound interacts with the HPG axis or adds to suppression.",
+      },
+    ],
+  },
+  {
+    stack: ["MK-677", "MK-2866 (Ostarine)"],
+    label: "MK-677 + MK-2866",
+    subtitle: "Beginner Stack — Dual Anabolic Axis, Clean PCT",
+    warning: false,
+    faqs: [
+      {
+        q: "Why is MK-677 + MK-2866 the recommended beginner SARM stack?",
+        a: "This combination covers two independent anabolic axes with the best risk profile in the SARM category. MK-2866 provides AR-mediated anabolism with mild suppression and the most human clinical data of any SARM. MK-677 provides GH/IGF-1-mediated anabolism with zero suppression, zero PCT requirement, and oral administration. The combination produces body recomposition — simultaneous lean mass gain and modest fat loss — that exceeds what either compound achieves alone, without the aggressive suppression or side effect profile of RAD-140 or LGD-4033.",
+      },
+      {
+        q: "How do I structure the cycle and PCT?",
+        a: "MK-2866: 20mg/day oral, 10 weeks. MK-677: 25mg/day oral, continues through PCT and beyond indefinitely. PCT after MK-2866 cessation: Enclomiphene 12.5mg/day for 4 weeks or Nolvadex 20mg/day for 4 weeks. MK-677 runs through PCT without interruption — it is non-suppressive and can actually be considered supportive during the recovery period. Add BPC-157/TB-500 throughout to protect connective tissue.",
+      },
+      {
+        q: "What results can I expect compared to RAD-140?",
+        a: "Expect more modest results than RAD-140 — this is by design. MK-2866 + MK-677 over 10 weeks produces approximately 5–8 lbs of lean mass with a caloric surplus, with more gradual strength gains than RAD-140. The trade-off is significantly lower suppression, better tolerability, and a simpler recovery. For a first SARM cycle, this combination is the responsible entry point. Once individual response, bloodwork patterns, and PCT dynamics are understood, RAD-140 or LGD-4033 represents a logical escalation.",
+      },
+    ],
+  },
+  {
+    stack: ["RAD-140 (Testolone)", "MK-677", "BPC-157", "TB-500"],
+    label: "RAD-140 + MK-677 + BPC/TB",
+    subtitle: "Optimal Lean Bulk — Intermediate",
+    warning: false,
+    faqs: [
+      {
+        q: "What makes this the optimal intermediate lean bulk stack?",
+        a: "Three independent anabolic mechanisms with built-in recovery support and zero redundancy. RAD-140 drives AR-mediated anabolism — the primary muscle protein synthesis pathway. MK-677 drives GH/IGF-1-mediated anabolism — a completely separate pathway with no receptor overlap. BPC-157/TB-500 protects the connective tissue that will be under accelerating stress as strength increases rapidly. The support layer (Tadalafil, bloodwork, PCT infrastructure) makes the cycle sustainable. This is the architecture referenced in Stack 1 of the Umbrella Labs reference document.",
+      },
+      {
+        q: "What does the full timeline look like?",
+        a: "Weeks 1–10: RAD-140 10–15mg/day + MK-677 25mg/day + BPC-157 250–500mcg/day + TB-500 2.5mg 2x/week. Tadalafil 5mg/day throughout. TUDCA and NAC optional at this dose range but reasonable precaution. Weeks 11–14: PCT — Enclomiphene 12.5mg/day or Nolvadex 20mg/day. MK-677, BPC-157, TB-500 all continue through PCT without interruption. Week 14+: MK-677 continues indefinitely. 4 weeks post-PCT: Full bloodwork to confirm testosterone, LH, FSH recovery before considering next cycle.",
+      },
+      {
+        q: "Should I add CJC/Ipamorelin to this stack?",
+        a: "Yes, if injectable GH peptides are within the user's protocol comfort. CJC/Ipamorelin pre-sleep adds the pulsatile GH dimension that MK-677's continuous IGF-1 signal doesn't fully replicate. The combination of MK-677 (sustained IGF-1 baseline) + CJC/Ipamorelin (sharp sleep-window GH pulse) produces more total GH axis stimulation than either alone. The addition is non-suppressive and does not complicate PCT. The practical consideration is adding two more daily injections alongside BPC-157.",
       },
     ],
   },
@@ -438,15 +668,15 @@ const STACK_FAQS = [
     faqs: [
       {
         q: "Will the GH peptides help preserve muscle during Semaglutide weight loss?",
-        a: "This is exactly what this combination is designed for. Semaglutide drives caloric restriction via appetite suppression, which creates catabolic pressure on muscle tissue. GH peptides (CJC/Ipamorelin) are anti-catabolic — GH directly inhibits muscle protein breakdown and shifts the body toward fat oxidation as the primary energy substrate. Clinical data on GLP-1 therapy shows 25–40% of weight lost is lean mass without intervention — GH co-administration is the primary tool for improving that ratio.",
+        a: "This is exactly what this combination is designed for. Semaglutide drives caloric restriction via appetite suppression, which creates catabolic pressure on muscle tissue. GH peptides (CJC/Ipamorelin or MK-677) are anti-catabolic — GH directly inhibits muscle protein breakdown and shifts the body toward fat oxidation as the primary energy substrate. Clinical data on GLP-1 therapy shows 25–40% of weight lost is lean mass without intervention — GH co-administration is the primary tool for improving that ratio.",
       },
       {
         q: "Do these compounds interact with each other?",
-        a: "There is no known pharmacological interaction. They operate through completely independent receptor systems: GLP-1 receptor agonism vs. GHRH/ghrelin receptor systems. Semaglutide is administered weekly; CJC/Ipamorelin is administered pre-sleep. These don't need to be timed together. There are no known contraindications for this combination.",
+        a: "There is no known pharmacological interaction. They operate through completely independent receptor systems: GLP-1 receptor agonism vs. GHRH/ghrelin receptor systems. Semaglutide is administered weekly; CJC/Ipamorelin is administered pre-sleep; MK-677 is oral daily. These don't need to be timed together. There are no known contraindications for this combination.",
       },
       {
         q: "When should I start the GH stack relative to the GLP-1?",
-        a: "Simultaneously, from the start of the protocol. Muscle catabolism begins immediately when a caloric deficit is created — there is no benefit to waiting to add the anti-catabolic layer. Starting the GH peptide stack concurrent with Semaglutide initiation means the protective mechanism is in place from day one.",
+        a: "Simultaneously, from the start of the protocol. Muscle catabolism begins immediately when a caloric deficit is created — there is no benefit to waiting to add the anti-catabolic layer. MK-677 is the simplest addition (oral, no additional injections), making it the lowest-friction lean mass preservation tool for GLP-1 users who are uncomfortable adding more injections.",
       },
     ],
   },
@@ -463,14 +693,14 @@ const STACK_FAQS = [
     ],
   },
   {
-    stack: ["Retatrutide (GLP-3)", "Ipamorelin + CJC-1295"],
-    label: "Retatrutide + GH Stack",
-    subtitle: "Aggressive Fat Loss + Lean Mass Preservation",
-    warning: false,
+    stack: ["RAD-140 (Testolone)", "LGD-4033 (Ligandrol)"],
+    label: "RAD-140 + LGD-4033",
+    subtitle: "⚠️ High Suppression — Advanced Users Only",
+    warning: true,
     faqs: [
       {
-        q: "Is combining the GH stack with Retatrutide the right approach?",
-        a: "Yes — the same logic that makes GH peptides essential alongside Semaglutide applies even more strongly with Retatrutide. Retatrutide's Glucagon component adds direct catabolic pressure beyond what GLP-1 alone produces. The GH peptide stack is not optional with this combination — it's the primary lean mass preservation mechanism. High protein intake and resistance training are equally non-negotiable.",
+        q: "Is stacking RAD-140 and LGD-4033 safe?",
+        a: "This is a high-risk combination for most users. Both compounds are full AR agonists with significant suppression profiles — stacking them produces additive HPG suppression without an additive reduction in side effects. The increased risk of severe lipid impact, prolonged recovery, and liver enzyme elevation is not proportionally offset by muscle gains beyond what either alone provides at optimized doses. If you are considering this combination, bloodwork infrastructure (pre, mid, post-PCT), full PCT protocol, TUDCA/NAC throughout, and Tadalafil 5mg/day are non-negotiable. This is not appropriate as a first or second SARM cycle.",
       },
     ],
   },
@@ -492,11 +722,7 @@ const GENERAL_FAQS = [
       },
       {
         q: "How do I calculate my dose from a reconstituted vial?",
-        a: "Example: 5mg BPC-157 vial + 2mL bacteriostatic water = 2,500 mcg/mL. To dose 500 mcg: 500 ÷ 2,500 = 0.2mL = 20 units on a U-100 insulin syringe. Formula: Desired dose (mcg) ÷ Concentration (mcg/mL) = Volume (mL). Convert to units by multiplying mL × 100 for U-100 syringes. Label your vial: compound name, date, total amount, water volume added, resulting concentration.",
-      },
-      {
-        q: "How long can I store unreconstituted lyophilized peptides?",
-        a: "Lyophilized (freeze-dried) peptides in sealed vials stored away from light and moisture: typically 12–24 months at room temperature, longer when refrigerated or frozen. Once reconstituted, refrigerate and use within 30 days. Signs of degraded peptides: discoloration, cloudiness, or visible particulates after reconstitution. Discard if any of these are present.",
+        a: "Example: 5mg BPC-157 vial + 2mL bacteriostatic water = 2,500 mcg/mL. To dose 500 mcg: 500 ÷ 2,500 = 0.2mL = 20 units on a U-100 insulin syringe. Formula: Desired dose (mcg) ÷ Concentration (mcg/mL) = Volume (mL). Convert to units by multiplying mL × 100 for U-100 syringes.",
       },
       {
         q: "What needle size should I use for SubQ peptide injections?",
@@ -510,15 +736,15 @@ const GENERAL_FAQS = [
     faqs: [
       {
         q: "How do I perform a subcutaneous injection correctly?",
-        a: "Step-by-step: (1) Wash hands thoroughly. (2) Swab injection site with alcohol, allow to dry 30 seconds. (3) Pinch a fold of skin at the injection site (abdomen, outer thigh). (4) Insert needle at a 45–90° angle — 90° for adequate skin fold, 45° for thinner individuals. (5) Inject the solution slowly and steadily. (6) Withdraw needle and apply gentle pressure with a clean swab (do not rub). (7) Dispose of needle in a sharps container. The needles are very fine — the physical sensation is minimal.",
+        a: "Step-by-step: (1) Wash hands thoroughly. (2) Swab injection site with alcohol, allow to dry 30 seconds. (3) Pinch a fold of skin at the injection site (abdomen, outer thigh). (4) Insert needle at a 45–90° angle. (5) Inject the solution slowly and steadily. (6) Withdraw needle and apply gentle pressure with a clean swab (do not rub). (7) Dispose of needle in a sharps container. The needles are very fine — the physical sensation is minimal with proper technique.",
       },
       {
         q: "What should I do if I hit a blood vessel?",
-        a: "If blood appears in the syringe when you aspirate (pull back slightly on plunger), withdraw the needle, apply pressure, discard the syringe, and draw a fresh dose with a new needle. SubQ injections have very low risk of intravascular administration — the SubQ tissue layer has minimal vasculature. If blood appears at the injection site after withdrawal, apply gentle pressure for 30 seconds.",
+        a: "If blood appears in the syringe when you aspirate (pull back slightly on plunger), withdraw the needle, apply pressure, discard the syringe, and draw a fresh dose with a new needle. SubQ injections have very low risk of intravascular administration — the SubQ tissue layer has minimal vasculature.",
       },
       {
         q: "How do I manage injection site reactions?",
-        a: "Minor redness, swelling, or itching at the injection site is normal and typically resolves within 24 hours. Rotating injection sites prevents accumulated irritation. Persistent nodules from repeated injection at the same site (lipohypertrophy) can be avoided by systematic rotation. Significant swelling, warmth, or signs of infection (spreading redness, fever, discharge) warrant medical attention.",
+        a: "Minor redness, swelling, or itching at the injection site is normal and typically resolves within 24 hours. Rotating injection sites prevents accumulated irritation. Significant swelling, warmth, or signs of infection (spreading redness, fever, discharge) warrant medical attention immediately.",
       },
     ],
   },
@@ -527,34 +753,46 @@ const GENERAL_FAQS = [
     icon: "🩺",
     faqs: [
       {
-        q: "What is the minimum bloodwork I should run before any peptide protocol?",
-        a: "For peptide-only protocols: comprehensive metabolic panel (CMP), CBC, fasting glucose, and HbA1c. This establishes liver, kidney, and blood sugar baselines. For GH peptides: add IGF-1. For GLP-1s: add lipid panel, TSH. For any protocols involving hormonal compounds (SARMs): full hormone panel including total testosterone, free testosterone, LH, FSH, estradiol, SHBG. Bloodwork is the only real safety net — it's not optional for responsible protocol management.",
+        q: "What is the minimum bloodwork I should run before any protocol?",
+        a: "For peptide-only protocols: comprehensive metabolic panel (CMP), CBC, fasting glucose, and HbA1c. For GH peptides: add IGF-1. For GLP-1s: add lipid panel, TSH. For SARM protocols: full hormone panel including total testosterone, free testosterone, LH, FSH, estradiol, SHBG, PLUS ALT/AST (liver) and full lipid panel. Bloodwork is the only real safety net — it's not optional for responsible SARM use.",
       },
       {
         q: "What does IGF-1 testing tell me about my GH peptide protocol?",
-        a: "IGF-1 is the most useful biomarker for assessing GH peptide efficacy. Unlike GH itself (which spikes and falls rapidly), IGF-1 reflects cumulative GH output over approximately 24 hours. A successful GH peptide protocol should produce measurable IGF-1 elevation from your baseline. If IGF-1 is unchanged after 8+ weeks, assess: timing relative to meals (GH is suppressed by insulin), injection technique, and compound quality.",
+        a: "IGF-1 is the most useful biomarker for assessing GH peptide efficacy. Unlike GH itself (which spikes and falls rapidly), IGF-1 reflects cumulative GH output over approximately 24 hours. A successful GH peptide or MK-677 protocol should produce measurable IGF-1 elevation from your baseline. If IGF-1 is unchanged after 8+ weeks, assess: timing relative to meals (GH is suppressed by insulin), injection technique, compound quality.",
       },
       {
-        q: "How often should I get bloodwork while on a peptide protocol?",
-        a: "Minimum: baseline before starting, mid-protocol check at 6–8 weeks, and post-protocol assessment. The mid-protocol check is most valuable for catching emerging issues while there is still time to adjust. For suppressive protocols (SARMs), add a post-PCT check to confirm HPG axis recovery. Annual or quarterly bloodwork is an underutilized health optimization tool that provides objective data no subjective assessment can match.",
+        q: "What does the bloodwork timeline look like for a SARM cycle?",
+        a: "Pre-cycle: Full hormone panel (Total T, Free T, LH, FSH, Estradiol, SHBG), ALT/AST, lipid panel (LDL/HDL/TG), CBC. Mid-cycle (week 5–6): ALT/AST, Estradiol, blood pressure check. Post-PCT (4 weeks after PCT completion): Full pre-cycle panel repeat — verify testosterone, LH, and FSH have returned to pre-cycle baseline. This post-PCT check is non-negotiable. Do not start another cycle until this confirms recovery.",
+      },
+      {
+        q: "What should I look for in lipid panel results?",
+        a: "Key markers: LDL-C (target below 100 mg/dL for general health). HDL-C (target above 40 mg/dL for men, 50 mg/dL for women — SARMs typically lower HDL meaningfully). Triglycerides (target below 150 mg/dL). SARMs can worsen lipid profiles significantly — LDL up, HDL down. Tadalafil 5mg/day and omega-3 supplementation are standard cardiovascular support measures during a SARM cycle.",
       },
     ],
   },
   {
-    category: "PCT & Cycling",
+    category: "PCT — Post-Cycle Therapy",
     icon: "🔁",
     faqs: [
       {
-        q: "Do peptides require PCT (Post-Cycle Therapy)?",
-        a: "No. None of the eight compounds in the Alki core database suppress the HPG axis (hypothalamic-pituitary-gonadal axis). They do not reduce testosterone production, LH, or FSH. PCT (which typically involves SERMs like Nolvadex or Enclomiphene to restart natural testosterone production) is specifically required for compounds that suppress the HPG axis — primarily SARMs, anabolic steroids, and exogenous testosterone. GH peptides, GLP-1s, BPC-157, TB-500, GHK-Cu, and PT-141 can all be stopped without a PCT protocol.",
+        q: "Do peptides require PCT?",
+        a: "No. None of the eight original core compounds and none of the GH peptides in the expanded database suppress the HPG axis. GH peptides, GLP-1s, BPC-157, TB-500, GHK-Cu, and PT-141 can all be stopped without a PCT protocol. MK-677 is non-suppressive and requires no PCT. PCT is required for AR-active SARMs only.",
       },
       {
-        q: "Do peptides cause hormonal suppression?",
-        a: "The compounds in the Alki core database do not. GH peptides stimulate your own pituitary — they are not exogenous GH, which would suppress the pituitary. GLP-1s have no HPG interaction. BPC-157 and TB-500 are non-hormonal. GHK-Cu is a naturally occurring copper peptide. PT-141 acts on melanocortin receptors unrelated to HPG. This is a fundamental advantage of peptide-based protocols over SARM or steroid protocols.",
+        q: "Which SARMs require PCT and how aggressive does it need to be?",
+        a: "All AR-active SARMs require some PCT. Graduated by suppression severity: MK-2866 (Ostarine) — mild suppression, 4 weeks Nolvadex 20mg or Enclomiphene 12.5mg is sufficient. RAD-140 — moderate-high suppression, 4–6 weeks full SERM PCT. LGD-4033 — similar to RAD-140, 4–6 weeks. YK-11 / S-23 — near-complete shutdown, 6 weeks aggressive SERM PCT, consider double SERM (Nolvadex + Enclomiphene together) and extended monitoring. PCT duration and intensity should match suppression severity.",
       },
       {
-        q: "Should I cycle peptides or can I run them continuously?",
-        a: "Most peptides are run for defined protocol windows rather than continuously — not because of suppression risk but as a precautionary approach to long-term use without established human safety data. Common frameworks: BPC-157/TB-500 — run until recovery goal is achieved, then stop. GH peptides — often run in 3–6 month cycles with breaks. GLP-1s — can be long-term per clinical protocols. No compound in the core eight has a documented receptor tolerance mechanism that requires mandatory cycling.",
+        q: "What's the difference between Nolvadex and Enclomiphene for PCT?",
+        a: "Both are SERMs that block estrogen receptors at the hypothalamus, stimulating LH/FSH production and testosterone recovery. Enclomiphene is the preferred choice: it is the pure active trans-isomer of clomiphene without the zuclomiphene isomer responsible for mood crashes, visual disturbances, and emotional instability seen with racemic Clomid. Nolvadex (Tamoxifen) is a valid alternative — decades of clinical data, effective, and affordable. Use Enclomiphene when available; Nolvadex is a solid fallback.",
+      },
+      {
+        q: "Can I run anything during PCT to maintain gains?",
+        a: "Yes — and this is where MK-677 proves its value. As a non-suppressive GH secretagogue, MK-677 runs continuously through cycles and PCT without complicating HPG recovery. It maintains IGF-1 elevation, preserves sleep quality, and supports tissue integrity during the post-cycle period when natural testosterone is recovering. BPC-157 and TB-500 also continue through PCT without interruption. These three compounds are the standard 'PCT bridge' layer in the Alki protocol.",
+      },
+      {
+        q: "How long should I wait between SARM cycles?",
+        a: "Standard guideline: time off equals time on. If a cycle was 10 weeks, wait 10 weeks before starting the next (this period includes PCT). More conservatively: wait until bloodwork confirms LH, FSH, and testosterone have returned to pre-cycle baseline — which should occur within 4–8 weeks post-PCT for most users on mild-moderate SARMs. Running another cycle before confirming HPG axis recovery risks compounding suppression that becomes progressively harder to reverse.",
       },
     ],
   },
@@ -563,16 +801,30 @@ const GENERAL_FAQS = [
     icon: "🔬",
     faqs: [
       {
-        q: "How do I evaluate the quality of a peptide supplier?",
-        a: "Key quality indicators: (1) Certificate of Analysis (CoA) — every batch should have an independently verified CoA showing purity percentage (target 98%+) and compound identity confirmation. (2) HPLC testing documentation — High-Performance Liquid Chromatography is the standard purity verification method for peptides. (3) Third-party lab testing — in-house testing is a conflict of interest; reputable suppliers use independent labs. (4) Clear 'research use only' labeling. (5) Reputation and community verification in established forums with long verification histories.",
+        q: "How do I evaluate the quality of a supplier?",
+        a: "Key quality indicators: (1) Certificate of Analysis (CoA) — every batch should have an independently verified CoA showing purity percentage (target 98%+) and compound identity confirmation. (2) HPLC testing documentation — High-Performance Liquid Chromatography is the standard purity verification method. (3) Third-party lab testing — in-house testing is a conflict of interest; reputable suppliers use independent labs. (4) Clear 'research use only' labeling. (5) Reputation and community verification in established forums with long verification histories.",
       },
       {
         q: "What are the risks of sourcing from low-quality suppliers?",
-        a: "Primary risks: (1) Incorrect compound — receiving a different peptide than labeled is documented and consequential. (2) Contamination — bacterial endotoxins in improperly manufactured peptides can cause significant systemic inflammation, fever, and serious adverse reactions. (3) Underdosing — receiving less of the active compound than labeled. (4) Excessive additives — undisclosed excipients or solvents. Quality verification is the most important non-protocol decision in any research compound use.",
+        a: "Primary risks: (1) Incorrect compound — receiving a different compound than labeled is documented and consequential. (2) Contamination — bacterial endotoxins in improperly manufactured peptides can cause significant systemic inflammation, fever, and serious adverse reactions. (3) Underdosing — receiving less of the active compound than labeled, leading to wasted resources and ineffective protocols. (4) Undisclosed excipients or solvents. Quality verification is the most important non-protocol decision in any research compound use.",
       },
       {
-        q: "What does 'for research use only' mean?",
-        a: "'Research use only' is the legal designation for compounds that have not received FDA approval for human therapeutic use in the indications they're being sold for. This designation allows suppliers to legally sell compounds without making therapeutic claims. Alki operates within this framework as an information platform about research compounds. Users who choose to use these compounds are doing so outside established medical care, which is why comprehensive education and individual responsibility are essential.",
+        q: "What does 'for research use only' mean legally?",
+        a: "'Research use only' is the legal designation for compounds that have not received FDA approval for human therapeutic use in the indications they're being sold for. This designation allows suppliers to legally sell compounds without making therapeutic claims. The regulatory environment is active — the FDA issued 50+ warning letters to peptide vendors and compounders in 2024–2025, and federal agents raided major domestic peptide resellers in 2025. The gray market is being squeezed. Alki operates as an information platform within this framework; users who choose to use these compounds do so outside established medical care.",
+      },
+    ],
+  },
+  {
+    category: "Using the Cycle Timeline",
+    icon: "📅",
+    faqs: [
+      {
+        q: "What does the Cycle Timeline show?",
+        a: "The Cycle Timeline screen (accessible from the dashboard) generates a week-by-week visual schedule for any stack you've built. It maps compound start/stop dates, PCT windows, support compound phases, bloodwork check points, and the MK-677/peptide continuation layer through PCT. It is the scheduling layer that turns a compound selection into an actionable protocol calendar.",
+      },
+      {
+        q: "How do I use the Cycle Timeline effectively?",
+        a: "Select your compounds on the dashboard, then tap the Timeline button in the header. The timeline renders your stack's schedule from cycle start through post-PCT bloodwork confirmation. Use it to identify: when PCT begins relative to the last SARM dose, which compounds continue through PCT, when mid-cycle bloodwork should be drawn, and the total time commitment of the full protocol before the next cycle is cleared to start.",
       },
     ],
   },
@@ -1137,7 +1389,6 @@ const S = {
     marginTop: 10,
     fontStyle: "italic",
   },
-  // Search results
   body: {
     flex: 1,
     overflowY: "auto",
