@@ -5,6 +5,9 @@ import StackGenerator from "./StackGenerator";
 import AlkiProtocolQA from "./AlkiProtocolQA";
 import CycleTimeline from "./CycleTimeline";
 import { EXPANDED_COMPOUNDS } from "./data/compounds-expanded";
+import Body3DAvatar from "./Body3DAvatar";
+import AvaturnCapture from "./AvaturnCapture";
+import { AVATURN_ENABLED } from "./avaturnConfig";
 // ─────────────────────────────────────────────────────────────
 // The import above adds 63 compounds via `data/compounds-expanded.js`.
 // The original 8 compounds remain inline below, untouched.
@@ -1158,7 +1161,7 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline }) {
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, avatarUrl, onCaptureAvatar, onResetAvatar }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
@@ -1425,13 +1428,13 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </div>
 
         {/* Before / After */}
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            <BodyAvatar params={avatarParams.current} label="Current" />
+            <Body3DAvatar params={avatarParams.current} label="Current" size="large" interactive={true} avatarUrl={avatarUrl} />
           </div>
           <div style={{ fontSize: 24, color: "rgba(255,255,255,0.15)", paddingBottom: 40 }}>→</div>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            <BodyAvatar params={avatarParams.projected} label="Projected" glow={true} />
+            <Body3DAvatar params={avatarParams.projected} label="Projected" size="large" interactive={true} glow={true} avatarUrl={avatarUrl} />
           </div>
         </div>
 
@@ -1554,10 +1557,47 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
       {/* Profile summary */}
       <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ width: 80, flexShrink: 0 }}>
-          <BodyAvatar params={avatarParams.current} label="" />
+          <Body3DAvatar params={avatarParams.current} label="" size="small" interactive={false} autoRotate={true} avatarUrl={avatarUrl} />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Your Profile</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Your Profile</div>
+            {avatarUrl ? (
+              <button
+                onClick={onResetAvatar}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255,255,255,0.35)",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  padding: 0,
+                }}
+              >
+                Reset avatar
+              </button>
+            ) : (
+              <button
+                onClick={onCaptureAvatar}
+                style={{
+                  background: "rgba(34,214,138,0.12)",
+                  border: "1px solid rgba(34,214,138,0.3)",
+                  color: "#22d68a",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  padding: "5px 10px",
+                  borderRadius: 8,
+                }}
+              >
+                {AVATURN_ENABLED ? "Make it me" : "Make it me · setup"}
+              </button>
+            )}
+          </div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.8 }}>
             {profile.sex === "male" ? "Male" : "Female"} · {profile.age} yrs · {profile.heightFt}'{profile.heightIn}" · {profile.weight} lbs<br />
             Body fat: <span style={{ color: "#fff", fontWeight: 600 }}>{profile.bodyFat}%</span>
@@ -1700,9 +1740,22 @@ export default function AlkiApp() {
   const [profile, setProfile] = useState(null);
   const [selectedCompounds, setSelectedCompounds] = useState([]);
   const [showTransform, setShowTransform] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [showAvatarCapture, setShowAvatarCapture] = useState(false);
+
+  const handleAvatarCreated = useCallback((url) => {
+    setAvatarUrl(url);
+    setShowAvatarCapture(false);
+  }, []);
 
   return (
     <div style={S.app}>
+      {showAvatarCapture && (
+        <AvaturnCapture
+          onAvatarCreated={handleAvatarCreated}
+          onCancel={() => setShowAvatarCapture(false)}
+        />
+      )}
 
       {screen === "splash" && <SplashScreen onEnter={() => setScreen("agegate")} />}
       {screen === "agegate" && <AgeGate onConfirm={() => setScreen("onboarding")} onDeny={() => setScreen("blocked")} />}
@@ -1725,6 +1778,9 @@ export default function AlkiApp() {
           onReset={() => { setSelectedCompounds([]); setShowTransform(false); setScreen("onboarding"); }}
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
+          avatarUrl={avatarUrl}
+          onCaptureAvatar={() => setShowAvatarCapture(true)}
+          onResetAvatar={() => setAvatarUrl(null)}
         />
       )}
       {screen === "qa" && (
