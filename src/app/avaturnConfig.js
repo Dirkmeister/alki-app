@@ -16,7 +16,7 @@
  * instead.
  */
 
-export const AVATURN_SUBDOMAIN = "demo"; // replace with your subdomain
+export const AVATURN_SUBDOMAIN = "alki-io"; // your Avaturn subdomain
 
 export const AVATURN_ENABLED =
   AVATURN_SUBDOMAIN !== "demo" && AVATURN_SUBDOMAIN !== "";
