@@ -1428,14 +1428,22 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </p>
         </div>
 
-        {/* Before / After */}
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
+        {/* Before / After — SVG free / 3D premium based on avatarUrl */}
+        <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            <Body3DAvatar params={avatarParams.current} label="Current" size="large" interactive={true} avatarUrl={avatarUrl} />
+            {avatarUrl ? (
+              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="Current" size="large" interactive={true} />
+            ) : (
+              <BodyAvatar params={avatarParams.current} label="Current" />
+            )}
           </div>
           <div style={{ fontSize: 24, color: "rgba(255,255,255,0.15)", paddingBottom: 40 }}>→</div>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            <Body3DAvatar params={avatarParams.projected} label="Projected" size="large" interactive={true} glow={true} avatarUrl={avatarUrl} />
+            {avatarUrl ? (
+              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.projected} label="Projected" size="large" interactive={true} glow={true} />
+            ) : (
+              <BodyAvatar params={avatarParams.projected} label="Projected" glow={true} />
+            )}
           </div>
         </div>
 
@@ -1561,7 +1569,11 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
       {/* Profile summary */}
       <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ width: 80, flexShrink: 0 }}>
-          <Body3DAvatar params={avatarParams.current} label="" size="small" interactive={false} autoRotate={true} avatarUrl={avatarUrl} />
+          {avatarUrl ? (
+            <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="small" interactive={false} autoRotate={true} />
+          ) : (
+            <BodyAvatar params={avatarParams.current} label="" />
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
