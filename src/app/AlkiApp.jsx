@@ -1284,9 +1284,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     catch (e) { console.error('getRecommendations error:', e); return []; }
   }, [profile]);
   const stackAnalysis = useMemo(() => {
-    if (selectedCompounds.length === 0) return { isBlocked: false, issues: [], compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null };
+    if (selectedCompounds.length === 0) return { isBlocked: false, compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null };
     try { return analyzeStack(selectedCompounds, profile); }
-    catch (e) { console.error('analyzeStack error:', e); return { isBlocked: false, issues: [], compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null }; }
+    catch (e) { console.error('analyzeStack error:', e); return { isBlocked: false, compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null }; }
   }, [selectedCompounds, profile]);
 
   useEffect(() => { setTimeout(() => setAnimateIn(true), 100); }, []);
@@ -1534,6 +1534,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
 
   // ── Resolve profile with latest log data when protocol is locked ──
+  // If user has logged newer BF/weight, the avatar should reflect that
   const effectiveProfile = useMemo(() => {
     if (!activeProtocol || editing || !progressLogs || !progressLogs.length) return profile;
     const latest = progressLogs[0];
@@ -1695,6 +1696,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       </div>
     );
   }
+
 
   return (
     <div style={{ ...S.inner, opacity: animateIn ? 1 : 0, transition: "opacity 0.6s ease" }}>
