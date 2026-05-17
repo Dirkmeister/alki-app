@@ -9,6 +9,8 @@ import Body3DAvatar from "./Body3DAvatar";
 import AvaturnCapture from "./AvaturnCapture";
 import { AVATURN_ENABLED } from "./avaturnConfig";
 import PeptideModeler from "./PeptideModeler";
+import ProgressLog from "./screens/ProgressLog";
+import { getCultivationState, getCultivationVisuals, getRegressionFactor } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 // ─────────────────────────────────────────────────────────────
 // The import above adds 63 compounds via `data/compounds-expanded.js`.
@@ -1025,7 +1027,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
       {/* Quick stats row */}
       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
-          Protocol: {c.dosing}
+          Research Protocol: {c.dosing}
         </span>
         <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
           {c.cycle}
@@ -1046,7 +1048,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
       {expanded && (
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ ...S.label, marginBottom: 6 }}>Key Benefits</div>
+            <div style={{ ...S.label, marginBottom: 6 }}>Research-Documented Benefits</div>
             {c.keyBenefits.map((b, i) => (
               <div key={i} style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", padding: "3px 0", paddingLeft: 12, borderLeft: `2px solid ${catColor}40` }}>
                 {b}
@@ -1055,13 +1057,13 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <div>
-              <div style={{ ...S.label, marginBottom: 6, color: "#22d68a" }}>Pros</div>
+              <div style={{ ...S.label, marginBottom: 6, color: "#22d68a" }}>Documented Advantages</div>
               {c.pros.map((p, i) => (
                 <div key={i} style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "3px 0", lineHeight: 1.5 }}>+ {p}</div>
               ))}
             </div>
             <div>
-              <div style={{ ...S.label, marginBottom: 6, color: "#ef4444" }}>Cons</div>
+              <div style={{ ...S.label, marginBottom: 6, color: "#ef4444" }}>Documented Considerations</div>
               {c.cons.map((p, i) => (
                 <div key={i} style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "3px 0", lineHeight: 1.5 }}>− {p}</div>
               ))}
@@ -1173,7 +1175,7 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, onModeler, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, onModeler, onProgress, cultivationState, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
@@ -1569,6 +1571,9 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button onClick={onProgress} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Progress
+          </button>
           <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Modeler
           </button>
@@ -1656,8 +1661,48 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </div>
       </div>
 
+      {/* Eidolon Cultivation Status */}
+      {(() => {
+        const cv = getCultivationVisuals(cultivationState?.state || "new");
+        return (
+          <div
+            onClick={onProgress}
+            style={{
+              ...S.card,
+              borderColor: cv.statusBorder,
+              background: cv.statusBg,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}
+          >
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                <span style={{ color: cv.statusColor, fontSize: 13 }}>{cv.statusIcon}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: cv.statusColor }}>
+                  Eidolon: {cv.statusLabel}
+                </span>
+                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.08)", color: "rgba(34,214,138,0.6)", fontWeight: 600 }}>PRO</span>
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+                {cultivationState?.state === "new" && "Log your first check-in →"}
+                {cultivationState?.state === "progressing" && `${cultivationState.streak}-week streak · Tap to log`}
+                {cultivationState?.state === "stagnant" && `${cultivationState.daysSinceLog}d since last log · Eidolon frozen`}
+                {cultivationState?.state === "regressing" && `${cultivationState.daysSinceLog}d since last log · Gains fading`}
+              </div>
+            </div>
+            <div style={{ color: cv.statusColor, fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+              {cultivationState?.streak > 0 ? cultivationState.streak : "→"}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Stack Generator — compose fresh stacks for the user's profile */}
-      <StackGenerator
+      <div style={{ position: "relative" }}>
+        <span style={{ position: "absolute", top: 10, right: 10, fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.08)", color: "rgba(34,214,138,0.6)", fontWeight: 600, zIndex: 1 }}>PRO</span>
+        <StackGenerator
         profile={profile}
         compoundCatalog={COMPOUNDS}
         onLoadStack={(compoundIds) => {
@@ -1665,6 +1710,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           setShowTransform(false);
         }}
       />
+      </div>
 
       {/* Transform CTA */}
       {selectedCompounds.length > 0 && (
@@ -1684,6 +1730,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           {stackAnalysis.isBlocked
             ? "Resolve Contraindications to Continue"
             : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
+          {!stackAnalysis.isBlocked && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(10,10,10,0.3)", color: "rgba(10,10,10,0.7)", fontWeight: 600, marginLeft: 4 }}>PRO</span>}
         </button>
       )}
 
@@ -1714,8 +1761,9 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
       />
 
       {/* Recommended */}
-      <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
+      <div style={{ ...S.label, marginBottom: 12, marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
         Matched to Your Profile — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
+        {recommended.length > 3 && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.08)", color: "rgba(34,214,138,0.6)", fontWeight: 600 }}>3 FREE · REST PRO</span>}
       </div>
       {recommended.length === 0 && (
         <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
@@ -1956,6 +2004,7 @@ export default function AlkiApp() {
   const [showTransform, setShowTransform] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
+  const [progressLogs, setProgressLogs] = useState([]);
   const saveTimeout = useRef(null);
 
   // ── Session check on mount ──
@@ -1975,6 +2024,12 @@ export default function AlkiApp() {
             setScreen("onboarding");
           }
         });
+        // Load progress logs for cultivation state
+        if (supabase) {
+          supabase.from("progress_logs").select("*").eq("user_id", session.user.id)
+            .order("logged_at", { ascending: false }).limit(50)
+            .then(({ data }) => { if (data) setProgressLogs(data); });
+        }
       } else {
         setScreen("splash");
       }
@@ -2005,6 +2060,8 @@ export default function AlkiApp() {
     return () => clearTimeout(saveTimeout.current);
   }, [user, profile, selectedCompounds, avatarUrl]);
 
+  const cultivationState = useMemo(() => getCultivationState(progressLogs), [progressLogs]);
+
   const handleAvatarCreated = useCallback((url) => {
     setAvatarUrl(url);
     setShowAvatarCapture(false);
@@ -2030,6 +2087,12 @@ export default function AlkiApp() {
       setScreen("dashboard");
     } else {
       setScreen("onboarding");
+    }
+    // Load progress logs
+    if (supabase) {
+      supabase.from("progress_logs").select("*").eq("user_id", authUser.id)
+        .order("logged_at", { ascending: false }).limit(50)
+        .then(({ data }) => { if (data) setProgressLogs(data); });
     }
   };
 
@@ -2082,11 +2145,21 @@ export default function AlkiApp() {
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
           onModeler={() => setScreen("modeler")}
+          onProgress={() => setScreen("progress")}
+          cultivationState={cultivationState}
           avatarUrl={avatarUrl}
           onCaptureAvatar={() => setShowAvatarCapture(true)}
           onResetAvatar={() => setAvatarUrl(null)}
           onSignOut={supabase ? handleSignOut : null}
           userEmail={user?.email || null}
+        />
+      )}
+      {screen === "progress" && (
+        <ProgressLog
+          onBack={() => setScreen("dashboard")}
+          userId={user?.id}
+          profile={profile}
+          cultivationState={cultivationState}
         />
       )}
       {screen === "qa" && (
