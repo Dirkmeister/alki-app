@@ -8,6 +8,7 @@ import { EXPANDED_COMPOUNDS } from "./data/compounds-expanded";
 import Body3DAvatar from "./Body3DAvatar";
 import AvaturnCapture from "./AvaturnCapture";
 import { AVATURN_ENABLED } from "./avaturnConfig";
+import PeptideModeler from "./PeptideModeler";
 // ─────────────────────────────────────────────────────────────
 // The import above adds 63 compounds via `data/compounds-expanded.js`.
 // The original 8 compounds remain inline below, untouched.
@@ -1161,7 +1162,7 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, avatarUrl, onCaptureAvatar, onResetAvatar }) {
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, onModeler, avatarUrl, onCaptureAvatar, onResetAvatar }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
@@ -1545,6 +1546,9 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Modeler
+          </button>
           <button onClick={onQA} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Protocol Q&amp;A
           </button>
@@ -1778,6 +1782,7 @@ export default function AlkiApp() {
           onReset={() => { setSelectedCompounds([]); setShowTransform(false); setScreen("onboarding"); }}
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
+          onModeler={() => setScreen("modeler")}
           avatarUrl={avatarUrl}
           onCaptureAvatar={() => setShowAvatarCapture(true)}
           onResetAvatar={() => setAvatarUrl(null)}
@@ -1790,6 +1795,14 @@ export default function AlkiApp() {
         <CycleTimeline
           stack={selectedCompounds}
           initialCycleLength={12}
+          onBack={() => setScreen("dashboard")}
+        />
+      )}
+      {screen === "modeler" && (
+        <PeptideModeler
+          profile={profile}
+          selectedCompounds={selectedCompounds}
+          compoundCatalog={COMPOUNDS}
           onBack={() => setScreen("dashboard")}
         />
       )}
