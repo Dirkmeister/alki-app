@@ -1921,11 +1921,8 @@ function AuthScreen({ onAuth, onBack, onSkip }) {
           </div>
         )}
 
-        <button onClick={handleSubmit} disabled={loading} style={{ ...S.btn, ...(loading ? S.btnDisabled : {}), marginBottom: 12 }}>
+        <button onClick={handleSubmit} disabled={loading} style={{ ...S.btn, ...(loading ? S.btnDisabled : {}), marginBottom: 20 }}>
           {loading ? "Working..." : (mode === "signin" ? "Sign In" : "Create Account")}
-        </button>
-        <button onClick={handleGoogleAuth} style={{ ...S.btnOutline, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          Continue with Google
         </button>
 
         <div style={{ textAlign: "center" }}>
