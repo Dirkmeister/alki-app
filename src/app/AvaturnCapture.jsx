@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { AVATURN_ENABLED, AVATURN_URL } from "./avaturnConfig";
+import AvatarHeadshot from "./AvatarHeadshot";
 
 /**
  * AvaturnCapture — Embeds the Avaturn iframe to capture a user's
@@ -21,8 +22,9 @@ import { AVATURN_ENABLED, AVATURN_URL } from "./avaturnConfig";
 export default function AvaturnCapture({ onAvatarCreated, onCancel }) {
   const containerRef = useRef(null);
   const sdkRef = useRef(null);
-  const [status, setStatus] = useState("loading"); // loading | ready | error | disabled
+  const [status, setStatus] = useState("loading"); // loading | ready | error | disabled | rendering
   const [errorMsg, setErrorMsg] = useState("");
+  const [pendingGlbUrl, setPendingGlbUrl] = useState(null);
 
   useEffect(() => {
     if (!AVATURN_ENABLED) {
@@ -57,7 +59,10 @@ export default function AvaturnCapture({ onAvatarCreated, onCancel }) {
           // data.url is the GLB; data also includes avatarId, ARKit blendshape info, etc.
           const glbUrl = data?.url || data?.avatarUrl || data?.glb;
           if (glbUrl) {
-            onAvatarCreated(glbUrl);
+            // Don't close the modal yet — generate the static headshot PNG
+            // first, then hand both up to the parent.
+            setPendingGlbUrl(glbUrl);
+            setStatus("rendering");
           } else {
             setErrorMsg("Avaturn returned no avatar URL. Try again.");
             setStatus("error");
@@ -128,6 +133,7 @@ export default function AvaturnCapture({ onAvatarCreated, onCancel }) {
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         {status === "disabled" && <SetupNotice onCancel={onCancel} />}
         {status === "loading" && <LoadingState />}
+        {status === "rendering" && <RenderingState />}
         {status === "error" && <ErrorState message={errorMsg} onCancel={onCancel} />}
 
         {/* Always-present container; SDK mounts into it when enabled */}
@@ -136,9 +142,25 @@ export default function AvaturnCapture({ onAvatarCreated, onCancel }) {
           style={{
             width: "100%",
             height: "100%",
-            display: AVATURN_ENABLED && status !== "error" ? "block" : "none",
+            display: AVATURN_ENABLED && status !== "error" && status !== "rendering" ? "block" : "none",
           }}
         />
+
+        {/* Offscreen one-shot headshot renderer. Mounts only when we have a
+            pending GLB; runs once; hands the PNG back to the parent. */}
+        {pendingGlbUrl && (
+          <AvatarHeadshot
+            glbUrl={pendingGlbUrl}
+            onComplete={(headshotDataUrl) => {
+              onAvatarCreated(pendingGlbUrl, headshotDataUrl);
+            }}
+            onError={() => {
+              // Fall back to using just the GLB even if the PNG fails
+              onAvatarCreated(pendingGlbUrl, null);
+            }}
+          />
+        )}
+
         <style jsx global>{`
           .alki-avaturn-iframe {
             width: 100% !important;
@@ -147,6 +169,21 @@ export default function AvaturnCapture({ onAvatarCreated, onCancel }) {
             display: block !important;
           }
         `}</style>
+      </div>
+    </div>
+  );
+}
+
+function RenderingState() {
+  return (
+    <div style={centerStyle}>
+      <div style={{ maxWidth: 280, textAlign: "center" }}>
+        <div style={{ fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", color: "#22d68a", marginBottom: 12 }}>
+          Finalizing your avatar
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
+          Generating profile image…
+        </div>
       </div>
     </div>
   );

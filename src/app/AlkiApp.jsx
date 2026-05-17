@@ -1217,7 +1217,7 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) 
   );
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const [editing, setEditing] = useState(!activeProtocol);
@@ -1749,8 +1749,19 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </button>
         )}
         <div style={{ width: 80, flexShrink: 0 }}>
-          {avatarUrl ? (
-            <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="small" interactive={false} autoRotate={true} />
+          {avatarHeadshot ? (
+            <img
+              src={avatarHeadshot}
+              alt="Your avatar"
+              style={{
+                width: "100%",
+                aspectRatio: "1 / 1",
+                objectFit: "cover",
+                borderRadius: "50%",
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.02)",
+              }}
+            />
           ) : (
             <BodyAvatar params={avatarParams.current} label="" />
           )}
@@ -2223,12 +2234,23 @@ export default function AlkiApp() {
   const [selectedCompounds, setSelectedCompounds] = useState([]);
   const [showTransform, setShowTransform] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [avatarHeadshot, setAvatarHeadshot] = useState(null);
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
   const [progressLogs, setProgressLogs] = useState([]);
   const [activeProtocol, setActiveProtocol] = useState(null);
   const [eidolons, setEidolons] = useState([]);
   const [activeEidolonId, setActiveEidolonId] = useState(null);
   const saveTimeout = useRef(null);
+
+  // ── Load saved avatar (URL + headshot PNG) from localStorage on mount ──
+  useEffect(() => {
+    try {
+      const savedUrl = localStorage.getItem("alki_avatar_url");
+      const savedShot = localStorage.getItem("alki_avatar_headshot");
+      if (savedUrl) setAvatarUrl(savedUrl);
+      if (savedShot) setAvatarHeadshot(savedShot);
+    } catch (_) {}
+  }, []);
 
   // ── Session check on mount ──
   useEffect(() => {
@@ -2288,9 +2310,27 @@ export default function AlkiApp() {
 
   const cultivationState = useMemo(() => getCultivationState(progressLogs), [progressLogs]);
 
-  const handleAvatarCreated = useCallback((url) => {
+  const handleAvatarCreated = useCallback((url, headshotDataUrl) => {
     setAvatarUrl(url);
+    setAvatarHeadshot(headshotDataUrl || null);
     setShowAvatarCapture(false);
+    try {
+      localStorage.setItem("alki_avatar_url", url);
+      if (headshotDataUrl) {
+        localStorage.setItem("alki_avatar_headshot", headshotDataUrl);
+      } else {
+        localStorage.removeItem("alki_avatar_headshot");
+      }
+    } catch (_) {}
+  }, []);
+
+  const handleResetAvatar = useCallback(() => {
+    setAvatarUrl(null);
+    setAvatarHeadshot(null);
+    try {
+      localStorage.removeItem("alki_avatar_url");
+      localStorage.removeItem("alki_avatar_headshot");
+    } catch (_) {}
   }, []);
 
   const handleSignOut = async () => {
@@ -2390,8 +2430,9 @@ export default function AlkiApp() {
           cultivationState={cultivationState}
           progressLogs={progressLogs}
           avatarUrl={avatarUrl}
+          avatarHeadshot={avatarHeadshot}
           onCaptureAvatar={() => setShowAvatarCapture(true)}
-          onResetAvatar={() => setAvatarUrl(null)}
+          onResetAvatar={handleResetAvatar}
           onSignOut={supabase ? handleSignOut : null}
           userEmail={user?.email || null}
           eidolons={eidolons}
