@@ -15,12 +15,19 @@ import * as THREE from "three";
  *      renders the primitive-based humanoid driven by
  *      { fat, muscle, isMale }.
  *
- * Both modes accept the same `params` object so the rest of the
- * app does not need to change between modes.
+ * Coordinate convention (both modes):
+ *   - Model feet land on y = 0
+ *   - Model head-top is at y ≈ 1.7
+ *   - Mid-torso ≈ y = 0.95
+ *
+ * That convention is enforced inside each <Humanoid />
+ * and <GLBAvatar />, so the outer Canvas camera + target work
+ * identically for both modes.
  */
 
 // ──────────────────────────────────────────────────────────────
 // PARAMETRIC HUMANOID (fallback)
+// Anchored: feet at y=0, head at y≈1.7
 // ──────────────────────────────────────────────────────────────
 function Humanoid({ params, glow, autoRotate = true }) {
   const { fat, muscle, isMale } = params;
@@ -44,6 +51,7 @@ function Humanoid({ params, glow, autoRotate = true }) {
   const headR     = 0.105 + fat * 0.020;
   const deltR     = armR + muscle * 0.022;
 
+  // Y positions — feet at 0, head ≈ 1.72
   const headY     = 1.62;
   const neckTop   = 1.52;
   const neckBot   = 1.43;
@@ -86,8 +94,9 @@ function Humanoid({ params, glow, autoRotate = true }) {
     );
   };
 
+  // NO outer offset — feet sit at y=0 as the convention requires.
   return (
-    <group ref={groupRef} position={[0, -0.85, 0]}>
+    <group ref={groupRef} position={[0, 0, 0]}>
       <mesh position={[0, headY, 0]} castShadow>
         <sphereGeometry args={[headR, 32, 32]} />
         <meshStandardMaterial {...skinMat} />
@@ -115,6 +124,7 @@ function Humanoid({ params, glow, autoRotate = true }) {
       <Limb x={0} yTop={chestY} yBot={waistY} rTop={chestW / 2} rBot={waistW / 2} />
       <Limb x={0} yTop={waistY} yBot={hipY} rTop={waistW / 2} rBot={hipW / 2} />
 
+      {/* Male: pec mass hint */}
       {isMale && muscle > 0.4 && (
         <>
           <mesh position={[-chestW / 4, chestY + 0.05, chestW / 4]} castShadow>
@@ -124,6 +134,20 @@ function Humanoid({ params, glow, autoRotate = true }) {
           <mesh position={[chestW / 4, chestY + 0.05, chestW / 4]} castShadow>
             <sphereGeometry args={[chestW / 5, 18, 12]} />
             <meshStandardMaterial {...skinDeepMat} />
+          </mesh>
+        </>
+      )}
+
+      {/* Male: visible pec plate even at lower muscle (so chest reads male) */}
+      {isMale && (
+        <>
+          <mesh position={[-chestW / 4.5, chestY + 0.04, chestW / 5]} castShadow>
+            <sphereGeometry args={[chestW / 4.5, 20, 14]} />
+            <meshStandardMaterial color={skinHex} roughness={0.62} metalness={0} />
+          </mesh>
+          <mesh position={[chestW / 4.5, chestY + 0.04, chestW / 5]} castShadow>
+            <sphereGeometry args={[chestW / 4.5, 20, 14]} />
+            <meshStandardMaterial color={skinHex} roughness={0.62} metalness={0} />
           </mesh>
         </>
       )}
@@ -171,76 +195,88 @@ function Humanoid({ params, glow, autoRotate = true }) {
 
 // ──────────────────────────────────────────────────────────────
 // GLB AVATAR (photoreal — Avaturn export)
+// Normalized to: feet at y=0, head ≈ y=1.7
 // ──────────────────────────────────────────────────────────────
-function GLBAvatar({ url, params, glow, autoRotate = true, framing = "full" }) {
+function GLBAvatar({ url, params, glow, autoRotate = true }) {
   const { fat, muscle } = params;
   const groupRef = useRef();
   const { scene } = useGLTF(url);
 
-  // Clone so multiple instances (current + projected) don't share state
+  // Clone so multiple instances (current + projected) don't share state.
   const cloned = useMemo(() => scene.clone(true), [scene]);
 
-  // Measure the model on first load to compute scale + center offset.
-  // Avaturn models are ~1.7m tall with origin at feet, but we frame
-  // everything to a normalized "unit-1.7m model centered around y=0.85"
-  // so the camera framing in the outer Canvas can be universal.
-  const fitTransform = useMemo(() => {
-    if (!cloned) return { scale: 1, offsetY: 0, height: 1.7 };
+  // Auto-fit: measure box, recenter X/Z, lift floor to y=0, scale to 1.7m.
+  const fit = useMemo(() => {
+    if (!cloned) return { scale: 1, offsetX: 0, offsetY: 0, offsetZ: 0 };
+
+    // Reset any previous transform we applied, so re-measure is accurate.
+    cloned.position.set(0, 0, 0);
+    cloned.scale.set(1, 1, 1);
+
     const box = new THREE.Box3().setFromObject(cloned);
     const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
     box.getSize(size);
-    box.getCenter(center);
 
     const modelHeight = Math.max(size.y, 0.001);
-    const targetHeight = 1.7; // canonical target height in scene units
+    const targetHeight = 1.7;
     const scale = targetHeight / modelHeight;
 
-    // After scaling, we want feet at y=0 (so model occupies y=0..1.7).
-    // box.min.y * scale would be the new floor; we shift up by -box.min.y * scale.
-    const floorAfterScale = box.min.y * scale;
-    const offsetY = -floorAfterScale;
+    // After scaling:
+    //   new floor y = box.min.y * scale
+    //   new midX   = (box.min.x + box.max.x) / 2 * scale
+    //   new midZ   = (box.min.z + box.max.z) / 2 * scale
+    const offsetY = -box.min.y * scale;                       // lift feet to y=0
+    const offsetX = -((box.min.x + box.max.x) / 2) * scale;   // center X
+    const offsetZ = -((box.min.z + box.max.z) / 2) * scale;   // center Z
 
-    return { scale, offsetY, height: targetHeight, centerX: -center.x * scale, centerZ: -center.z * scale };
+    return { scale, offsetX, offsetY, offsetZ };
   }, [cloned]);
 
+  // Apply per-mesh body-comp tweaks WITHOUT touching the head.
   useEffect(() => {
     if (!cloned) return;
-
-    // Body-comp scale heuristic — visible enough to read on previews
-    // but conservative enough to never distort the head or face.
-    const torsoScaleX = 1.0 + fat * 0.10 - muscle * 0.02 + (muscle * 0.04);
+    const torsoScaleX = 1.0 + fat * 0.10 - muscle * 0.02 + muscle * 0.04;
     const torsoScaleY = 1.0;
     const torsoScaleZ = 1.0 + fat * 0.08 + muscle * 0.03;
 
     cloned.traverse((obj) => {
-      if (obj.isMesh) {
-        const lower = (obj.name || "").toLowerCase();
-        const isHead = lower.includes("head") || lower.includes("face") || lower.includes("hair") || lower.includes("eye") || lower.includes("teeth") || lower.includes("tongue");
-        const isBody = !isHead && (lower.includes("body") || lower.includes("torso") || lower.includes("avatar"));
+      if (!obj.isMesh) return;
+      const lower = (obj.name || "").toLowerCase();
+      const isHead =
+        lower.includes("head") ||
+        lower.includes("face") ||
+        lower.includes("hair") ||
+        lower.includes("eye") ||
+        lower.includes("teeth") ||
+        lower.includes("tongue") ||
+        lower.includes("beard") ||
+        lower.includes("brow");
+      const isBody = !isHead && (
+        lower.includes("body") ||
+        lower.includes("torso") ||
+        lower.includes("avatar")
+      );
 
-        if (isHead) {
-          obj.scale.set(1, 1, 1);
-        } else if (isBody) {
-          obj.scale.set(torsoScaleX, torsoScaleY, torsoScaleZ);
-        }
-
-        if (obj.material && !obj.userData._alkiTuned) {
-          if (obj.material.roughness !== undefined) {
-            obj.material.roughness = Math.min(1, (obj.material.roughness ?? 0.7) + 0.05);
-            obj.material.metalness = 0;
-          }
-          if (glow && obj.material.emissive) {
-            obj.material.emissive = new THREE.Color("#0e4a2a");
-            obj.material.emissiveIntensity = 0.18;
-          }
-          obj.material.needsUpdate = true;
-          obj.userData._alkiTuned = true;
-        }
-
-        obj.castShadow = true;
-        obj.receiveShadow = false;
+      if (isHead) {
+        obj.scale.set(1, 1, 1);
+      } else if (isBody) {
+        obj.scale.set(torsoScaleX, torsoScaleY, torsoScaleZ);
       }
+
+      if (obj.material && !obj.userData._alkiTuned) {
+        if (obj.material.roughness !== undefined) {
+          obj.material.roughness = Math.min(1, (obj.material.roughness ?? 0.7) + 0.05);
+          obj.material.metalness = 0;
+        }
+        if (glow && obj.material.emissive) {
+          obj.material.emissive = new THREE.Color("#0e4a2a");
+          obj.material.emissiveIntensity = 0.18;
+        }
+        obj.material.needsUpdate = true;
+        obj.userData._alkiTuned = true;
+      }
+      obj.castShadow = true;
+      obj.receiveShadow = false;
     });
   }, [cloned, fat, muscle, glow]);
 
@@ -250,15 +286,11 @@ function GLBAvatar({ url, params, glow, autoRotate = true, framing = "full" }) {
     }
   });
 
-  // For "head" framing (small profile bubble), nudge the model down
-  // so the head dominates the visible area.
-  const verticalOffset = framing === "head" ? -1.4 : -0.85;
-
   return (
     <group
       ref={groupRef}
-      position={[fitTransform.centerX ?? 0, verticalOffset + fitTransform.offsetY, fitTransform.centerZ ?? 0]}
-      scale={fitTransform.scale}
+      position={[fit.offsetX, fit.offsetY, fit.offsetZ]}
+      scale={fit.scale}
     >
       <primitive object={cloned} />
     </group>
@@ -267,6 +299,7 @@ function GLBAvatar({ url, params, glow, autoRotate = true, framing = "full" }) {
 
 // ──────────────────────────────────────────────────────────────
 // OUTER COMPONENT
+// One camera convention for both modes since both place feet at y=0.
 // ──────────────────────────────────────────────────────────────
 export default function Body3DAvatar({
   params,
@@ -277,30 +310,31 @@ export default function Body3DAvatar({
   autoRotate = true,
   avatarUrl = null,
 }) {
-  // Camera framing depends BOTH on size AND on whether we have a GLB.
-  // Small + GLB → close-up of head/shoulders (avatar reveal vibe).
-  // Large + GLB → full body, slightly wider FOV to fit Avaturn's taller mesh.
-  // Parametric mode keeps the original tight framing.
   const isGLB = !!avatarUrl;
-  const framing = size === "small" ? "head" : "full";
 
-  let camPos, camFov;
-  if (isGLB) {
-    if (size === "small") {
-      camPos = [0, 0.0, 1.0];   // closer for head/shoulders bubble
-      camFov = 28;
-    } else {
-      camPos = [0, 0.15, 3.4];  // pulled back to fit ~1.7m model
-      camFov = 28;
-    }
+  // Camera setups (model is 1.7m tall, feet at y=0):
+  //   - LARGE: full body. Camera at mid-body height, ~3.0m away.
+  //   - SMALL: head-and-shoulders portrait. Camera near head, very close.
+  let camPos, camFov, targetY, ctrlMinPol, ctrlMaxPol;
+
+  if (size === "small") {
+    // Profile-card bubble — head + upper chest portrait
+    camPos = [0, 1.55, 1.4];
+    camFov = 26;
+    targetY = 1.55;
+    ctrlMinPol = Math.PI / 2.4;
+    ctrlMaxPol = Math.PI / 1.95;
   } else {
-    // Parametric humanoid — original tight framing
-    camPos = size === "small" ? [0, 0.3, 2.4] : [0, 0.3, 2.6];
-    camFov = size === "small" ? 22 : 24;
+    // Full-body framing
+    camPos = isGLB ? [0, 1.0, 3.4] : [0, 1.0, 3.0];
+    camFov = isGLB ? 26 : 28;
+    targetY = 0.95;
+    ctrlMinPol = Math.PI / 2.6;
+    ctrlMaxPol = Math.PI / 1.9;
   }
 
   const wrapStyle = size === "small"
-    ? { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 100 }
+    ? { width: "100%", aspectRatio: "1 / 1.4", maxWidth: 100 }
     : { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 200 };
 
   return (
@@ -313,8 +347,8 @@ export default function Body3DAvatar({
           gl={{ antialias: true, alpha: true, preserveDrawingBuffer: false }}
           style={{ background: "transparent" }}
         >
-          {/* Premium 3-point lighting — Apple Fitness+ feel */}
-          <ambientLight intensity={0.4} />
+          {/* Premium 3-point lighting */}
+          <ambientLight intensity={0.42} />
           <directionalLight
             position={[2.5, 4, 3]}
             intensity={1.15}
@@ -331,13 +365,13 @@ export default function Body3DAvatar({
 
           <Suspense fallback={null}>
             {isGLB ? (
-              <GLBAvatar url={avatarUrl} params={params} glow={glow} autoRotate={autoRotate} framing={framing} />
+              <GLBAvatar url={avatarUrl} params={params} glow={glow} autoRotate={autoRotate} />
             ) : (
               <Humanoid params={params} glow={glow} autoRotate={autoRotate} />
             )}
             {size === "large" && (
               <ContactShadows
-                position={[0, -0.86, 0]}
+                position={[0, 0, 0]}
                 opacity={0.45}
                 scale={3}
                 blur={2.4}
@@ -351,11 +385,11 @@ export default function Body3DAvatar({
             <OrbitControls
               enablePan={false}
               enableZoom={false}
-              minPolarAngle={Math.PI / 2.6}
-              maxPolarAngle={Math.PI / 1.9}
+              minPolarAngle={ctrlMinPol}
+              maxPolarAngle={ctrlMaxPol}
               autoRotate={false}
               dampingFactor={0.08}
-              target={isGLB && size === "large" ? [0, 0.85, 0] : [0, 0.3, 0]}
+              target={[0, targetY, 0]}
             />
           )}
         </Canvas>
