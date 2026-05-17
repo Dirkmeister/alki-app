@@ -1176,9 +1176,10 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
+  const [editing, setEditing] = useState(!activeProtocol);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
   const stackAnalysis = useMemo(() => analyzeStack(selectedCompounds, profile), [selectedCompounds, profile]);
 
@@ -1554,7 +1555,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
 
         {/* Lock In from Transformation View */}
         <button
-          onClick={() => onLockIn(selectedCompounds)}
+          onClick={() => { onLockIn(selectedCompounds); setEditing(false); }}
           style={{
             ...S.btn,
             marginBottom: 12,
@@ -1577,6 +1578,23 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
     );
   }
 
+  // ── Committed View: clean daily screen when protocol is locked ──
+  if (activeProtocol && !editing) {
+    return (
+      <Home
+        profile={profile}
+        activeProtocol={activeProtocol}
+        cultivationState={cultivationState}
+        avatarUrl={avatarUrl}
+        onProgress={onProgress}
+        onModify={() => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }}
+        onNewEidolon={() => { setActiveProtocol(null); setSelectedCompounds([]); setEditing(true); }}
+        onSignOut={onSignOut}
+        userEmail={userEmail}
+      />
+    );
+  }
+
   return (
     <div style={{ ...S.inner, opacity: animateIn ? 1 : 0, transition: "opacity 0.6s ease" }}>
       {/* Header */}
@@ -1587,8 +1605,8 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {onBackToHome && (
-            <button onClick={onBackToHome} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          {activeProtocol && (
+            <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               ← Home
             </button>
           )}
@@ -1770,7 +1788,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
       {/* Lock In Protocol CTA */}
       {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
         <button
-          onClick={() => onLockIn(selectedCompounds)}
+          onClick={() => { onLockIn(selectedCompounds); setEditing(false); }}
           style={{
             ...S.btnOutline,
             marginBottom: 16,
@@ -2056,7 +2074,7 @@ export default function AlkiApp() {
             setSelectedCompounds(saved.selectedCompounds || []);
             setAvatarUrl(saved.avatarUrl || null);
             setActiveProtocol(saved.activeProtocol || null);
-            setScreen(saved.activeProtocol ? "home" : "dashboard");
+            setScreen("dashboard");
           } else {
             setScreen("onboarding");
           }
@@ -2123,7 +2141,7 @@ export default function AlkiApp() {
       setSelectedCompounds(saved.selectedCompounds || []);
       setAvatarUrl(saved.avatarUrl || null);
       setActiveProtocol(saved.activeProtocol || null);
-      setScreen(saved.activeProtocol ? "home" : "dashboard");
+      setScreen("dashboard");
     } else {
       setScreen("onboarding");
     }
@@ -2173,19 +2191,6 @@ export default function AlkiApp() {
           initialStep={profile ? 3 : 0}
         />
       )}
-      {screen === "home" && profile && (
-        <Home
-          profile={profile}
-          activeProtocol={activeProtocol}
-          cultivationState={cultivationState}
-          avatarUrl={avatarUrl}
-          onProgress={() => setScreen("progress")}
-          onModify={() => { setSelectedCompounds(activeProtocol?.compounds || []); setScreen("dashboard"); }}
-          onNewEidolon={() => { setSelectedCompounds([]); setActiveProtocol(null); setScreen("dashboard"); }}
-          onSignOut={supabase ? handleSignOut : null}
-          userEmail={user?.email || null}
-        />
-      )}
       {screen === "dashboard" && profile && (
         <Dashboard
           profile={profile}
@@ -2194,8 +2199,10 @@ export default function AlkiApp() {
           showTransform={showTransform}
           setShowTransform={setShowTransform}
           onReset={() => { setSelectedCompounds([]); setShowTransform(false); setScreen("onboarding"); }}
-          onLockIn={(compounds) => { const p = { compounds, lockedAt: new Date().toISOString() }; setActiveProtocol(p); setScreen("home"); }}
-          onBackToHome={activeProtocol ? () => setScreen("home") : null}
+          onLockIn={(compounds) => { const p = { compounds, lockedAt: new Date().toISOString() }; setActiveProtocol(p); }}
+          activeProtocol={activeProtocol}
+          setActiveProtocol={setActiveProtocol}
+          onBackToHome={null}
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
           onModeler={() => setScreen("modeler")}
