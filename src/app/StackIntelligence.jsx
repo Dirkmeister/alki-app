@@ -30,6 +30,8 @@ import React, { useMemo } from "react";
  * Compound IDs match AlkiApp.jsx COMPOUNDS array:
  *   bpc157, tb500, ipacjc, tesamorelin, semaglutide,
  *   retatrutide, ghkcu, pt141
+ *   + expanded: sermorelin, cjc1295_nodac, ipamorelin, mk677, igf1lr3,
+ *     fragment176, mk2866, rad140, lgd4033, yk11, s23, tadalafil, bpc_tb_blend
  * ============================================================
  */
 
@@ -125,7 +127,7 @@ const COMPOUND_INTEL = {
       { axis: "tissue_repair", weight: 1.0, mechanism: "Angiogenesis, local tendon/ligament/gut repair" },
     ],
     risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "limited_human" },
-    synergies: ["tb500"],
+    synergies: ["tb500", "bpc_tb_blend", "mk677", "ipacjc"],
     redundancies: [],
     supportTriggers: [],
     contraindications: [],
@@ -138,7 +140,7 @@ const COMPOUND_INTEL = {
       { axis: "tissue_repair", weight: 0.9, mechanism: "Systemic actin binding, stem cell mobilization" },
     ],
     risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "limited_human" },
-    synergies: ["bpc157"],
+    synergies: ["bpc157", "bpc_tb_blend", "mk677", "ipacjc"],
     redundancies: [],
     supportTriggers: [],
     contraindications: [],
@@ -151,8 +153,8 @@ const COMPOUND_INTEL = {
       { axis: "gh_axis", weight: 1.0, mechanism: "GHRH analog (CJC) + selective ghrelin agonist (Ipamorelin)" },
     ],
     risk: { suppression: 0, liver: 0, cardio: 0.05, dataQuality: "moderate" },
-    synergies: ["bpc157", "tb500", "semaglutide", "retatrutide"],
-    redundancies: ["tesamorelin"],
+    synergies: ["bpc157", "tb500", "semaglutide", "retatrutide", "mk677", "bpc_tb_blend"],
+    redundancies: ["tesamorelin", "sermorelin", "cjc1295_nodac"],
     supportTriggers: [],
     contraindications: [],
     designNote: "Physiological GH pulse via complementary mechanisms. 5–10x larger pulse than either alone. Run pre-sleep for primary repair window.",
@@ -248,6 +250,208 @@ const COMPOUND_INTEL = {
       },
     ],
     designNote: "Central nervous system mechanism — not vascular like PDE-5 inhibitors. Use as needed, max 2x/week. Nausea common at higher doses.",
+  },
+
+  // ============================================================
+  // EXPANDED COMPOUND INTEL — GH Axis
+  // ============================================================
+
+  sermorelin: {
+    name: "Sermorelin",
+    category: "Growth Hormone",
+    axes: [
+      { axis: "gh_axis", weight: 0.80, mechanism: "GHRH analog (1-29) — physiological pulsatile GH release; most clinical data of any GH peptide, formerly FDA-approved" },
+    ],
+    risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "fda_approved" },
+    synergies: ["bpc157", "tb500", "ghkcu"],
+    redundancies: ["ipacjc", "tesamorelin"],
+    supportTriggers: [],
+    contraindications: [],
+    designNote: "Physiological GH pulse via the natural GHRH pathway. Preserves pituitary feedback — no desensitization risk. Best GH peptide for long-term anti-aging use. Requires daily injection; short half-life.",
+  },
+
+  cjc1295_nodac: {
+    name: "CJC-1295 (No DAC)",
+    category: "Growth Hormone",
+    axes: [
+      { axis: "gh_axis", weight: 0.80, mechanism: "Short-acting GHRH analog — sharp GH pulse; 30-min half-life; must be paired with a GHRP" },
+    ],
+    risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "moderate" },
+    synergies: ["bpc157", "tb500", "ghkcu"],
+    redundancies: ["ipacjc", "tesamorelin", "sermorelin"],
+    supportTriggers: [],
+    contraindications: [],
+    designNote: "Short-acting GHRH analog. Drives a sharp physiological GH pulse when combined with Ipamorelin — together they mirror the GH pulse from Ipamorelin + CJC-1295 No DAC (the most common pairing). 30-minute half-life means it must always be co-administered with a GHRP.",
+  },
+
+  ipamorelin: {
+    name: "Ipamorelin",
+    category: "Growth Hormone",
+    axes: [
+      { axis: "gh_axis", weight: 0.85, mechanism: "Selective ghrelin receptor agonist (GHRP) — cleanest GH secretagogue, no cortisol or prolactin spike" },
+    ],
+    risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "moderate" },
+    synergies: ["bpc157", "tb500", "cjc1295_nodac", "semaglutide", "retatrutide"],
+    redundancies: ["ipacjc"],
+    supportTriggers: [],
+    contraindications: [],
+    designNote: "The cleanest GHRP. No cortisol or prolactin elevation unlike GHRP-6 or hexarelin. Typically combined with CJC-1295 No DAC for a 5–10x amplified GH pulse. Standalone Ipamorelin is also effective but less potent than the combined stack.",
+  },
+
+  mk677: {
+    name: "MK-677",
+    category: "Growth Hormone",
+    axes: [
+      { axis: "gh_axis", weight: 0.80, mechanism: "Oral ghrelin receptor agonist — 24-hour IGF-1 elevation; the only practical oral GH axis entry" },
+    ],
+    risk: { suppression: 0, liver: 0.05, cardio: 0.05, dataQuality: "moderate" },
+    synergies: ["bpc157", "tb500", "ipacjc", "rad140", "lgd4033", "mk2866", "bpc_tb_blend"],
+    redundancies: [],
+    supportTriggers: [],
+    contraindications: [],
+    designNote: "Non-suppressive. Runs through cycles, PCT, and bridges indefinitely — the most universally useful compound for any stack involving suppressive SARMs. Oral dosing. Appetite increase and water retention common in the first two weeks.",
+  },
+
+  igf1lr3: {
+    name: "IGF-1 LR3",
+    category: "Growth Hormone",
+    axes: [
+      { axis: "gh_axis", weight: 0.90, mechanism: "Modified IGF-1 analog — bypasses GH axis for direct IGF-1R activation; 20–30hr half-life; theoretical hyperplasia potential" },
+    ],
+    risk: { suppression: 0, liver: 0.10, cardio: 0.05, dataQuality: "limited_human" },
+    synergies: ["bpc157", "tb500"],
+    redundancies: ["ipacjc", "mk677"],
+    supportTriggers: [],
+    contraindications: [
+      {
+        type: "body_fat_min",
+        male: 8,
+        female: 14,
+        severity: "moderate",
+        message: "IGF-1 LR3 is not recommended below this body fat threshold — hypoglycemia risk increases significantly in very lean individuals.",
+      },
+    ],
+    designNote: "Most potent IGF-1 signal outside pharmaceutical HGH. Works in users with poor pituitary response. Requires food management to avoid hypoglycemia. Mandatory receptor breaks (4 weeks on / 4 weeks off) to prevent downregulation. Not appropriate as a first peptide cycle.",
+  },
+
+  fragment176: {
+    name: "Fragment 176-191",
+    category: "Fat Loss",
+    axes: [
+      { axis: "metabolic", weight: 0.40, mechanism: "Isolated GH fat-burning fragment — fat oxidation without anabolic effect or blood glucose impact" },
+    ],
+    risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "limited_human" },
+    synergies: ["ipacjc", "tesamorelin", "semaglutide"],
+    redundancies: [],
+    supportTriggers: [],
+    contraindications: [],
+    designNote: "Clean lipolysis adjunct. No anabolic activity, no effect on blood glucose. Stacks with GH peptides or GLP-1 compounds without receptor competition. Best used as an add-on mechanism, not a primary fat loss driver.",
+  },
+
+  // ============================================================
+  // EXPANDED COMPOUND INTEL — SARMs
+  // ============================================================
+
+  mk2866: {
+    name: "MK-2866 (Ostarine)",
+    category: "SARM",
+    axes: [
+      { axis: "ar", weight: 0.65, mechanism: "Partial AR agonist — mildest, most studied SARM; low-moderate suppression" },
+    ],
+    risk: { suppression: 0.35, liver: 0.10, cardio: 0.10, dataQuality: "moderate" },
+    synergies: ["mk677", "bpc157", "tb500", "tadalafil"],
+    redundancies: ["rad140", "lgd4033", "yk11", "s23"],
+    supportTriggers: ["pct_standard", "bloodwork_panel"],
+    contraindications: [],
+    designNote: "Entry-point SARM. Lowest suppression and best-characterized human safety profile in class. Best choice for a first SARM cycle. Recomposition signal at moderate doses. Mild SERM PCT sufficient.",
+  },
+
+  rad140: {
+    name: "RAD-140",
+    category: "SARM",
+    axes: [
+      { axis: "ar", weight: 0.90, mechanism: "Potent AR agonist — fastest strength and lean mass onset in SARM class" },
+    ],
+    risk: { suppression: 0.65, liver: 0.10, cardio: 0.15, dataQuality: "moderate" },
+    synergies: ["mk677", "bpc157", "tb500", "bpc_tb_blend", "tadalafil"],
+    redundancies: ["lgd4033", "yk11", "s23", "mk2866"],
+    supportTriggers: ["pct_standard", "bloodwork_panel", "tadalafil_daily"],
+    contraindications: [],
+    designNote: "Premier lean mass AR agonist. Fast-acting strength signal within 2 weeks. High suppression — PCT is non-negotiable. MK-677 pairs cleanly for GH/IGF-1 coverage through PCT. Bloodwork required before, mid-cycle, and 4 weeks post-PCT.",
+  },
+
+  lgd4033: {
+    name: "LGD-4033",
+    category: "SARM",
+    axes: [
+      { axis: "ar", weight: 0.90, mechanism: "AR agonist — significant mass gains; among the strongest SARMs for bulking phases" },
+    ],
+    risk: { suppression: 0.65, liver: 0.25, cardio: 0.10, dataQuality: "moderate" },
+    synergies: ["mk677", "bpc157", "tb500", "bpc_tb_blend", "tadalafil"],
+    redundancies: ["rad140", "yk11", "s23", "mk2866"],
+    supportTriggers: ["pct_standard", "bloodwork_panel", "tudca_nac", "tadalafil_daily"],
+    contraindications: [],
+    designNote: "Mass-building SARM. Some hepatotoxicity reports in human data — TUDCA is recommended throughout. Significant suppression requires full PCT. MK-677 adds non-suppressive GH coverage that runs through PCT. Bloodwork mandatory.",
+  },
+
+  yk11: {
+    name: "YK-11",
+    category: "SARM",
+    axes: [
+      { axis: "ar", weight: 1.0, mechanism: "Steroidal AR agonist + myostatin inhibitor — most aggressive compound in SARM class" },
+    ],
+    risk: { suppression: 0.90, liver: 0.50, cardio: 0.20, dataQuality: "minimal" },
+    synergies: ["mk677", "bpc157", "tb500", "bpc_tb_blend", "tadalafil"],
+    redundancies: ["rad140", "lgd4033", "s23", "mk2866"],
+    supportTriggers: ["pct_standard", "bloodwork_panel", "tudca_nac", "tadalafil_daily"],
+    contraindications: [],
+    designNote: "Steroidal SARM with myostatin inhibition — the ceiling-removal mechanism. Near-complete testosterone shutdown expected. TUDCA 500mg/day + NAC 600mg/day are mandatory throughout cycle and for 2 weeks after. Minimum 2-3 month recovery post-PCT. Not appropriate for any user without prior SARM cycle experience.",
+  },
+
+  s23: {
+    name: "S-23",
+    category: "SARM",
+    axes: [
+      { axis: "ar", weight: 0.95, mechanism: "Near-complete AR agonism — researched as a male contraceptive agent" },
+    ],
+    risk: { suppression: 0.95, liver: 0.10, cardio: 0.10, dataQuality: "minimal" },
+    synergies: ["mk677", "bpc157", "tb500", "bpc_tb_blend", "tadalafil"],
+    redundancies: ["rad140", "lgd4033", "yk11", "mk2866"],
+    supportTriggers: ["pct_standard", "bloodwork_panel", "tadalafil_daily"],
+    contraindications: [],
+    designNote: "Near-complete testosterone shutdown. Full dual-SERM PCT (Nolvadex + Enclomiphene) required. Minimal human data — risk profile extrapolated from animal models and anecdote. Not appropriate without full bloodwork infrastructure.",
+  },
+
+  // ============================================================
+  // EXPANDED COMPOUND INTEL — Cycle Support & Recovery
+  // ============================================================
+
+  tadalafil: {
+    name: "Tadalafil",
+    category: "Cycle Support",
+    axes: [
+      { axis: "cardiovascular", weight: 1.0, mechanism: "PDE-5 inhibitor (longest-acting) — cardiovascular protection, blood pressure management, sexual function support" },
+    ],
+    risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "fda_approved" },
+    synergies: ["rad140", "lgd4033", "yk11", "s23", "mk2866"],
+    redundancies: [],
+    supportTriggers: [],
+    contraindications: [],
+    designNote: "Most underrated cycle support compound. Daily 5mg provides cardiovascular protection, blood pressure management, pump enhancement, and sexual function support under HPG suppression. Strong clinical data. Zero downside at therapeutic dose for most users.",
+  },
+
+  bpc_tb_blend: {
+    name: "BPC-157 / TB-500 Blend",
+    category: "Recovery",
+    axes: [
+      { axis: "tissue_repair", weight: 1.0, mechanism: "Pre-mixed local angiogenesis (BPC-157) + systemic stem cell mobilization (TB-500) — full-spectrum tissue repair in one injection" },
+    ],
+    risk: { suppression: 0, liver: 0, cardio: 0, dataQuality: "limited_human" },
+    synergies: ["ipacjc", "mk677", "ghkcu", "rad140", "lgd4033", "yk11", "s23"],
+    redundancies: ["bpc157", "tb500"],
+    supportTriggers: [],
+    contraindications: [],
+    designNote: "Pre-mixed gold standard recovery pairing. BPC-157 drives local tissue repair; TB-500 conditions the systemic healing environment. Chemically identical to running them separately — convenience format for users who want both without managing two vials.",
   },
 };
 
@@ -430,7 +634,7 @@ function analyzeStack(stackIds, userProfile = {}) {
     });
   });
 
-  // Stack-level: duplicate-class detection
+  // Stack-level: duplicate GLP-class detection
   const glpCount = compounds.filter((c) =>
     c.axes.some((a) => a.axis === "metabolic" && a.weight >= 0.9)
   ).length;
@@ -442,6 +646,23 @@ function analyzeStack(stackIds, userProfile = {}) {
       severity: "critical",
       message:
         "Multiple GLP-class agonists detected in this stack. These should never be combined — receptor saturation, severe GI side effects, and dangerous hypoglycemia risk. Select one GLP compound only.",
+    });
+  }
+
+  // Stack-level: dual suppressive SARM detection
+  const suppressiveSARMs = compounds.filter((c) =>
+    c.category === "SARM" && c.risk.suppression >= 0.35
+  );
+  if (suppressiveSARMs.length > 1) {
+    contraindications.push({
+      compound: null,
+      compoundName: "Stack-level",
+      type: "receptor_competition",
+      severity: "critical",
+      message:
+        `Multiple suppressive SARMs detected (${suppressiveSARMs.map(c => c.name).join(" + ")}). ` +
+        "Compounded suppression does not produce proportionally greater results but does compound recovery burden. " +
+        "Near-complete testosterone shutdown expected. Dual-SERM PCT (Nolvadex + Enclomiphene), bloodwork at every phase, TUDCA/NAC for any hepatotoxic compound, and 2–3 month recovery minimum are non-negotiable.",
     });
   }
 
@@ -512,6 +733,7 @@ function matchesContraindication(contra, userProfile) {
 function getSynergyMessage(idA, idB) {
   const key = [idA, idB].sort().join("|");
   const messages = {
+    // ── Original 8 compound pairs ────────────────────────────────
     "bpc157|tb500":
       "The canonical recovery pairing. BPC-157 drives local angiogenesis and direct tissue repair; TB-500 mobilizes stem cells systemically and conditions the body-wide healing environment. Together they cover both ends of the repair pathway with no receptor overlap.",
     "bpc157|ghkcu":
@@ -526,6 +748,54 @@ function getSynergyMessage(idA, idB) {
       "Aggressive fat loss with GH-axis muscle preservation. The most powerful GLP agent paired with GH peptide support. Resistance training and protein intake remain non-negotiable.",
     "ghkcu|tesamorelin":
       "Visceral fat reduction (Tesamorelin) with skin quality support (GHK-Cu). Tesamorelin's fat loss can reveal skin laxity; GHK-Cu actively rebuilds collagen and ECM in parallel.",
+
+    // ── MK-677 pairings ─────────────────────────────────────────
+    "ipacjc|mk677":
+      "Complementary GH axis coverage: Ipamorelin/CJC drives the sharp pre-sleep GH pulse; MK-677 maintains 24-hour IGF-1 elevation orally between pulses. Together they provide full-spectrum, non-suppressive GH/IGF-1 support across the entire day.",
+    "bpc157|mk677":
+      "Tissue repair under sustained IGF-1 elevation. MK-677's 24-hour IGF-1 signal amplifies BPC-157's local repair mechanisms. Non-suppressive combination — safe to run indefinitely.",
+    "mk677|tb500":
+      "Systemic healing under sustained IGF-1 support. TB-500 mobilizes stem cells and conditions the repair environment; MK-677's IGF-1 elevation accelerates the regenerative processes TB-500 activates.",
+    "lgd4033|mk677":
+      "Independent anabolic mechanisms with zero receptor overlap. LGD-4033 drives AR-mediated muscle protein synthesis; MK-677 adds GH/IGF-1 anabolism through a completely separate pathway. MK-677 is non-suppressive and runs through PCT — the most universally useful pairing for any SARM cycle.",
+    "mk677|rad140":
+      "Premier lean bulk pairing. RAD-140 drives potent AR anabolism; MK-677 provides sustained GH/IGF-1 coverage through a fully independent mechanism. Zero receptor overlap. MK-677's non-suppressive nature means it continues through PCT, bridging the hormonal recovery window.",
+    "mk2866|mk677":
+      "Clean entry-level stack. Ostarine's mild AR signal with MK-677's oral GH support — two independent anabolic mechanisms, neither suppressing the other's pathway. Best first combination for users new to performance compounds.",
+    "mk677|yk11":
+      "Triple-mechanism mass stack: AR + Myostatin inhibition (YK-11) layered under GH/IGF-1 elevation (MK-677). MK-677 continues through PCT while YK-11 cycle ends — maintains IGF-1 during the critical recovery window.",
+    "mk677|s23":
+      "GH axis support throughout the most suppressive SARM available. MK-677's non-suppressive IGF-1 elevation provides ongoing anabolic signaling while S-23's PCT window completes.",
+
+    // ── BPC-TB Blend pairings ────────────────────────────────────
+    "bpc157|bpc_tb_blend":
+      "Note: BPC-157/TB-500 Blend already contains BPC-157. Adding standalone BPC-157 creates redundancy at the local repair axis — consider using the blend alone or running standalone BPC-157 + TB-500 separately if dose titration is important.",
+    "bpc_tb_blend|tb500":
+      "Note: BPC-157/TB-500 Blend already contains TB-500. This combination creates redundancy at the systemic repair axis. Use the blend alone or standalone BPC-157 + TB-500 to avoid dose overlap.",
+    "bpc_tb_blend|ipacjc":
+      "Complete recovery architecture: BPC-157/TB-500 Blend covers both local and systemic tissue repair while Ipamorelin/CJC-1295 maximizes the GH repair window during sleep. Every mechanism operates at a different biological level. Non-suppressive — no PCT required.",
+    "bpc_tb_blend|mk677":
+      "Maximum non-suppressive recovery stack. BPC-157/TB-500 covers local and systemic tissue repair; MK-677 adds 24-hour IGF-1 elevation orally. Three independent repair mechanisms — none overlapping, none suppressive. Can be run indefinitely.",
+    "bpc_tb_blend|ghkcu":
+      "Full-spectrum tissue restoration. BPC-157/TB-500 handles acute repair; GHK-Cu adds collagen synthesis, ECM reconstruction, and longevity gene activation. Complementary depth of mechanism.",
+    "bpc_tb_blend|rad140":
+      "SARM cycle with mandatory recovery infrastructure. RAD-140 drives the anabolic AR signal; BPC-157/TB-500 Blend protects connective tissue under the progressive load this cycle enables. Standard pairing for any AR compound — connective tissue is the limiting factor before muscle is.",
+    "bpc_tb_blend|lgd4033":
+      "Mass cycle with connective tissue protection. LGD-4033's significant mass gains put connective tissue under stress; BPC-157/TB-500 Blend is the standard recovery infrastructure for managing that load.",
+    "bpc_tb_blend|yk11":
+      "Aggressive cycle with mandatory repair layer. YK-11's AR + myostatin inhibition produces rapid tissue loading; BPC-157/TB-500 Blend is non-negotiable connective tissue protection. The blend runs through the full cycle and PCT without conflict.",
+
+    // ── SARM + Tadalafil pairings ────────────────────────────────
+    "rad140|tadalafil":
+      "Cardiovascular support under AR suppression. Tadalafil 5mg daily provides blood pressure management, cardiovascular protection, and sexual function support during the HPG-suppressed cycle state RAD-140 produces. Strongest evidence of any cycle support compound at this dose.",
+    "lgd4033|tadalafil":
+      "Cardiovascular and sexual health support throughout LGD-4033 cycle. Tadalafil's PDE-5 inhibition maintains vascular tone and sexual function during HPG suppression. Zero interaction risk.",
+    "mk2866|tadalafil":
+      "Even mild SARM cycles benefit from cardiovascular support. Tadalafil 5mg daily adds no risk and provides BP management and pump enhancement throughout the mild Ostarine cycle.",
+    "s23|tadalafil":
+      "Critical pairing for the most suppressive SARM. Tadalafil's cardiovascular protection and sexual function support are particularly valuable during S-23's near-complete HPG shutdown.",
+    "tadalafil|yk11":
+      "Mandatory cycle support for the most aggressive SARM stack. Tadalafil's cardiovascular coverage is non-negotiable during YK-11's near-complete HPG suppression.",
   };
   return (
     messages[key] ||
