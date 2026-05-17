@@ -15,7 +15,7 @@ import * as THREE from "three";
  * and recenters X/Z so the model is always framed correctly.
  */
 
-function GLBAvatar({ url, params, glow, autoRotate }) {
+function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) {
   const { fat, muscle } = params;
   const groupRef = useRef();
   const { scene } = useGLTF(url);
@@ -36,6 +36,21 @@ function GLBAvatar({ url, params, glow, autoRotate }) {
     const offsetY = -box.min.y * scale;
     const offsetX = -((box.min.x + box.max.x) / 2) * scale;
     const offsetZ = -((box.min.z + box.max.z) / 2) * scale;
+
+    // Debug logging — prints the raw bbox so we can see exactly where the
+    // model sits. Inspect the browser console after loading the avatar.
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.log("[Alki GLB fit]", {
+        rawMin: box.min.toArray().map(n => n.toFixed(3)),
+        rawMax: box.max.toArray().map(n => n.toFixed(3)),
+        rawSize: size.toArray().map(n => n.toFixed(3)),
+        scaleFactor: scale.toFixed(3),
+        appliedOffset: [offsetX.toFixed(3), offsetY.toFixed(3), offsetZ.toFixed(3)],
+        afterFitFeetY: 0,
+        afterFitHeadY: 1.7
+      });
+    }
     return { scale, offsetX, offsetY, offsetZ };
   }, [cloned]);
 
@@ -74,6 +89,9 @@ function GLBAvatar({ url, params, glow, autoRotate }) {
 
   useFrame((_, delta) => {
     if (autoRotate && groupRef.current) {
+      // Rotate around the rotateAround pivot rather than the group origin
+      // (feet). For the small head-portrait view this keeps the head fixed
+      // in frame as the body rotates underneath.
       groupRef.current.rotation.y += delta * 0.2;
     }
   });
@@ -101,12 +119,12 @@ export default function Body3DAvatar({
   // Two framing setups. Camera positions and FOVs chosen empirically
   // so the 1.7m model (feet at y=0, head at y≈1.72) fits each canvas.
   const isSmall = size === "small";
-  // SMALL: head + shoulders portrait. Camera at head height, pulled back
-  // enough to fit the shoulders horizontally in a narrow portrait canvas.
+  // SMALL: head portrait. Camera far back with tight FOV so the model
+  // fills frame with head at center and shoulders just inside.
   // LARGE: full body. Camera at mid-body, well back to capture feet-to-head.
-  const camPos = isSmall ? [0, 1.5, 2.4] : [0, 0.95, 3.6];
-  const camFov = isSmall ? 20 : 30;
-  const targetY = isSmall ? 1.5 : 0.95;
+  const camPos = isSmall ? [0, 1.55, 3.0] : [0, 0.95, 3.6];
+  const camFov = isSmall ? 15 : 30;
+  const targetY = isSmall ? 1.55 : 0.95;
 
   const wrapStyle = isSmall
     ? { width: "100%", aspectRatio: "1 / 1.2", maxWidth: 110 }
