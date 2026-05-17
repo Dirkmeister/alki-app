@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
     "@avaturn/sdk": "^1.1.0",
     "@react-three/drei": "^10.0.0",
     "@react-three/fiber": "^9.0.0",

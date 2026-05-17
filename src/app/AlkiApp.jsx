@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import StackIntelligence, { analyzeStack } from "./StackIntelligence";
 import StackGenerator from "./StackGenerator";
 import AlkiProtocolQA from "./AlkiProtocolQA";
@@ -9,6 +9,7 @@ import Body3DAvatar from "./Body3DAvatar";
 import AvaturnCapture from "./AvaturnCapture";
 import { AVATURN_ENABLED } from "./avaturnConfig";
 import PeptideModeler from "./PeptideModeler";
+import { supabase } from "./lib/supabase";
 // ─────────────────────────────────────────────────────────────
 // The import above adds 63 compounds via `data/compounds-expanded.js`.
 // The original 8 compounds remain inline below, untouched.
@@ -1172,7 +1173,7 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, onModeler, avatarUrl, onCaptureAvatar, onResetAvatar }) {
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, onModeler, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
@@ -1577,6 +1578,11 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           <button onClick={onReset} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
             Reset
           </button>
+          {onSignOut && (
+            <button onClick={onSignOut} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              Sign Out
+            </button>
+          )}
         </div>
       </div>
 
@@ -1642,6 +1648,11 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
               );
             })}
           </div>
+          {userEmail && (
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 6 }}>
+              {userEmail}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1767,19 +1778,265 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
   );
 }
 
+// ── SUPABASE PROFILE HELPERS ───────────────────────────────
+async function loadProfile(userId) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (error || !data) return null;
+    return {
+      profile: {
+        sex: data.sex,
+        age: data.age,
+        heightFt: data.height_ft,
+        heightIn: data.height_in,
+        weight: data.weight,
+        bodyFat: data.body_fat,
+        goals: data.goals || [],
+        adv: data.adv || {}
+      },
+      selectedCompounds: data.selected_compounds || [],
+      avatarUrl: data.avatar_url || null
+    };
+  } catch (e) {
+    console.error("loadProfile error:", e);
+    return null;
+  }
+}
+
+async function saveProfile(userId, profile, selectedCompounds, avatarUrl) {
+  if (!supabase || !profile) return;
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        sex: profile.sex,
+        age: profile.age,
+        height_ft: profile.heightFt,
+        height_in: profile.heightIn,
+        weight: profile.weight,
+        body_fat: profile.bodyFat,
+        goals: profile.goals,
+        adv: profile.adv || {},
+        selected_compounds: selectedCompounds || [],
+        avatar_url: avatarUrl || null,
+        updated_at: new Date().toISOString()
+      });
+    if (error) console.error("saveProfile error:", error);
+  } catch (e) {
+    console.error("saveProfile error:", e);
+  }
+}
+
+// ── AUTH SCREEN ────────────────────────────────────────────
+function AuthScreen({ onAuth, onBack, onSkip }) {
+  const [mode, setMode] = useState("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
+
+  const handleSubmit = async () => {
+    setError(null);
+    setMessage(null);
+    if (!email || !password) { setError("Email and password are required."); return; }
+    if (mode === "signup") {
+      if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+      if (password !== confirmPw) { setError("Passwords don't match."); return; }
+    }
+    setLoading(true);
+    if (mode === "signin") {
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+      setLoading(false);
+      if (err) { setError(err.message); }
+      else { onAuth(data.user); }
+    } else {
+      const { data, error: err } = await supabase.auth.signUp({ email, password });
+      setLoading(false);
+      if (err) { setError(err.message); }
+      else if (data.user && !data.session) {
+        setMessage("Check your email to confirm your account, then sign in.");
+        setMode("signin"); setPassword(""); setConfirmPw("");
+      } else if (data.user) { onAuth(data.user); }
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setError(null);
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    });
+    if (err) setError(err.message);
+  };
+
+  return (
+    <div style={S.inner}>
+      <div style={{ padding: "16px 0 8px" }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 14, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+          ← Back
+        </button>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+          </h1>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 8 }}>
+            {mode === "signin" ? "Welcome back, researcher." : "Create your research account."}
+          </p>
+        </div>
+
+        {message && (
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(34,214,138,0.1)", border: "1px solid rgba(34,214,138,0.2)", fontSize: 13, color: "#22d68a", marginBottom: 16, lineHeight: 1.5 }}>
+            {message}
+          </div>
+        )}
+        {error && (
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 13, color: "#fca5a5", marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={S.label}>Email</label>
+          <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={S.label}>Password</label>
+          <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && mode === "signin" && handleSubmit()} />
+        </div>
+        {mode === "signup" && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={S.label}>Confirm Password</label>
+            <input type="password" placeholder="••••••••" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+          </div>
+        )}
+
+        <button onClick={handleSubmit} disabled={loading} style={{ ...S.btn, ...(loading ? S.btnDisabled : {}), marginBottom: 12 }}>
+          {loading ? "Working..." : (mode === "signin" ? "Sign In" : "Create Account")}
+        </button>
+        <button onClick={handleGoogleAuth} style={{ ...S.btnOutline, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          Continue with Google
+        </button>
+
+        <div style={{ textAlign: "center" }}>
+          <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setMessage(null); }} style={{ background: "none", border: "none", color: S.accent, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            {mode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+          </button>
+        </div>
+
+        {onSkip && (
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <button onClick={onSkip} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              Continue without account →
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p style={{ ...S.disclaimer, paddingBottom: 20 }}>
+        Your research profile is saved to your account and synced across devices.
+      </p>
+    </div>
+  );
+}
+
 // ── APP ROOT ───────────────────────────────────────────────
 export default function AlkiApp() {
-  const [screen, setScreen] = useState("splash");
+  const [screen, setScreen] = useState(supabase ? "loading" : "splash");
+  const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [selectedCompounds, setSelectedCompounds] = useState([]);
   const [showTransform, setShowTransform] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
+  const saveTimeout = useRef(null);
+
+  // ── Session check on mount ──
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        loadProfile(session.user.id).then(saved => {
+          if (saved) {
+            setProfile(saved.profile);
+            setSelectedCompounds(saved.selectedCompounds || []);
+            setAvatarUrl(saved.avatarUrl || null);
+            setScreen("dashboard");
+          } else {
+            setScreen("onboarding");
+          }
+        });
+      } else {
+        setScreen("splash");
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          setProfile(null);
+          setSelectedCompounds([]);
+          setShowTransform(false);
+          setAvatarUrl(null);
+          setScreen("splash");
+        }
+      }
+    );
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Auto-save profile on changes (debounced) ──
+  useEffect(() => {
+    if (!supabase || !user || !profile) return;
+    clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      saveProfile(user.id, profile, selectedCompounds, avatarUrl);
+    }, 1500);
+    return () => clearTimeout(saveTimeout.current);
+  }, [user, profile, selectedCompounds, avatarUrl]);
 
   const handleAvatarCreated = useCallback((url) => {
     setAvatarUrl(url);
     setShowAvatarCapture(false);
   }, []);
+
+  const handleSignOut = async () => {
+    if (supabase) await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setSelectedCompounds([]);
+    setShowTransform(false);
+    setAvatarUrl(null);
+    setScreen("splash");
+  };
+
+  const handleAuthComplete = async (authUser) => {
+    setUser(authUser);
+    const saved = await loadProfile(authUser.id);
+    if (saved) {
+      setProfile(saved.profile);
+      setSelectedCompounds(saved.selectedCompounds || []);
+      setAvatarUrl(saved.avatarUrl || null);
+      setScreen("dashboard");
+    } else {
+      setScreen("onboarding");
+    }
+  };
+
+  const afterAgeGate = supabase ? "auth" : "onboarding";
 
   return (
     <div style={S.app}>
@@ -1790,9 +2047,25 @@ export default function AlkiApp() {
         />
       )}
 
+      {screen === "loading" && (
+        <div style={{ ...S.inner, justifyContent: "center", alignItems: "center" }}>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, marginTop: 12 }}>Loading...</div>
+        </div>
+      )}
+
       {screen === "splash" && <SplashScreen onEnter={() => setScreen("agegate")} />}
-      {screen === "agegate" && <AgeGate onConfirm={() => setScreen("onboarding")} onDeny={() => setScreen("blocked")} />}
+      {screen === "agegate" && <AgeGate onConfirm={() => setScreen(afterAgeGate)} onDeny={() => setScreen("blocked")} />}
       {screen === "blocked" && <AgeBlocked />}
+      {screen === "auth" && (
+        <AuthScreen
+          onAuth={handleAuthComplete}
+          onBack={() => setScreen("agegate")}
+          onSkip={() => setScreen("onboarding")}
+        />
+      )}
       {screen === "onboarding" && (
         <Onboarding
           onComplete={(p) => { setProfile(p); setScreen("dashboard"); }}
@@ -1815,6 +2088,8 @@ export default function AlkiApp() {
           avatarUrl={avatarUrl}
           onCaptureAvatar={() => setShowAvatarCapture(true)}
           onResetAvatar={() => setAvatarUrl(null)}
+          onSignOut={supabase ? handleSignOut : null}
+          userEmail={user?.email || null}
         />
       )}
       {screen === "qa" && (
