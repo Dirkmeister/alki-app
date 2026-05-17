@@ -60,9 +60,9 @@ export default function StackGenerator({ profile, compoundCatalog, onLoadStack }
         <div style={styles.entryLeft}>
           <div style={styles.entryIcon}>⚡</div>
           <div style={styles.entryText}>
-            <div style={styles.entryTitle}>Generate Optimal Stack</div>
+            <div style={styles.entryTitle}>Generate Research Protocol</div>
             <div style={styles.entrySubtitle}>
-              {stacks.length} architecturally distinct stack{stacks.length !== 1 ? "s" : ""} built for your profile · {phaseLabel}
+              {stacks.length} architecturally distinct protocol{stacks.length !== 1 ? "s" : ""} built for your profile · {phaseLabel}
             </div>
           </div>
         </div>
@@ -73,7 +73,7 @@ export default function StackGenerator({ profile, compoundCatalog, onLoadStack }
       {expanded && (
         <div style={styles.stackList}>
           <div style={styles.phaseNote}>
-            Based on your body fat ({profile.bodyFat}%), goals, and biometrics, Alki identified <span style={{ color: "#22d68a", fontWeight: 600 }}>{phaseLabel}</span> as your primary phase. Each stack below uses a different architectural approach.
+            Based on your body fat ({profile.bodyFat}%), goals, and biometrics, Alki identified <span style={{ color: "#22d68a", fontWeight: 600 }}>{phaseLabel}</span> as your primary research phase. Each protocol below uses a different architectural approach.
           </div>
 
           {stacks.map((stack) => (
@@ -146,7 +146,7 @@ function StackCard({ stack, isOpen, onToggle, onLoad }) {
         <div style={styles.expandedSection}>
           {/* Design note */}
           <div style={styles.sectionBlock}>
-            <div style={styles.sectionTitle}>Why This Stack</div>
+            <div style={styles.sectionTitle}>Why This Protocol</div>
             <div style={styles.designNote}>{stack.designNote}</div>
           </div>
 
@@ -201,7 +201,7 @@ function StackCard({ stack, isOpen, onToggle, onLoad }) {
 
       {/* Load button — always visible at bottom */}
       <button onClick={onLoad} style={styles.loadButton}>
-        Load This Stack →
+        Load This Protocol →
       </button>
     </div>
   );

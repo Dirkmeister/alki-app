@@ -650,6 +650,9 @@ function SplashScreen({ onEnter }) {
         <p style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginTop: 12, letterSpacing: "0.15em", textTransform: "uppercase" }}>
           Peptide Intelligence Platform
         </p>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", marginTop: 6, fontStyle: "italic", letterSpacing: "0.04em" }}>
+          εἰδωλον · Your Eidolon Awaits
+        </p>
       </div>
 
       <div style={{ width: "100%", maxWidth: 320 }}>
@@ -658,6 +661,9 @@ function SplashScreen({ onEnter }) {
         </button>
         <p style={{ ...S.disclaimer, marginTop: 20, maxWidth: 280, margin: "20px auto 0" }}>
           For informational and research purposes only. Not medical advice. Consult a licensed physician before initiating any peptide protocol.
+        </p>
+        <p style={{ fontSize: 12, color: "rgba(34,214,138,0.4)", marginTop: 12, fontStyle: "italic", letterSpacing: "0.06em" }}>
+          Happy Researching.
         </p>
       </div>
     </div>
@@ -726,18 +732,18 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
 
   const bfNum = parseFloat(data.bodyFat);
   const bfFeedback = !isNaN(bfNum) && bfNum > 0 ? (
-    bfNum < 8 ? { text: "Competition-level lean. All compounds available. Recovery and GH peptides tend to be highest-value at this range.", color: "#22d68a" } :
-    bfNum < 15 ? { text: "Athletic range. Full compound spectrum available. GH and recovery peptides are particularly effective here; GLP-1s carry lean mass risk at this level.", color: "#22d68a" } :
-    bfNum < 22 ? { text: "Healthy range. Full compound spectrum available. Body recomposition protocols are ideal at this body fat level.", color: "#22d68a" } :
-    bfNum < 30 ? { text: "GLP-1 compounds are highly effective at this range. Fat loss protocols will be prioritized in your recommendations.", color: "#22d68a" } :
-    { text: "GLP-1 compounds show strongest clinical results at this body fat percentage. Fat loss protocols will lead your recommendations.", color: "#22d68a" }
+    bfNum < 8 ? { text: "Competition-level lean. All compounds available for research. Recovery and GH peptides are most commonly studied at this range.", color: "#22d68a" } :
+    bfNum < 15 ? { text: "Athletic range. Full compound spectrum available for research. GH and recovery peptides are frequently studied here; GLP-1 research indicates lean mass risk at this level.", color: "#22d68a" } :
+    bfNum < 22 ? { text: "Healthy range. Full compound spectrum available. Research literature supports body recomposition protocols at this body fat level.", color: "#22d68a" } :
+    bfNum < 30 ? { text: "Research literature indicates GLP-1 compounds show strongest outcomes at this range. Fat loss protocols will be prioritized in your research profile.", color: "#22d68a" } :
+    { text: "Research literature documents strongest GLP-1 clinical results at this body fat percentage. Fat loss protocols will lead your research profile.", color: "#22d68a" }
   ) : null;
 
   const steps = [
     // Step 0: Sex
     <div key="sex">
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Biological Sex</h2>
-      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>Compound recommendations and avatar rendering are calibrated to biological sex.</p>
+      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>Research protocols and Eidolon rendering are calibrated to biological sex.</p>
       <div style={{ display: "flex", gap: 12 }}>
         {["male", "female"].map(s => (
           <button key={s} onClick={() => { set("sex", s); setStep(1); }} style={{
@@ -787,7 +793,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
     // Step 2: Body fat + Advanced accordion
     <div key="bf">
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Body Fat Percentage</h2>
-      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>The single most important variable for compound selection. Estimate as accurately as possible.</p>
+      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>The single most important variable for protocol configuration. Estimate as accurately as possible.</p>
       <input type="number" placeholder="18" value={data.bodyFat} onChange={e => set("bodyFat", e.target.value)} style={{ ...S.input, fontSize: 32, textAlign: "center", fontWeight: 700 }} min="3" max="60" />
       <div style={{ textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 6 }}>%</div>
       {bfFeedback && (
@@ -877,7 +883,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
     // Step 3: Goals
     <div key="goals">
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Primary Goals</h2>
-      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>Select all that apply. Your goals determine which compounds are surfaced and how they are ranked.</p>
+      <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>Select all that apply. Your goals determine which compounds are surfaced and how your research protocol is configured.</p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
         {GOALS.map(g => {
           const active = data.goals.includes(g.id);
@@ -906,7 +912,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
         };
         onComplete(profile);
       }}>
-        Generate Recommendations →
+        Generate Research Protocol →
       </button>
     </div>
   ];
@@ -1018,11 +1024,15 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
       {/* Quick stats row */}
       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
-          {c.dosing}
+          Protocol: {c.dosing}
         </span>
         <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
           {c.cycle}
         </span>
+      </div>
+
+      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 8, lineHeight: 1.4, fontStyle: "italic" }}>
+        All information is derived from published research literature and is presented for educational purposes.
       </div>
 
       <button onClick={() => setExpanded(!expanded)} style={{
@@ -1062,7 +1072,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
             </div>
           )}
           <div style={{ marginTop: 12 }}>
-            <div style={{ ...S.label, marginBottom: 6 }}>Administration</div>
+            <div style={{ ...S.label, marginBottom: 6 }}>Documented Administration Route</div>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>{c.route}</div>
           </div>
         </div>
@@ -1417,14 +1427,15 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
       <div style={S.inner}>
         <div style={{ padding: "16px 0 8px" }}>
           <button onClick={() => setShowTransform(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 14, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-            ← Back to Compounds
+            ← Back to Research
           </button>
         </div>
 
         <div style={{ textAlign: "center", padding: "20px 0 10px" }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Projected Transformation</h2>
+          <div style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 6 }}>εἰδωλον</div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Projected Research Outcome</h2>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, marginTop: 6 }}>
-            {projectedChanges.timeline}-week projection based on selected stack
+            {projectedChanges.timeline}-week protocol · Based on published research literature
           </p>
         </div>
 
@@ -1432,24 +1443,24 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
           <div style={{ flex: 1, maxWidth: 180 }}>
             {avatarUrl ? (
-              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="Current" size="large" interactive={true} />
+              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="Current Eidolon" size="large" interactive={true} />
             ) : (
-              <BodyAvatar params={avatarParams.current} label="Current" />
+              <BodyAvatar params={avatarParams.current} label="Current Eidolon" />
             )}
           </div>
           <div style={{ fontSize: 24, color: "rgba(255,255,255,0.15)", paddingBottom: 40 }}>→</div>
           <div style={{ flex: 1, maxWidth: 180 }}>
             {avatarUrl ? (
-              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.projected} label="Projected" size="large" interactive={true} glow={true} />
+              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.projected} label="Projected Eidolon" size="large" interactive={true} glow={true} />
             ) : (
-              <BodyAvatar params={avatarParams.projected} label="Projected" glow={true} />
+              <BodyAvatar params={avatarParams.projected} label="Projected Eidolon" glow={true} />
             )}
           </div>
         </div>
 
         {/* Stats — core projections */}
         <div style={S.card}>
-          <div style={{ ...S.label, marginBottom: 12 }}>Projected Outcomes · {projectedChanges.timeline} weeks</div>
+          <div style={{ ...S.label, marginBottom: 12 }}>Projected Outcomes · {projectedChanges.timeline}-week protocol</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <StatTile
               label="Body Fat"
@@ -1502,7 +1513,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
 
         {/* Selected Stack */}
         <div style={S.card}>
-          <div style={{ ...S.label, marginBottom: 10 }}>Selected Stack</div>
+          <div style={{ ...S.label, marginBottom: 10 }}>Your Research Protocol</div>
           {selectedCompounds.map(id => {
             const c = COMPOUNDS.find(x => x.id === id);
             return (
@@ -1534,11 +1545,14 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
             gap: 8
           }}
         >
-          View Cycle Timeline →
+          View Research Timeline →
         </button>
 
         <p style={S.disclaimer}>
-          Projections are estimates based on published research data and population averages. Individual results vary significantly based on genetics, training, nutrition, and adherence. This is not medical advice.
+          Projected research outcome based on published literature. Individual results are not guaranteed. This is not medical advice. Consult a licensed healthcare provider before initiating any protocol.
+        </p>
+        <p style={{ fontSize: 12, color: "rgba(34,214,138,0.35)", textAlign: "center", paddingBottom: 20, fontStyle: "italic", letterSpacing: "0.06em" }}>
+          Happy Researching.
         </p>
       </div>
     );
@@ -1658,7 +1672,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         >
           {stackAnalysis.isBlocked
             ? "Resolve Contraindications to Continue"
-            : `View Transformation (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
+            : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
         </button>
       )}
 
@@ -1675,7 +1689,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
             gap: 8
           }}
         >
-          View Cycle Timeline →
+          View Research Timeline →
         </button>
       )}
 
@@ -1690,7 +1704,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
 
       {/* Recommended */}
       <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
-        Recommended for You — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
+        Matched to Your Profile — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
       </div>
       {recommended.length === 0 && (
         <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
@@ -1743,8 +1757,11 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </>
       )}
 
-      <p style={{ ...S.disclaimer, paddingBottom: 32 }}>
+      <p style={{ ...S.disclaimer, paddingBottom: 8 }}>
         All information is for research and educational purposes only. Nothing on this platform constitutes medical advice. Consult a licensed healthcare provider before initiating any peptide protocol. Alki assumes no liability for user decisions.
+      </p>
+      <p style={{ fontSize: 12, color: "rgba(34,214,138,0.3)", textAlign: "center", paddingBottom: 32, fontStyle: "italic", letterSpacing: "0.06em" }}>
+        Alki · ἀλκή · Happy Researching.
       </p>
     </div>
   );

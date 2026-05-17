@@ -2,7 +2,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'ALKI — Peptide Intelligence Platform',
-  description: 'AI-powered peptide intelligence. Personalized research-grade compound recommendations based on your biometric profile.',
+  description: 'AI-powered peptide intelligence. Personalized research-grade compound protocols and Eidolon body projection based on your biometric profile. For research and educational purposes only.',
   icons: {
     icon: '/favicon.ico',
   },
