@@ -99,11 +99,14 @@ export default function Body3DAvatar({
   autoRotate = true,
 }) {
   // Two framing setups. Camera positions and FOVs chosen empirically
-  // so the 1.7m model fits comfortably in each canvas aspect ratio.
+  // so the 1.7m model (feet at y=0, head at y≈1.72) fits each canvas.
   const isSmall = size === "small";
-  const camPos = isSmall ? [0, 1.55, 1.8] : [0, 0.95, 3.6];
-  const camFov = isSmall ? 26 : 30;
-  const targetY = isSmall ? 1.55 : 0.95;
+  // SMALL: head + shoulders portrait. Camera at head height, pulled back
+  // enough to fit the shoulders horizontally in a narrow portrait canvas.
+  // LARGE: full body. Camera at mid-body, well back to capture feet-to-head.
+  const camPos = isSmall ? [0, 1.5, 2.4] : [0, 0.95, 3.6];
+  const camFov = isSmall ? 20 : 30;
+  const targetY = isSmall ? 1.5 : 0.95;
 
   const wrapStyle = isSmall
     ? { width: "100%", aspectRatio: "1 / 1.2", maxWidth: 110 }
