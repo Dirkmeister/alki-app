@@ -170,6 +170,23 @@ const COMPOUNDS = [
   ...EXPANDED_COMPOUNDS
 ];
 
+// Category color tokens — shared between CompoundCard, stack badges, and any
+// other surface that wants a consistent per-category accent.
+const CAT_COLORS = {
+  Recovery: "#3b82f6",
+  "Growth Hormone": "#a855f7",
+  "Fat Loss": "#f59e0b",
+  "Weight Loss": "#ef4444",
+  "Anti-Aging": "#ec4899",
+  Performance: "#06b6d4",
+  SARM: "#ea580c",
+  Nootropic: "#6366f1",
+  "Cycle Support": "#10b981",
+  "Hair Support": "#14b8a6",
+  Metabolic: "#eab308",
+  Hormonal: "#f43f5e"
+};
+
 const GOALS = [
   { id: "fat_loss", label: "Fat Loss", icon: "🔥" },
   { id: "muscle", label: "Muscle Gain", icon: "💪" },
@@ -374,7 +391,7 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
 }
 
 // ── SVG AVATAR COMPONENT ───────────────────────────────────
-function BodyAvatar({ params, label, glow = false }) {
+function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
   const { fat, muscle, isMale } = params;
 
   // Derived dimensions
@@ -405,7 +422,7 @@ function BodyAvatar({ params, label, glow = false }) {
 
   return (
     <div style={{ textAlign: "center" }}>
-      <svg viewBox="0 0 200 260" style={{ width: "100%", maxWidth: 180 }}>
+      <svg viewBox="0 0 200 260" style={{ width: "100%", maxWidth }}>
         {glow && (
           <defs>
             <filter id="avatarGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -1070,21 +1087,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
   const c = rec.compound;
   const blocked = rec.blocked;
 
-  const catColors = {
-    Recovery: "#3b82f6",
-    "Growth Hormone": "#a855f7",
-    "Fat Loss": "#f59e0b",
-    "Weight Loss": "#ef4444",
-    "Anti-Aging": "#ec4899",
-    Performance: "#06b6d4",
-    SARM: "#ea580c",
-    Nootropic: "#6366f1",
-    "Cycle Support": "#10b981",
-    "Hair Support": "#14b8a6",
-    Metabolic: "#eab308",
-    Hormonal: "#f43f5e"
-  };
-  const catColor = catColors[c.category] || "#888";
+  const catColor = CAT_COLORS[c.category] || "#888";
 
   return (
     <div style={{
@@ -1329,6 +1332,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [editing, setEditing] = useState(!activeProtocol);
   const [showGoalsEditor, setShowGoalsEditor] = useState(false);
   const [showEidolonSwitcher, setShowEidolonSwitcher] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
 
   const activeEidolon = eidolons?.find(e => e.id === activeEidolonId) || eidolons?.[0] || null;
   const isModifying = editing && activeEidolon?.lockedAt != null;
@@ -1364,6 +1369,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setShowGoalsEditor(false);
     setShowEidolonSwitcher(false);
   }, [eidolons, profile?.goals]);
+
+  const commitEidolonName = useCallback(() => {
+    const trimmed = (nameInput || "").trim();
+    if (!trimmed || !activeEidolon) { setEditingName(false); return; }
+    setEidolons(prev => (prev || []).map(e => e.id === activeEidolon.id ? { ...e, name: trimmed } : e));
+    setEditingName(false);
+  }, [nameInput, activeEidolon, setEidolons]);
 
   const handleGoalToggle = useCallback((goalId) => {
     const currentGoals = profile?.goals || [];
@@ -1837,7 +1849,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         </div>
       </div>
 
-      {/* Profile card */}
+      {/* Profile card — only visible in builder mode; the new avatar-first home replaces it when committed. */}
+      {editing && (
       <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16, position: 'relative' }}>
         {/* Reset avatar icon — top-left */}
         {avatarUrl && (
@@ -1915,24 +1928,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               {userEmail}
             </div>
           )}
-          {/* Committed mode: Modify / Switch / New buttons */}
-          {!editing && activeProtocol && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-              <button onClick={() => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Modify
-              </button>
-              {eidolons?.length > 1 && (
-                <button onClick={() => setShowEidolonSwitcher(true)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Switch Eidolon
-                </button>
-              )}
-              <button onClick={createNewEidolon} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                New
-              </button>
-            </div>
-          )}
         </div>
       </div>
+      )}
 
       {/* Inline Goals Editor — collapsible */}
       {showGoalsEditor && (
@@ -1959,35 +1957,193 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         </div>
       )}
 
-      {/* ═══ COMMITTED MODE ═══ */}
+      {/* ═══ COMMITTED MODE — Avatar-First Home ═══ */}
       {!editing && activeProtocol && (
         <>
-          {/* Projection CTA */}
-          {selectedCompounds.length > 0 && (
-            <button
-              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-              disabled={stackAnalysis.isBlocked}
-              style={{
-                ...S.btn,
-                ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
-                marginBottom: 12,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8
-              }}
-            >
-              {stackAnalysis.isBlocked
-                ? "Resolve Contraindications to Continue"
-                : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
-            </button>
-          )}
+          {/* 1. Eidolon name — large, centered, inline-editable */}
+          <div style={{ textAlign: "center", marginTop: 6, marginBottom: 0 }}>
+            {editingName ? (
+              <input
+                autoFocus
+                type="text"
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onBlur={commitEidolonName}
+                onKeyDown={e => {
+                  if (e.key === "Enter") commitEidolonName();
+                  if (e.key === "Escape") setEditingName(false);
+                }}
+                maxLength={30}
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: `1.5px solid ${S.accent}`,
+                  color: "#fff",
+                  textAlign: "center",
+                  outline: "none",
+                  fontFamily: "'Syne', sans-serif",
+                  letterSpacing: "-0.02em",
+                  padding: "4px 14px",
+                  minWidth: 220,
+                  maxWidth: "90%"
+                }}
+              />
+            ) : (
+              <h1
+                onClick={() => {
+                  setNameInput(activeEidolon?.name || 'Eidolon 1');
+                  setEditingName(true);
+                }}
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: "#fff",
+                  margin: 0,
+                  fontFamily: "'Syne', sans-serif",
+                  letterSpacing: "-0.02em",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "2px 8px"
+                }}
+                title="Tap to rename"
+              >
+                {activeEidolon?.name || 'Eidolon 1'}
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 400 }}>✎</span>
+              </h1>
+            )}
+            <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
+              εἰδωλον
+            </div>
+          </div>
 
-          {/* Timeline CTA */}
-          {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
-            <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              View Research Timeline →
-            </button>
-          )}
+          {/* 2. Hero avatar with subtle radial glow */}
+          <div style={{
+            position: "relative",
+            display: "flex",
+            justifyContent: "center",
+            padding: "10px 0 4px",
+            width: "100%"
+          }}>
+            <div style={{
+              position: "absolute",
+              top: 20,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 300,
+              height: 300,
+              borderRadius: "50%",
+              background: "radial-gradient(circle at center, rgba(26,232,122,0.10) 0%, rgba(26,232,122,0.04) 40%, transparent 70%)",
+              pointerEvents: "none",
+              filter: "blur(6px)"
+            }} />
+            <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
+              {avatarUrl ? (
+                <Body3DAvatar
+                  avatarUrl={avatarUrl}
+                  params={avatarParams.current}
+                  label=""
+                  size="large"
+                  interactive={true}
+                />
+              ) : (
+                <BodyAvatar
+                  params={avatarParams.current}
+                  label=""
+                  maxWidth={280}
+                />
+              )}
+            </div>
+          </div>
 
-          {/* Cultivation Status */}
+          {/* Avatar customization chip */}
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            {avatarUrl ? (
+              <button
+                onClick={onResetAvatar}
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  color: "rgba(255,255,255,0.35)",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  padding: "5px 12px",
+                  borderRadius: 100,
+                  cursor: "pointer",
+                  fontFamily: "inherit"
+                }}
+              >
+                ↺ Reset Avatar
+              </button>
+            ) : (
+              <button
+                onClick={onCaptureAvatar}
+                style={{
+                  background: "rgba(26,232,122,0.08)",
+                  border: "1px solid rgba(26,232,122,0.22)",
+                  color: S.accent,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  padding: "7px 16px",
+                  borderRadius: 100,
+                  cursor: "pointer",
+                  fontFamily: "inherit"
+                }}
+              >
+                {AVATURN_ENABLED ? "✦ Make it me" : "Make it me · setup"}
+              </button>
+            )}
+          </div>
+
+          {/* 3. Stat pills */}
+          <div style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            justifyContent: "center",
+            marginBottom: 14
+          }}>
+            {[
+              { label: "BF",  value: `${profile.bodyFat}%` },
+              { label: "WT",  value: `${profile.weight}lb` },
+              { label: "HT",  value: `${profile.heightFt}'${profile.heightIn}\"` },
+              { label: "AGE", value: `${profile.age}` },
+              { label: "SEX", value: profile.sex === "male" ? "♂" : "♀" }
+            ].map(p => (
+              <div key={p.label} style={{
+                padding: "5px 11px",
+                borderRadius: 100,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                fontSize: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6
+              }}>
+                <span style={{
+                  color: "rgba(255,255,255,0.3)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  fontFamily: "'JetBrains Mono', monospace"
+                }}>
+                  {p.label}
+                </span>
+                <span style={{ color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                  {p.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* 4. Cultivation status */}
           {(() => {
             const cv = getCultivationVisuals(cultivationState?.state || "new");
             return (
@@ -2004,7 +2160,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                     <span style={{ color: cv.statusColor, fontSize: 13 }}>{cv.statusIcon}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: cv.statusColor }}>Eidolon: {cv.statusLabel}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: cv.statusColor }}>Cultivation: {cv.statusLabel}</span>
                   </div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
                     {cultivationState?.state === "new" && "Log your first check-in →"}
@@ -2020,19 +2176,124 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             );
           })()}
 
-          {/* Active Protocol Summary */}
+          {/* 5. Active stack — equipped badges */}
           <div style={S.card}>
-            <div style={{ ...S.label, marginBottom: 10 }}>Active Research Protocol</div>
-            {(activeProtocol.compounds || []).map(id => {
-              const c = COMPOUNDS.find(x => x.id === id);
-              if (!c) return null;
-              return (
-                <div key={id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{c.dosing}</span>
-                </div>
-              );
-            })}
+            <div style={{ ...S.label, marginBottom: 10 }}>Active Stack</div>
+            {(activeProtocol.compounds || []).length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                {(activeProtocol.compounds || []).map(id => {
+                  const c = COMPOUNDS.find(x => x.id === id);
+                  if (!c) return null;
+                  const catColor = CAT_COLORS[c.category] || "#888";
+                  return (
+                    <span key={id} style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "6px 12px",
+                      borderRadius: 100,
+                      background: `${catColor}12`,
+                      border: `1px solid ${catColor}30`,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#fff"
+                    }}>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: catColor,
+                        boxShadow: `0 0 6px ${catColor}88`,
+                        display: "inline-block"
+                      }} />
+                      {c.name}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>No active stack</div>
+            )}
+          </div>
+
+          {/* 6. Goals */}
+          <div style={S.card}>
+            <div style={{ ...S.label, marginBottom: 10 }}>Goals</div>
+            {(profile.goals || []).length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {(profile.goals || []).map(gid => {
+                  const goal = GOALS.find(x => x.id === gid);
+                  if (!goal) return null;
+                  return (
+                    <span key={gid} style={{
+                      fontSize: 12,
+                      padding: "5px 12px",
+                      borderRadius: 100,
+                      background: "rgba(26,232,122,0.08)",
+                      border: "1px solid rgba(26,232,122,0.18)",
+                      color: S.accent,
+                      fontWeight: 600
+                    }}>
+                      {goal.icon} {goal.label}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowGoalsEditor(true)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: S.accent,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  padding: 0
+                }}
+              >
+                Set your goals →
+              </button>
+            )}
+          </div>
+
+          {/* 7. Action grid — 2×2 */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
+            marginTop: 8,
+            marginBottom: 10
+          }}>
+            <button
+              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+              disabled={stackAnalysis.isBlocked}
+              style={{
+                ...S.btnOutline,
+                ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {})
+              }}
+            >
+              View Projection
+            </button>
+            <button
+              onClick={() => {
+                setSelectedCompounds(activeProtocol.compounds || []);
+                setEditing(true);
+              }}
+              style={S.btnOutline}
+            >
+              Modify Stack
+            </button>
+            <button
+              onClick={() => setShowEidolonSwitcher(true)}
+              style={S.btnOutline}
+            >
+              Switch Eidolon
+            </button>
+            <button
+              onClick={createNewEidolon}
+              style={S.btnOutline}
+            >
+              New Eidolon
+            </button>
           </div>
         </>
       )}
