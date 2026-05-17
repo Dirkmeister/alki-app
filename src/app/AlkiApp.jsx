@@ -413,8 +413,8 @@ function BodyAvatar({ params, label, glow = false }) {
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
             <linearGradient id="glowOverlay" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#22d68a" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#22d68a" stopOpacity="0.02" />
+              <stop offset="0%" stopColor="#1ae87a" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#1ae87a" stopOpacity="0.02" />
             </linearGradient>
           </defs>
         )}
@@ -533,7 +533,7 @@ function BodyAvatar({ params, label, glow = false }) {
         fontWeight: 600,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: glow ? "#22d68a" : "rgba(255,255,255,0.5)",
+        color: glow ? "#1ae87a" : "rgba(255,255,255,0.5)",
         marginTop: 4
       }}>{label}</div>
     </div>
@@ -544,129 +544,212 @@ function BodyAvatar({ params, label, glow = false }) {
 const S = {
   app: {
     minHeight: "100vh",
-    background: "#0a0a0a",
-    color: "#e8e8e8",
+    background: "#060608",
+    color: "#ededed",
     fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
     overflow: "hidden"
   },
   inner: {
     maxWidth: 480,
     margin: "0 auto",
-    padding: "0 20px",
+    padding: "0 24px",
     minHeight: "100vh",
     display: "flex",
     flexDirection: "column"
   },
-  accent: "#22d68a",
-  accentDim: "rgba(34,214,138,0.15)",
-  accentBorder: "rgba(34,214,138,0.25)",
+  accent: "#1ae87a",
+  accentDim: "rgba(26,232,122,0.12)",
+  accentBorder: "rgba(26,232,122,0.22)",
   card: {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 12
+    background: "rgba(255,255,255,0.035)",
+    border: "1px solid rgba(255,255,255,0.07)",
+    borderRadius: 16,
+    padding: 22,
+    marginBottom: 14,
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    transition: "border-color 0.25s ease, background 0.25s ease"
   },
   input: {
     width: "100%",
-    padding: "14px 16px",
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 10,
+    padding: "15px 18px",
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.09)",
+    borderRadius: 12,
     color: "#fff",
     fontSize: 16,
     outline: "none",
     boxSizing: "border-box",
-    fontFamily: "inherit"
+    fontFamily: "inherit",
+    transition: "border-color 0.2s ease, background 0.2s ease"
   },
   btn: {
     width: "100%",
-    padding: "16px 24px",
-    background: "#22d68a",
-    color: "#0a0a0a",
+    padding: "17px 24px",
+    background: "#1ae87a",
+    color: "#060608",
     border: "none",
-    borderRadius: 12,
-    fontSize: 16,
+    borderRadius: 14,
+    fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
-    letterSpacing: "0.02em",
-    fontFamily: "inherit",
-    transition: "opacity 0.2s"
+    letterSpacing: "0.03em",
+    fontFamily: "'Syne', 'DM Sans', sans-serif",
+    transition: "transform 0.15s ease, box-shadow 0.2s ease",
+    boxShadow: "0 0 20px rgba(26,232,122,0.15), 0 2px 8px rgba(0,0,0,0.3)"
   },
   btnDisabled: {
-    opacity: 0.35,
-    cursor: "not-allowed"
+    opacity: 0.3,
+    cursor: "not-allowed",
+    boxShadow: "none"
   },
   btnOutline: {
     width: "100%",
-    padding: "14px 24px",
-    background: "transparent",
-    color: "#22d68a",
-    border: "2px solid rgba(34,214,138,0.3)",
-    borderRadius: 12,
-    fontSize: 15,
+    padding: "15px 24px",
+    background: "rgba(26,232,122,0.04)",
+    color: "#1ae87a",
+    border: "1.5px solid rgba(26,232,122,0.2)",
+    borderRadius: 14,
+    fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "inherit"
+    fontFamily: "'Syne', 'DM Sans', sans-serif",
+    letterSpacing: "0.02em",
+    transition: "border-color 0.2s ease, background 0.2s ease"
   },
   label: {
-    fontSize: 12,
-    fontWeight: 600,
-    letterSpacing: "0.1em",
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.14em",
     textTransform: "uppercase",
-    color: "rgba(255,255,255,0.45)",
-    marginBottom: 8,
-    display: "block"
+    color: "rgba(255,255,255,0.35)",
+    marginBottom: 10,
+    display: "block",
+    fontFamily: "'JetBrains Mono', 'SF Mono', monospace"
   },
   tag: {
     display: "inline-block",
-    padding: "6px 14px",
-    borderRadius: 20,
+    padding: "8px 16px",
+    borderRadius: 100,
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
-    transition: "all 0.2s",
+    transition: "all 0.2s ease",
     marginRight: 8,
     marginBottom: 8
   },
   disclaimer: {
     fontSize: 11,
-    color: "rgba(255,255,255,0.3)",
-    lineHeight: 1.5,
+    color: "rgba(255,255,255,0.22)",
+    lineHeight: 1.6,
     textAlign: "center",
-    padding: "16px 0"
+    padding: "20px 0",
+    fontFamily: "'DM Sans', sans-serif"
   }
 };
 
 // ── SCREEN COMPONENTS ──────────────────────────────────────
 
 function SplashScreen({ onEnter }) {
-  const [show, setShow] = useState(false);
-  useEffect(() => { setTimeout(() => setShow(true), 100); }, []);
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 150);
+    const t2 = setTimeout(() => setPhase(2), 500);
+    const t3 = setTimeout(() => setPhase(3), 900);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
 
   return (
-    <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center", opacity: show ? 1 : 0, transition: "opacity 0.8s ease" }}>
-      <div style={{ marginBottom: 48 }}>
-        <div style={{ fontSize: 13, letterSpacing: "0.35em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: 16 }}>ἀλκή</div>
-        <h1 style={{ fontSize: 56, fontWeight: 800, letterSpacing: "-0.03em", margin: 0, lineHeight: 1 }}>
-          <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+    <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center", position: "relative" }}>
+      {/* Atmospheric gradient orbs */}
+      <div style={{ position: "absolute", top: "10%", left: "20%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,232,122,0.06) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none", opacity: phase >= 1 ? 1 : 0, transition: "opacity 1.5s ease" }} />
+      <div style={{ position: "absolute", bottom: "15%", right: "10%", width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,120,232,0.04) 0%, transparent 70%)", filter: "blur(40px)", pointerEvents: "none", opacity: phase >= 2 ? 1 : 0, transition: "opacity 1.5s ease" }} />
+
+      <div style={{ marginBottom: 56, opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? "translateY(0)" : "translateY(20px)", transition: "all 0.8s cubic-bezier(0.16,1,0.3,1)" }}>
+        {/* Greek text */}
+        <div style={{
+          fontSize: 11,
+          letterSpacing: "0.5em",
+          textTransform: "uppercase",
+          color: "rgba(255,255,255,0.18)",
+          marginBottom: 20,
+          fontFamily: "'JetBrains Mono', monospace",
+          fontWeight: 400
+        }}>ἀλκή</div>
+
+        {/* Logo mark */}
+        <h1 style={{
+          fontSize: 72,
+          fontWeight: 800,
+          letterSpacing: "-0.04em",
+          margin: 0,
+          lineHeight: 0.9,
+          fontFamily: "'Syne', sans-serif"
+        }}>
+          <span style={{ color: "#fff" }}>AL</span>
+          <span style={{
+            color: S.accent,
+            textShadow: "0 0 40px rgba(26,232,122,0.3), 0 0 80px rgba(26,232,122,0.1)"
+          }}>KI</span>
         </h1>
-        <p style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginTop: 12, letterSpacing: "0.15em", textTransform: "uppercase" }}>
-          Peptide Intelligence Platform
+
+        {/* Decorative line */}
+        <div style={{
+          width: 48,
+          height: 1,
+          background: "linear-gradient(90deg, transparent, rgba(26,232,122,0.4), transparent)",
+          margin: "20px auto",
+          opacity: phase >= 2 ? 1 : 0,
+          transform: phase >= 2 ? "scaleX(1)" : "scaleX(0)",
+          transition: "all 0.6s ease 0.2s"
+        }} />
+
+        <p style={{
+          fontSize: 12,
+          color: "rgba(255,255,255,0.35)",
+          letterSpacing: "0.2em",
+          textTransform: "uppercase",
+          fontFamily: "'Syne', sans-serif",
+          fontWeight: 500,
+          opacity: phase >= 2 ? 1 : 0,
+          transition: "opacity 0.6s ease 0.3s"
+        }}>
+          Peptide Intelligence
         </p>
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", marginTop: 6, fontStyle: "italic", letterSpacing: "0.04em" }}>
+
+        <p style={{
+          fontSize: 11,
+          color: "rgba(255,255,255,0.15)",
+          marginTop: 10,
+          letterSpacing: "0.06em",
+          fontFamily: "'DM Sans', sans-serif",
+          fontStyle: "italic",
+          opacity: phase >= 2 ? 1 : 0,
+          transition: "opacity 0.6s ease 0.5s"
+        }}>
           εἰδωλον · Your Eidolon Awaits
         </p>
       </div>
 
-      <div style={{ width: "100%", maxWidth: 320 }}>
-        <button style={S.btn} onClick={onEnter}>
+      <div style={{
+        width: "100%",
+        maxWidth: 300,
+        opacity: phase >= 3 ? 1 : 0,
+        transform: phase >= 3 ? "translateY(0)" : "translateY(12px)",
+        transition: "all 0.6s cubic-bezier(0.16,1,0.3,1)"
+      }}>
+        <button
+          style={S.btn}
+          onClick={onEnter}
+          onMouseEnter={e => { e.target.style.transform = "translateY(-1px)"; e.target.style.boxShadow = "0 0 30px rgba(26,232,122,0.25), 0 4px 12px rgba(0,0,0,0.4)"; }}
+          onMouseLeave={e => { e.target.style.transform = "translateY(0)"; e.target.style.boxShadow = S.btn.boxShadow; }}
+        >
           Enter Platform
         </button>
-        <p style={{ ...S.disclaimer, marginTop: 20, maxWidth: 280, margin: "20px auto 0" }}>
+        <p style={{ ...S.disclaimer, marginTop: 24, maxWidth: 280, margin: "24px auto 0", fontSize: 10, lineHeight: 1.7 }}>
           For informational and research purposes only. Not medical advice. Consult a licensed physician before initiating any peptide protocol.
         </p>
-        <p style={{ fontSize: 12, color: "rgba(34,214,138,0.4)", marginTop: 12, fontStyle: "italic", letterSpacing: "0.06em" }}>
+        <p style={{ fontSize: 11, color: "rgba(26,232,122,0.3)", marginTop: 14, fontFamily: "'DM Sans', sans-serif", fontStyle: "italic", letterSpacing: "0.06em" }}>
           Happy Researching.
         </p>
       </div>
@@ -675,23 +758,46 @@ function SplashScreen({ onEnter }) {
 }
 
 function AgeGate({ onConfirm, onDeny }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => { setTimeout(() => setShow(true), 100); }, []);
+
   return (
-    <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-      <div style={{ marginBottom: 40 }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: "rgba(34,214,138,0.1)", border: `1px solid ${S.accentBorder}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>
+    <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center", opacity: show ? 1 : 0, transform: show ? "translateY(0)" : "translateY(12px)", transition: "all 0.6s cubic-bezier(0.16,1,0.3,1)" }}>
+      <div style={{ marginBottom: 44 }}>
+        <div style={{
+          width: 72,
+          height: 72,
+          borderRadius: 20,
+          background: "rgba(26,232,122,0.06)",
+          border: "1px solid rgba(26,232,122,0.15)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 24px",
+          fontSize: 30,
+          boxShadow: "0 0 30px rgba(26,232,122,0.06)"
+        }}>
           🔒
         </div>
-        <h2 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Age Verification</h2>
-        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, marginTop: 12, lineHeight: 1.6 }}>
+        <h2 style={{ fontSize: 26, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Age Verification</h2>
+        <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 14, lineHeight: 1.7, maxWidth: 300, margin: "14px auto 0" }}>
           Alki is designed exclusively for adults aged 18 and older. By continuing, you confirm that you are at least 18 years of age.
         </p>
       </div>
 
-      <div style={{ width: "100%", maxWidth: 320 }}>
-        <button style={S.btn} onClick={onConfirm}>
+      <div style={{ width: "100%", maxWidth: 300 }}>
+        <button
+          style={S.btn}
+          onClick={onConfirm}
+          onMouseEnter={e => { e.target.style.transform = "translateY(-1px)"; e.target.style.boxShadow = "0 0 30px rgba(26,232,122,0.25), 0 4px 12px rgba(0,0,0,0.4)"; }}
+          onMouseLeave={e => { e.target.style.transform = "translateY(0)"; e.target.style.boxShadow = S.btn.boxShadow; }}
+        >
           I am 18 or older
         </button>
-        <button style={{ ...S.btnOutline, marginTop: 12 }} onClick={onDeny}>
+        <button
+          style={{ ...S.btnOutline, marginTop: 12 }}
+          onClick={onDeny}
+        >
           I am under 18
         </button>
       </div>
@@ -702,8 +808,8 @@ function AgeGate({ onConfirm, onDeny }) {
 function AgeBlocked() {
   return (
     <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-      <h2 style={{ fontSize: 24, fontWeight: 700 }}>Access Restricted</h2>
-      <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, marginTop: 12, maxWidth: 300 }}>
+      <h2 style={{ fontSize: 26, fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>Access Restricted</h2>
+      <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 14, maxWidth: 300, lineHeight: 1.7 }}>
         Alki is not available to individuals under 18 years of age. This restriction is non-negotiable.
       </p>
     </div>
@@ -736,17 +842,17 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
 
   const bfNum = parseFloat(data.bodyFat);
   const bfFeedback = !isNaN(bfNum) && bfNum > 0 ? (
-    bfNum < 8 ? { text: "Competition-level lean. All compounds available for research. Recovery and GH peptides are most commonly studied at this range.", color: "#22d68a" } :
-    bfNum < 15 ? { text: "Athletic range. Full compound spectrum available for research. GH and recovery peptides are frequently studied here; GLP-1 research indicates lean mass risk at this level.", color: "#22d68a" } :
-    bfNum < 22 ? { text: "Healthy range. Full compound spectrum available. Research literature supports body recomposition protocols at this body fat level.", color: "#22d68a" } :
-    bfNum < 30 ? { text: "Research literature indicates GLP-1 compounds show strongest outcomes at this range. Fat loss protocols will be prioritized in your research profile.", color: "#22d68a" } :
-    { text: "Research literature documents strongest GLP-1 clinical results at this body fat percentage. Fat loss protocols will lead your research profile.", color: "#22d68a" }
+    bfNum < 8 ? { text: "Competition-level lean. All compounds available for research. Recovery and GH peptides are most commonly studied at this range.", color: "#1ae87a" } :
+    bfNum < 15 ? { text: "Athletic range. Full compound spectrum available for research. GH and recovery peptides are frequently studied here; GLP-1 research indicates lean mass risk at this level.", color: "#1ae87a" } :
+    bfNum < 22 ? { text: "Healthy range. Full compound spectrum available. Research literature supports body recomposition protocols at this body fat level.", color: "#1ae87a" } :
+    bfNum < 30 ? { text: "Research literature indicates GLP-1 compounds show strongest outcomes at this range. Fat loss protocols will be prioritized in your research profile.", color: "#1ae87a" } :
+    { text: "Research literature documents strongest GLP-1 clinical results at this body fat percentage. Fat loss protocols will lead your research profile.", color: "#1ae87a" }
   ) : null;
 
   const steps = [
     // Step 0: Sex
     <div key="sex">
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Biological Sex</h2>
+      <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Biological Sex</h2>
       <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>Research protocols and Eidolon rendering are calibrated to biological sex.</p>
       <div style={{ display: "flex", gap: 12 }}>
         {["male", "female"].map(s => (
@@ -765,7 +871,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
 
     // Step 1: Basics
     <div key="basics">
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Biometrics</h2>
+      <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 24, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Biometrics</h2>
       <div style={{ marginBottom: 20 }}>
         <label style={S.label}>Age</label>
         <input type="number" placeholder="28" value={data.age} onChange={e => set("age", e.target.value)} style={S.input} min="18" max="99" />
@@ -796,7 +902,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
 
     // Step 2: Body fat + Advanced accordion
     <div key="bf">
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Body Fat Percentage</h2>
+      <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Body Fat Percentage</h2>
       <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>The single most important variable for protocol configuration. Estimate as accurately as possible.</p>
       <input type="number" placeholder="18" value={data.bodyFat} onChange={e => set("bodyFat", e.target.value)} style={{ ...S.input, fontSize: 32, textAlign: "center", fontWeight: 700 }} min="3" max="60" />
       <div style={{ textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 6 }}>%</div>
@@ -837,7 +943,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
                 <span>⚗️</span>
                 <span>Advanced body stats</span>
                 {filledCount > 0 && (
-                  <span style={{ background: "rgba(34,214,138,0.15)", color: "#22d68a", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
+                  <span style={{ background: "rgba(26,232,122,0.15)", color: "#1ae87a", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
                     {filledCount}/8
                   </span>
                 )}
@@ -886,7 +992,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
 
     // Step 3: Goals
     <div key="goals">
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Primary Goals</h2>
+      <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Primary Goals</h2>
       <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginBottom: 24 }}>Select all that apply. Your goals determine which compounds are surfaced and how your research protocol is configured.</p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
         {GOALS.map(g => {
@@ -985,12 +1091,12 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
       ...S.card,
       opacity: blocked ? 0.45 : 1,
       borderColor: isSelected ? S.accent : "rgba(255,255,255,0.08)",
-      background: isSelected ? "rgba(34,214,138,0.06)" : "rgba(255,255,255,0.04)"
+      background: isSelected ? "rgba(26,232,122,0.06)" : "rgba(255,255,255,0.04)"
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <span style={{ fontSize: 18, fontWeight: 700 }}>{c.name}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>{c.name}</span>
             <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 12, background: `${catColor}20`, color: catColor, fontWeight: 600 }}>
               {c.category}
             </span>
@@ -1002,7 +1108,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
             width: 36, height: 36, borderRadius: 10, border: `2px solid ${isSelected ? S.accent : "rgba(255,255,255,0.15)"}`,
             background: isSelected ? S.accent : "transparent",
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, color: isSelected ? "#0a0a0a" : "rgba(255,255,255,0.3)", flexShrink: 0
+            fontSize: 18, color: isSelected ? "#060608" : "rgba(255,255,255,0.3)", flexShrink: 0
           }}>
             {isSelected ? "✓" : "+"}
           </button>
@@ -1058,7 +1164,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <div>
-              <div style={{ ...S.label, marginBottom: 6, color: "#22d68a" }}>Documented Advantages</div>
+              <div style={{ ...S.label, marginBottom: 6, color: "#1ae87a" }}>Documented Advantages</div>
               {c.pros.map((p, i) => (
                 <div key={i} style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "3px 0", lineHeight: 1.5 }}>+ {p}</div>
               ))}
@@ -1071,7 +1177,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
             </div>
           </div>
           {rec.stackNotes.length > 0 && (
-            <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(34,214,138,0.06)", border: "1px solid rgba(34,214,138,0.15)", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+            <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(26,232,122,0.06)", border: "1px solid rgba(26,232,122,0.15)", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
               🔗 {rec.stackNotes[0]}
             </div>
           )}
@@ -1092,7 +1198,7 @@ function StatTile({ label, current, projected, delta, unit, goodDirection = "up"
   const deltaColor = !hasDelta
     ? "rgba(255,255,255,0.35)"
     : isFavorable
-    ? "#22d68a"
+    ? "#1ae87a"
     : "#ef4444";
 
   // Display value: prefer projected absolute when provided, otherwise show delta.
@@ -1116,7 +1222,7 @@ function StatTile({ label, current, projected, delta, unit, goodDirection = "up"
       </div>
       {showAbsolute ? (
         <>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", lineHeight: 1.1, fontFamily: "'JetBrains Mono', monospace" }}>
             {projected}
           </div>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
@@ -1126,7 +1232,7 @@ function StatTile({ label, current, projected, delta, unit, goodDirection = "up"
         </>
       ) : (
         <>
-          <div style={{ fontSize: 22, fontWeight: 800, color: deltaColor, lineHeight: 1.1 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: deltaColor, lineHeight: 1.1, fontFamily: "'JetBrains Mono', monospace" }}>
             {hasDelta ? formattedDelta : (isScore ? "—" : `0${unit}`)}
           </div>
           {note && (
@@ -1146,7 +1252,7 @@ function BiomarkerRow({ projection }) {
   const deltaColor = !hasDelta
     ? "rgba(255,255,255,0.35)"
     : positive
-    ? "#22d68a"
+    ? "#1ae87a"
     : "#ef4444";
   const deltaStr = `${delta > 0 ? "+" : ""}${delta}${unit}`;
 
@@ -1190,8 +1296,8 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) 
               onClick={() => onSelect(e.id)}
               style={{
                 width: '100%', padding: '14px 16px', textAlign: 'left',
-                background: e.id === activeEidolonId ? 'rgba(34,214,138,0.08)' : 'rgba(255,255,255,0.04)',
-                border: `1.5px solid ${e.id === activeEidolonId ? '#22d68a' : 'rgba(255,255,255,0.08)'}`,
+                background: e.id === activeEidolonId ? 'rgba(26,232,122,0.08)' : 'rgba(255,255,255,0.04)',
+                border: `1.5px solid ${e.id === activeEidolonId ? '#1ae87a' : 'rgba(255,255,255,0.08)'}`,
                 borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between'
               }}
@@ -1203,8 +1309,8 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) 
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {e.lockedAt && <span style={{ fontSize: 10, color: 'rgba(34,214,138,0.6)', fontWeight: 600 }}>LOCKED</span>}
-                {e.id === activeEidolonId && <span style={{ color: '#22d68a', fontSize: 16 }}>●</span>}
+                {e.lockedAt && <span style={{ fontSize: 10, color: 'rgba(26,232,122,0.6)', fontWeight: 600 }}>LOCKED</span>}
+                {e.id === activeEidolonId && <span style={{ color: '#1ae87a', fontSize: 16 }}>●</span>}
               </div>
             </button>
           ))}
@@ -1557,7 +1663,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
         <div style={{ textAlign: "center", padding: "20px 0 10px" }}>
           <div style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 6 }}>εἰδωλον</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Projected Research Outcome</h2>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Projected Research Outcome</h2>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, marginTop: 6 }}>
             {projectedChanges.timeline}-week protocol · Based on published research literature
           </p>
@@ -1691,7 +1797,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         <p style={S.disclaimer}>
           Projected research outcome based on published literature. Individual results are not guaranteed. This is not medical advice. Consult a licensed healthcare provider before initiating any protocol.
         </p>
-        <p style={{ fontSize: 12, color: "rgba(34,214,138,0.35)", textAlign: "center", paddingBottom: 20, fontStyle: "italic", letterSpacing: "0.06em" }}>
+        <p style={{ fontSize: 12, color: "rgba(26,232,122,0.35)", textAlign: "center", paddingBottom: 20, fontStyle: "italic", letterSpacing: "0.06em" }}>
           Happy Researching.
         </p>
       </div>
@@ -1704,7 +1810,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* Header */}
       <div style={{ padding: "16px 0 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", fontFamily: "'Syne', sans-serif" }}>
             <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
           </span>
         </div>
@@ -1773,9 +1879,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               <button
                 onClick={onCaptureAvatar}
                 style={{
-                  background: "rgba(34,214,138,0.12)",
-                  border: "1px solid rgba(34,214,138,0.3)",
-                  color: "#22d68a",
+                  background: "rgba(26,232,122,0.12)",
+                  border: "1px solid rgba(26,232,122,0.3)",
+                  color: "#1ae87a",
                   fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: "0.04em",
@@ -1798,7 +1904,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             {(profile.goals || []).map(g => {
               const goal = GOALS.find(x => x.id === g);
               return (
-                <span key={g} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.1)", color: S.accent }}>
+                <span key={g} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(26,232,122,0.1)", color: S.accent }}>
                   {goal?.label}
                 </span>
               );
@@ -1830,7 +1936,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
       {/* Inline Goals Editor — collapsible */}
       {showGoalsEditor && (
-        <div style={{ ...S.card, borderColor: 'rgba(34,214,138,0.2)' }}>
+        <div style={{ ...S.card, borderColor: 'rgba(26,232,122,0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ ...S.label, marginBottom: 0 }}>Goals for {activeEidolon?.name || 'Eidolon 1'}</div>
             <button onClick={() => setShowGoalsEditor(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
@@ -2044,7 +2150,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       <p style={{ ...S.disclaimer, paddingBottom: 8 }}>
         All information is for research and educational purposes only. Nothing on this platform constitutes medical advice. Consult a licensed healthcare provider before initiating any peptide protocol. Alki assumes no liability for user decisions.
       </p>
-      <p style={{ fontSize: 12, color: "rgba(34,214,138,0.3)", textAlign: "center", paddingBottom: 32, fontStyle: "italic", letterSpacing: "0.06em" }}>
+      <p style={{ fontSize: 12, color: "rgba(26,232,122,0.3)", textAlign: "center", paddingBottom: 32, fontStyle: "italic", letterSpacing: "0.06em" }}>
         Alki · ἀλκή · Happy Researching.
       </p>
     </div>
@@ -2166,8 +2272,8 @@ function AuthScreen({ onAuth, onBack, onSkip }) {
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>
-            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+          <h1 style={{ fontSize: 40, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(26,232,122,0.2)" }}>KI</span>
           </h1>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 8 }}>
             {mode === "signin" ? "Welcome back, researcher." : "Create your research account."}
@@ -2175,7 +2281,7 @@ function AuthScreen({ onAuth, onBack, onSkip }) {
         </div>
 
         {message && (
-          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(34,214,138,0.1)", border: "1px solid rgba(34,214,138,0.2)", fontSize: 13, color: "#22d68a", marginBottom: 16, lineHeight: 1.5 }}>
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(26,232,122,0.1)", border: "1px solid rgba(26,232,122,0.2)", fontSize: 13, color: "#1ae87a", marginBottom: 16, lineHeight: 1.5 }}>
             {message}
           </div>
         )}
@@ -2379,7 +2485,7 @@ export default function AlkiApp() {
 
       {screen === "loading" && (
         <div style={{ ...S.inner, justifyContent: "center", alignItems: "center" }}>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
             <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
           </div>
           <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, marginTop: 12 }}>Loading...</div>
