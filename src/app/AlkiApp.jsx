@@ -1248,24 +1248,27 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
   const createNewEidolon = useCallback(() => {
     const num = (eidolons?.length || 0) + 1;
-    const eid = { id: 'e_' + Date.now(), name: `Eidolon ${num}`, goals: [...(profile.goals || [])], compounds: [], lockedAt: null };
+    const eid = { id: 'e_' + Date.now(), name: `Eidolon ${num}`, goals: [...(profile?.goals || [])], compounds: [], lockedAt: null };
     setEidolons(prev => [...(prev || []), eid]);
     setActiveEidolonId(eid.id);
     setActiveProtocol(null);
     setSelectedCompounds([]);
     setEditing(true);
     setShowTransform(false);
-  }, [eidolons, profile.goals]);
+    setShowGoalsEditor(false);
+    setShowEidolonSwitcher(false);
+  }, [eidolons, profile?.goals]);
 
   const handleGoalToggle = useCallback((goalId) => {
-    const newGoals = profile.goals.includes(goalId)
-      ? profile.goals.filter(g => g !== goalId)
-      : [...profile.goals, goalId];
+    const currentGoals = profile?.goals || [];
+    const newGoals = currentGoals.includes(goalId)
+      ? currentGoals.filter(g => g !== goalId)
+      : [...currentGoals, goalId];
     setProfile(prev => ({ ...prev, goals: newGoals }));
     if (activeEidolon) {
       setEidolons(prev => prev.map(e => e.id === activeEidolon.id ? { ...e, goals: newGoals } : e));
     }
-  }, [profile.goals, activeEidolon]);
+  }, [profile?.goals, activeEidolon]);
 
   const handleLockIn = useCallback((compounds) => {
     const protocol = { compounds, lockedAt: new Date().toISOString() };
@@ -1277,7 +1280,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   }, [activeEidolon]);
 
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
-  const stackAnalysis = useMemo(() => analyzeStack(selectedCompounds, profile), [selectedCompounds, profile]);
+  const stackAnalysis = useMemo(() => selectedCompounds.length > 0 ? analyzeStack(selectedCompounds, profile) : { isBlocked: false, issues: [] }, [selectedCompounds, profile]);
 
   useEffect(() => { setTimeout(() => setAnimateIn(true), 100); }, []);
 
@@ -1771,7 +1774,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             Body fat: <span style={{ color: "#fff", fontWeight: 600 }}>{profile.bodyFat}%</span>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-            {profile.goals.map(g => {
+            {(profile.goals || []).map(g => {
               const goal = GOALS.find(x => x.id === g);
               return (
                 <span key={g} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.1)", color: S.accent }}>
@@ -1813,7 +1816,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
             {GOALS.map(g => {
-              const active = profile.goals.includes(g.id);
+              const active = (profile.goals || []).includes(g.id);
               return (
                 <button key={g.id} onClick={() => handleGoalToggle(g.id)} style={{
                   ...S.tag,
@@ -1946,12 +1949,14 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           )}
 
           {/* Stack Intelligence — compact */}
-          <StackIntelligence
-            stackIds={selectedCompounds}
-            userProfile={profile}
-            onRemoveCompound={toggleCompound}
-            mode="compact"
-          />
+          {selectedCompounds.length > 0 && (
+            <StackIntelligence
+              stackIds={selectedCompounds}
+              userProfile={profile}
+              onRemoveCompound={toggleCompound}
+              mode="compact"
+            />
+          )}
 
           {/* Recommended compounds */}
           <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
