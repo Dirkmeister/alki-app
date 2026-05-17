@@ -51,7 +51,7 @@ function ScoreInput({ label, value, onChange, icon }) {
   );
 }
 
-export default function ProgressLog({ onBack, userId, profile, cultivationState }) {
+export default function ProgressLog({ onBack, userId, profile, cultivationState, onLogsChanged }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -77,7 +77,10 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState 
       .order("logged_at", { ascending: false })
       .limit(50)
       .then(({ data, error }) => {
-        if (!error && data) setLogs(data);
+        if (!error && data) {
+          setLogs(data);
+          if (onLogsChanged) onLogsChanged(data);
+        }
         setLoading(false);
       });
   }, [userId]);
@@ -102,7 +105,9 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState 
       .single();
     setSaving(false);
     if (!error && data) {
-      setLogs(prev => [data, ...prev]);
+      const updated = [data, ...logs];
+      setLogs(updated);
+      if (onLogsChanged) onLogsChanged(updated);
       setShowForm(false);
       setNotes("");
     }

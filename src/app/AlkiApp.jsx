@@ -1683,7 +1683,6 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
                 <span style={{ fontSize: 13, fontWeight: 700, color: cv.statusColor }}>
                   Eidolon: {cv.statusLabel}
                 </span>
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.08)", color: "rgba(34,214,138,0.6)", fontWeight: 600 }}>PRO</span>
               </div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
                 {cultivationState?.state === "new" && "Log your first check-in →"}
@@ -1700,9 +1699,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
       })()}
 
       {/* Stack Generator — compose fresh stacks for the user's profile */}
-      <div style={{ position: "relative" }}>
-        <span style={{ position: "absolute", top: 10, right: 10, fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.08)", color: "rgba(34,214,138,0.6)", fontWeight: 600, zIndex: 1 }}>PRO</span>
-        <StackGenerator
+      <StackGenerator
         profile={profile}
         compoundCatalog={COMPOUNDS}
         onLoadStack={(compoundIds) => {
@@ -1710,7 +1707,6 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           setShowTransform(false);
         }}
       />
-      </div>
 
       {/* Transform CTA */}
       {selectedCompounds.length > 0 && (
@@ -1730,7 +1726,6 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           {stackAnalysis.isBlocked
             ? "Resolve Contraindications to Continue"
             : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
-          {!stackAnalysis.isBlocked && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(10,10,10,0.3)", color: "rgba(10,10,10,0.7)", fontWeight: 600, marginLeft: 4 }}>PRO</span>}
         </button>
       )}
 
@@ -1761,9 +1756,8 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
       />
 
       {/* Recommended */}
-      <div style={{ ...S.label, marginBottom: 12, marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
         Matched to Your Profile — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
-        {recommended.length > 3 && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(34,214,138,0.08)", color: "rgba(34,214,138,0.6)", fontWeight: 600 }}>3 FREE · REST PRO</span>}
       </div>
       {recommended.length === 0 && (
         <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
@@ -2160,6 +2154,7 @@ export default function AlkiApp() {
           userId={user?.id}
           profile={profile}
           cultivationState={cultivationState}
+          onLogsChanged={setProgressLogs}
         />
       )}
       {screen === "qa" && (
