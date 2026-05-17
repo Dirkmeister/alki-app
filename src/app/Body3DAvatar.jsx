@@ -138,20 +138,6 @@ function Humanoid({ params, glow, autoRotate = true }) {
         </>
       )}
 
-      {/* Male: visible pec plate even at lower muscle (so chest reads male) */}
-      {isMale && (
-        <>
-          <mesh position={[-chestW / 4.5, chestY + 0.04, chestW / 5]} castShadow>
-            <sphereGeometry args={[chestW / 4.5, 20, 14]} />
-            <meshStandardMaterial color={skinHex} roughness={0.62} metalness={0} />
-          </mesh>
-          <mesh position={[chestW / 4.5, chestY + 0.04, chestW / 5]} castShadow>
-            <sphereGeometry args={[chestW / 4.5, 20, 14]} />
-            <meshStandardMaterial color={skinHex} roughness={0.62} metalness={0} />
-          </mesh>
-        </>
-      )}
-
       {[-1, 1].map((side) => {
         const shoulderX = side * (shoulderW / 2 - 0.005);
         const elbowY = shoulderY - 0.32;
@@ -298,6 +284,20 @@ function GLBAvatar({ url, params, glow, autoRotate = true }) {
 }
 
 // ──────────────────────────────────────────────────────────────
+// CAMERA RIG — sets camera position AND target every frame.
+// OrbitControls would handle this when interactive, but small
+// preview tiles render without controls, so we need this.
+// ──────────────────────────────────────────────────────────────
+function CameraRig({ position, target }) {
+  useFrame(({ camera }) => {
+    camera.position.set(position[0], position[1], position[2]);
+    camera.lookAt(target[0], target[1], target[2]);
+    camera.updateProjectionMatrix();
+  });
+  return null;
+}
+
+// ──────────────────────────────────────────────────────────────
 // OUTER COMPONENT
 // One camera convention for both modes since both place feet at y=0.
 // ──────────────────────────────────────────────────────────────
@@ -313,21 +313,28 @@ export default function Body3DAvatar({
   const isGLB = !!avatarUrl;
 
   // Camera setups (model is 1.7m tall, feet at y=0):
-  //   - LARGE: full body. Camera at mid-body height, ~3.0m away.
-  //   - SMALL: head-and-shoulders portrait. Camera near head, very close.
+  //   - LARGE: full body. Camera at mid-body height, pulled back.
+  //   - SMALL: head-and-shoulders portrait. Camera near head, close.
   let camPos, camFov, targetY, ctrlMinPol, ctrlMaxPol;
 
   if (size === "small") {
     // Profile-card bubble — head + upper chest portrait
-    camPos = [0, 1.55, 1.4];
-    camFov = 26;
-    targetY = 1.55;
+    camPos = [0, 1.55, 1.2];
+    camFov = 28;
+    targetY = 1.5;
     ctrlMinPol = Math.PI / 2.4;
     ctrlMaxPol = Math.PI / 1.95;
+  } else if (isGLB) {
+    // GLB full-body — pulled back, wider FOV
+    camPos = [0, 0.95, 3.4];
+    camFov = 30;
+    targetY = 0.95;
+    ctrlMinPol = Math.PI / 2.6;
+    ctrlMaxPol = Math.PI / 1.9;
   } else {
-    // Full-body framing
-    camPos = isGLB ? [0, 1.0, 3.4] : [0, 1.0, 3.0];
-    camFov = isGLB ? 26 : 28;
+    // Parametric full-body — original framing
+    camPos = [0, 0.95, 2.8];
+    camFov = 26;
     targetY = 0.95;
     ctrlMinPol = Math.PI / 2.6;
     ctrlMaxPol = Math.PI / 1.9;
@@ -380,6 +387,9 @@ export default function Body3DAvatar({
               />
             )}
           </Suspense>
+
+          {/* Always-on camera rig keeps framing correct even without OrbitControls */}
+          <CameraRig position={camPos} target={[0, targetY, 0]} />
 
           {interactive && (
             <OrbitControls
