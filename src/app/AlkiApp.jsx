@@ -1176,10 +1176,106 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
+function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 360, background: '#141414', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 24, maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Switch Eidolon</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 20 }}>Select a research profile to load.</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {eidolons.map(e => (
+            <button
+              key={e.id}
+              onClick={() => onSelect(e.id)}
+              style={{
+                width: '100%', padding: '14px 16px', textAlign: 'left',
+                background: e.id === activeEidolonId ? 'rgba(34,214,138,0.08)' : 'rgba(255,255,255,0.04)',
+                border: `1.5px solid ${e.id === activeEidolonId ? '#22d68a' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{e.name}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                  {e.goals?.length ? e.goals.map(gid => GOALS.find(g => g.id === gid)?.label).filter(Boolean).join(', ') : 'No goals set'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {e.lockedAt && <span style={{ fontSize: 10, color: 'rgba(34,214,138,0.6)', fontWeight: 600 }}>LOCKED</span>}
+                {e.id === activeEidolonId && <span style={{ color: '#22d68a', fontSize: 16 }}>●</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} style={{ width: '100%', marginTop: 16, padding: '12px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const [editing, setEditing] = useState(!activeProtocol);
+  const [showGoalsEditor, setShowGoalsEditor] = useState(false);
+  const [showEidolonSwitcher, setShowEidolonSwitcher] = useState(false);
+
+  const activeEidolon = eidolons?.find(e => e.id === activeEidolonId) || eidolons?.[0] || null;
+  const isModifying = editing && activeEidolon?.lockedAt != null;
+
+  // ── Eidolon helpers ──
+  const switchToEidolon = useCallback((eidId) => {
+    const eid = eidolons.find(e => e.id === eidId);
+    if (!eid) return;
+    setActiveEidolonId(eidId);
+    setProfile(prev => ({ ...prev, goals: eid.goals || [] }));
+    if (eid.lockedAt && eid.compounds?.length) {
+      setActiveProtocol({ compounds: eid.compounds, lockedAt: eid.lockedAt });
+      setSelectedCompounds(eid.compounds);
+      setEditing(false);
+    } else {
+      setActiveProtocol(null);
+      setSelectedCompounds(eid.compounds || []);
+      setEditing(true);
+    }
+    setShowTransform(false);
+    setShowEidolonSwitcher(false);
+  }, [eidolons]);
+
+  const createNewEidolon = useCallback(() => {
+    const num = (eidolons?.length || 0) + 1;
+    const eid = { id: 'e_' + Date.now(), name: `Eidolon ${num}`, goals: [...(profile.goals || [])], compounds: [], lockedAt: null };
+    setEidolons(prev => [...(prev || []), eid]);
+    setActiveEidolonId(eid.id);
+    setActiveProtocol(null);
+    setSelectedCompounds([]);
+    setEditing(true);
+    setShowTransform(false);
+  }, [eidolons, profile.goals]);
+
+  const handleGoalToggle = useCallback((goalId) => {
+    const newGoals = profile.goals.includes(goalId)
+      ? profile.goals.filter(g => g !== goalId)
+      : [...profile.goals, goalId];
+    setProfile(prev => ({ ...prev, goals: newGoals }));
+    if (activeEidolon) {
+      setEidolons(prev => prev.map(e => e.id === activeEidolon.id ? { ...e, goals: newGoals } : e));
+    }
+  }, [profile.goals, activeEidolon]);
+
+  const handleLockIn = useCallback((compounds) => {
+    const protocol = { compounds, lockedAt: new Date().toISOString() };
+    setActiveProtocol(protocol);
+    if (activeEidolon) {
+      setEidolons(prev => prev.map(e => e.id === activeEidolon.id ? { ...e, compounds, lockedAt: protocol.lockedAt } : e));
+    }
+    setEditing(false);
+  }, [activeEidolon]);
+
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
   const stackAnalysis = useMemo(() => analyzeStack(selectedCompounds, profile), [selectedCompounds, profile]);
 
@@ -1553,9 +1649,9 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           View Research Timeline →
         </button>
 
-        {/* Lock In from Transformation View */}
+        {/* Lock In / Confirm Changes from Transformation View */}
         <button
-          onClick={() => { onLockIn(selectedCompounds); setEditing(false); }}
+          onClick={() => handleLockIn(selectedCompounds)}
           style={{
             ...S.btn,
             marginBottom: 12,
@@ -1565,7 +1661,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
             gap: 8
           }}
         >
-          Lock In This Protocol →
+          {isModifying ? 'Confirm Changes →' : 'Lock In This Protocol →'}
         </button>
 
         <p style={S.disclaimer}>
@@ -1605,6 +1701,9 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
               ← Home
             </button>
           )}
+          <button onClick={() => setShowGoalsEditor(v => !v)} style={{ background: "none", border: "none", color: showGoalsEditor ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Goals
+          </button>
           <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Modeler
           </button>
@@ -1619,8 +1718,23 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </div>
       </div>
 
-      {/* Profile summary */}
-      <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16 }}>
+      {/* Profile card */}
+      <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16, position: 'relative' }}>
+        {/* Reset avatar icon — top-left */}
+        {avatarUrl && (
+          <button
+            onClick={onResetAvatar}
+            title="Reset avatar"
+            style={{
+              position: 'absolute', top: 10, left: 10,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 6, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'rgba(255,255,255,0.35)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0
+            }}
+          >
+            ↺
+          </button>
+        )}
         <div style={{ width: 80, flexShrink: 0 }}>
           {avatarUrl ? (
             <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="small" interactive={false} autoRotate={true} />
@@ -1630,23 +1744,8 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Your Profile</div>
-            {avatarUrl ? (
-              <button
-                onClick={onResetAvatar}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "rgba(255,255,255,0.35)",
-                  fontSize: 11,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  padding: 0,
-                }}
-              >
-                Reset avatar
-              </button>
-            ) : (
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{activeEidolon?.name || 'Eidolon 1'}</div>
+            {!avatarUrl && (
               <button
                 onClick={onCaptureAvatar}
                 style={{
@@ -1686,212 +1785,234 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
               {userEmail}
             </div>
           )}
+          {/* Committed mode: Modify / Switch / New buttons */}
+          {!editing && activeProtocol && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <button onClick={() => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Modify
+              </button>
+              {eidolons?.length > 1 && (
+                <button onClick={() => setShowEidolonSwitcher(true)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Switch Eidolon
+                </button>
+              )}
+              <button onClick={createNewEidolon} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 10px', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                New
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Eidolon Cultivation Status */}
-      {(() => {
-        const cv = getCultivationVisuals(cultivationState?.state || "new");
-        return (
-          <div
-            onClick={onProgress}
-            style={{
-              ...S.card,
-              borderColor: cv.statusBorder,
-              background: cv.statusBg,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between"
-            }}
-          >
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                <span style={{ color: cv.statusColor, fontSize: 13 }}>{cv.statusIcon}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: cv.statusColor }}>
-                  Eidolon: {cv.statusLabel}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
-                {cultivationState?.state === "new" && "Log your first check-in →"}
-                {cultivationState?.state === "progressing" && `${cultivationState.streak}-week streak · Tap to log`}
-                {cultivationState?.state === "stagnant" && `${cultivationState.daysSinceLog}d since last log · Eidolon frozen`}
-                {cultivationState?.state === "regressing" && `${cultivationState.daysSinceLog}d since last log · Gains fading`}
-              </div>
-            </div>
-            <div style={{ color: cv.statusColor, fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-              {cultivationState?.streak > 0 ? cultivationState.streak : "→"}
-            </div>
+      {/* Inline Goals Editor — collapsible */}
+      {showGoalsEditor && (
+        <div style={{ ...S.card, borderColor: 'rgba(34,214,138,0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ ...S.label, marginBottom: 0 }}>Goals for {activeEidolon?.name || 'Eidolon 1'}</div>
+            <button onClick={() => setShowGoalsEditor(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
           </div>
-        );
-      })()}
-
-      {/* Locked Protocol Summary — when committed */}
-      {!editing && activeProtocol && (
-        <div style={S.card}>
-          <div style={{ ...S.label, marginBottom: 10 }}>Active Research Protocol</div>
-          {(activeProtocol.compounds || []).map(id => {
-            const c = COMPOUNDS.find(x => x.id === id);
-            if (!c) return null;
-            return (
-              <div key={id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{c.dosing}</span>
-              </div>
-            );
-          })}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
+            {GOALS.map(g => {
+              const active = profile.goals.includes(g.id);
+              return (
+                <button key={g.id} onClick={() => handleGoalToggle(g.id)} style={{
+                  ...S.tag,
+                  background: active ? S.accentDim : 'rgba(255,255,255,0.04)',
+                  border: `1.5px solid ${active ? S.accent : 'rgba(255,255,255,0.1)'}`,
+                  color: active ? '#fff' : 'rgba(255,255,255,0.5)'
+                }}>
+                  {g.icon} {g.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Modify/New — only when locked */}
+      {/* ═══ COMMITTED MODE ═══ */}
       {!editing && activeProtocol && (
         <>
-          <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-            <button onClick={() => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }} style={{ ...S.btnOutline, flex: 1, fontSize: 13, padding: "12px 16px" }}>
-              Modify Protocol
+          {/* Projection CTA */}
+          {selectedCompounds.length > 0 && (
+            <button
+              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+              disabled={stackAnalysis.isBlocked}
+              style={{
+                ...S.btn,
+                ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
+                marginBottom: 12,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+              }}
+            >
+              {stackAnalysis.isBlocked
+                ? "Resolve Contraindications to Continue"
+                : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
             </button>
-            <button onClick={() => { setActiveProtocol(null); setSelectedCompounds([]); setEditing(true); }} style={{ ...S.btnOutline, flex: 1, fontSize: 13, padding: "12px 16px" }}>
-              New Eidolon
+          )}
+
+          {/* Timeline CTA */}
+          {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
+            <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              View Research Timeline →
             </button>
+          )}
+
+          {/* Cultivation Status */}
+          {(() => {
+            const cv = getCultivationVisuals(cultivationState?.state || "new");
+            return (
+              <div
+                onClick={onProgress}
+                style={{
+                  ...S.card,
+                  borderColor: cv.statusBorder,
+                  background: cv.statusBg,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "space-between"
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <span style={{ color: cv.statusColor, fontSize: 13 }}>{cv.statusIcon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: cv.statusColor }}>Eidolon: {cv.statusLabel}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+                    {cultivationState?.state === "new" && "Log your first check-in →"}
+                    {cultivationState?.state === "progressing" && `${cultivationState.streak}-week streak · Tap to log`}
+                    {cultivationState?.state === "stagnant" && `${cultivationState.daysSinceLog}d since last log · Eidolon frozen`}
+                    {cultivationState?.state === "regressing" && `${cultivationState.daysSinceLog}d since last log · Gains fading`}
+                  </div>
+                </div>
+                <div style={{ color: cv.statusColor, fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                  {cultivationState?.streak > 0 ? cultivationState.streak : "→"}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Active Protocol Summary */}
+          <div style={S.card}>
+            <div style={{ ...S.label, marginBottom: 10 }}>Active Research Protocol</div>
+            {(activeProtocol.compounds || []).map(id => {
+              const c = COMPOUNDS.find(x => x.id === id);
+              if (!c) return null;
+              return (
+                <div key={id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{c.dosing}</span>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
 
-      {/* Stack Generator — builder only */}
+      {/* ═══ BUILDER MODE ═══ */}
       {editing && (
-      <StackGenerator
-        profile={profile}
-        compoundCatalog={COMPOUNDS}
-        onLoadStack={(compoundIds) => {
-          setSelectedCompounds(compoundIds);
-          setShowTransform(false);
-        }}
-      />
-      )}
-
-      {/* Transform CTA */}
-      {selectedCompounds.length > 0 && (
-        <button
-          onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-          disabled={stackAnalysis.isBlocked}
-          style={{
-            ...S.btn,
-            ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
-            marginBottom: 12,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8
-          }}
-        >
-          {stackAnalysis.isBlocked
-            ? "Resolve Contraindications to Continue"
-            : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
-        </button>
-      )}
-
-      {/* Cycle Timeline CTA */}
-      {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
-        <button
-          onClick={onTimeline}
-          style={{
-            ...S.btnOutline,
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8
-          }}
-        >
-          View Research Timeline →
-        </button>
-      )}
-
-      {/* Lock In Protocol CTA — builder only */}
-      {editing && selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
-        <button
-          onClick={() => { onLockIn(selectedCompounds); setEditing(false); }}
-          style={{
-            ...S.btnOutline,
-            marginBottom: 16,
-            borderColor: "rgba(34,214,138,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8
-          }}
-        >
-          Lock In This Protocol →
-        </button>
-      )}
-
-      {/* Stack Intelligence — compact mode on dashboard shows only critical
-          contraindication blocks. Full analysis renders on Transform screen. */}
-      <StackIntelligence
-        stackIds={selectedCompounds}
-        userProfile={profile}
-        onRemoveCompound={toggleCompound}
-        mode="compact"
-      />
-
-      {/* Recommended — builder only */}
-      {editing && (
-      <>
-      <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
-        Matched to Your Profile — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
-      </div>
-      {recommended.length === 0 && (
-        <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
-          No compounds match your current profile and goals. Try adjusting your goals via Reset, or browse the full library below.
-        </div>
-      )}
-      {recommended.map(rec => (
-        <CompoundCard
-          key={rec.compound.id}
-          rec={rec}
-          isSelected={selectedCompounds.includes(rec.compound.id)}
-          onToggle={() => toggleCompound(rec.compound.id)}
-        />
-      ))}
-
-      {/* Browse all — collapsible */}
-      {otherCompounds.length > 0 && (
         <>
-          <button
-            onClick={() => setShowOtherCompounds(v => !v)}
-            style={{
-              ...S.btnOutline,
-              marginTop: 20,
-              marginBottom: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "13px 16px",
-              fontSize: 13
+          {/* Stack Generator */}
+          <StackGenerator
+            profile={profile}
+            compoundCatalog={COMPOUNDS}
+            onLoadStack={(compoundIds) => {
+              setSelectedCompounds(compoundIds);
+              setShowTransform(false);
             }}
-          >
-            <span>{showOtherCompounds ? "Hide" : "Browse"} all compounds ({otherCompounds.length} more)</span>
-            <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: showOtherCompounds ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
-          </button>
-          {showOtherCompounds && (
+          />
+
+          {/* Projection CTA */}
+          {selectedCompounds.length > 0 && (
+            <button
+              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+              disabled={stackAnalysis.isBlocked}
+              style={{
+                ...S.btn,
+                ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
+                marginBottom: 12,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+              }}
+            >
+              {stackAnalysis.isBlocked
+                ? "Resolve Contraindications to Continue"
+                : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
+            </button>
+          )}
+
+          {/* Timeline CTA */}
+          {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
+            <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              View Research Timeline →
+            </button>
+          )}
+
+          {/* Stack Intelligence — compact */}
+          <StackIntelligence
+            stackIds={selectedCompounds}
+            userProfile={profile}
+            onRemoveCompound={toggleCompound}
+            mode="compact"
+          />
+
+          {/* Recommended compounds */}
+          <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
+            Matched to Your Profile — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
+          </div>
+          {recommended.length === 0 && (
+            <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
+              No compounds match your current profile and goals. Try adjusting your goals, or browse the full library below.
+            </div>
+          )}
+          {recommended.map(rec => (
+            <CompoundCard
+              key={rec.compound.id}
+              rec={rec}
+              isSelected={selectedCompounds.includes(rec.compound.id)}
+              onToggle={() => toggleCompound(rec.compound.id)}
+            />
+          ))}
+
+          {/* Browse all — collapsible */}
+          {otherCompounds.length > 0 && (
             <>
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>
-                These compounds fall outside your goals, body fat range, or experience tier. Some are educational reference only — read the full profile before considering.
-              </p>
-              {otherCompounds.map(rec => (
-                <CompoundCard
-                  key={rec.compound.id}
-                  rec={rec}
-                  isSelected={selectedCompounds.includes(rec.compound.id)}
-                  onToggle={() => toggleCompound(rec.compound.id)}
-                />
-              ))}
+              <button
+                onClick={() => setShowOtherCompounds(v => !v)}
+                style={{
+                  ...S.btnOutline, marginTop: 20, marginBottom: 12,
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "13px 16px", fontSize: 13
+                }}
+              >
+                <span>{showOtherCompounds ? "Hide" : "Browse"} all compounds ({otherCompounds.length} more)</span>
+                <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: showOtherCompounds ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+              </button>
+              {showOtherCompounds && (
+                <>
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>
+                    These compounds fall outside your goals, body fat range, or experience tier. Some are educational reference only — read the full profile before considering.
+                  </p>
+                  {otherCompounds.map(rec => (
+                    <CompoundCard
+                      key={rec.compound.id}
+                      rec={rec}
+                      isSelected={selectedCompounds.includes(rec.compound.id)}
+                      onToggle={() => toggleCompound(rec.compound.id)}
+                    />
+                  ))}
+                </>
+              )}
             </>
           )}
         </>
       )}
 
-      </>
+      {/* Eidolon Switcher Modal */}
+      {showEidolonSwitcher && (
+        <EidolonSwitcherModal
+          eidolons={eidolons || []}
+          activeEidolonId={activeEidolonId}
+          onSelect={switchToEidolon}
+          onClose={() => setShowEidolonSwitcher(false)}
+        />
       )}
 
       <p style={{ ...S.disclaimer, paddingBottom: 8 }}>
@@ -2222,7 +2343,13 @@ export default function AlkiApp() {
       )}
       {screen === "onboarding" && (
         <Onboarding
-          onComplete={(p) => { setProfile(p); setScreen("dashboard"); }}
+          onComplete={(p) => {
+            const eid = { id: 'e_' + Date.now(), name: 'Eidolon 1', goals: p.goals, compounds: [], lockedAt: null };
+            setEidolons(prev => [...(prev || []).filter(e => e.id !== eid.id), eid]);
+            setActiveEidolonId(eid.id);
+            setProfile(p);
+            setScreen("dashboard");
+          }}
           onExitHome={() => { setProfile(null); setSelectedCompounds([]); setShowTransform(false); setScreen("splash"); }}
           prefill={profile}
           initialStep={profile ? 3 : 0}
@@ -2231,6 +2358,7 @@ export default function AlkiApp() {
       {screen === "dashboard" && profile && (
         <Dashboard
           profile={profile}
+          setProfile={setProfile}
           selectedCompounds={selectedCompounds}
           setSelectedCompounds={setSelectedCompounds}
           showTransform={showTransform}
@@ -2251,6 +2379,10 @@ export default function AlkiApp() {
           onResetAvatar={() => setAvatarUrl(null)}
           onSignOut={supabase ? handleSignOut : null}
           userEmail={user?.email || null}
+          eidolons={eidolons}
+          setEidolons={setEidolons}
+          activeEidolonId={activeEidolonId}
+          setActiveEidolonId={setActiveEidolonId}
         />
       )}
       {screen === "progress" && (
