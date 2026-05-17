@@ -1176,7 +1176,7 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const [editing, setEditing] = useState(!activeProtocol);
@@ -1578,22 +1578,17 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
     );
   }
 
-  // ── Committed View: clean daily screen when protocol is locked ──
-  if (activeProtocol && !editing) {
-    return (
-      <Home
-        profile={profile}
-        activeProtocol={activeProtocol}
-        cultivationState={cultivationState}
-        avatarUrl={avatarUrl}
-        onProgress={onProgress}
-        onModify={() => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }}
-        onNewEidolon={() => { setActiveProtocol(null); setSelectedCompounds([]); setEditing(true); }}
-        onSignOut={onSignOut}
-        userEmail={userEmail}
-      />
-    );
-  }
+  // ── Resolve profile with latest log data when protocol is locked ──
+  // If user has logged newer BF/weight, the avatar should reflect that
+  const effectiveProfile = useMemo(() => {
+    if (!activeProtocol || editing || !progressLogs || !progressLogs.length) return profile;
+    const latest = progressLogs[0];
+    return {
+      ...profile,
+      weight: latest.weight || profile.weight,
+      bodyFat: latest.body_fat || profile.bodyFat
+    };
+  }, [profile, activeProtocol, editing, progressLogs]);
 
   return (
     <div style={{ ...S.inner, opacity: animateIn ? 1 : 0, transition: "opacity 0.6s ease" }}>
@@ -1605,7 +1600,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {activeProtocol && (
+          {activeProtocol && editing && (
             <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               ← Home
             </button>
@@ -1737,7 +1732,42 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         );
       })()}
 
-      {/* Stack Generator — compose fresh stacks for the user's profile */}
+      {/* Locked Protocol Summary — when committed */}
+      {!editing && activeProtocol && (
+        <div style={S.card}>
+          <div style={{ ...S.label, marginBottom: 10 }}>Active Research Protocol</div>
+          {(activeProtocol.compounds || []).map(id => {
+            const c = COMPOUNDS.find(x => x.id === id);
+            if (!c) return null;
+            return (
+              <div key={id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{c.dosing}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Log + Modify — only when locked */}
+      {!editing && activeProtocol && (
+        <>
+          <button onClick={onProgress} style={{ ...S.btn, marginBottom: 12 }}>
+            Log Research Check-in
+          </button>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            <button onClick={() => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }} style={{ ...S.btnOutline, flex: 1, fontSize: 13, padding: "12px 16px" }}>
+              Modify Protocol
+            </button>
+            <button onClick={() => { setActiveProtocol(null); setSelectedCompounds([]); setEditing(true); }} style={{ ...S.btnOutline, flex: 1, fontSize: 13, padding: "12px 16px" }}>
+              New Eidolon
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Stack Generator — builder only */}
+      {editing && (
       <StackGenerator
         profile={profile}
         compoundCatalog={COMPOUNDS}
@@ -1746,6 +1776,7 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           setShowTransform(false);
         }}
       />
+      )}
 
       {/* Transform CTA */}
       {selectedCompounds.length > 0 && (
@@ -1785,8 +1816,8 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </button>
       )}
 
-      {/* Lock In Protocol CTA */}
-      {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
+      {/* Lock In Protocol CTA — builder only */}
+      {editing && selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
         <button
           onClick={() => { onLockIn(selectedCompounds); setEditing(false); }}
           style={{
@@ -1812,7 +1843,9 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         mode="compact"
       />
 
-      {/* Recommended */}
+      {/* Recommended — builder only */}
+      {editing && (
+      <>
       <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
         Matched to Your Profile — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
       </div>
@@ -1865,6 +1898,9 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
             </>
           )}
         </>
+      )}
+
+      </>
       )}
 
       <p style={{ ...S.disclaimer, paddingBottom: 8 }}>
@@ -2208,6 +2244,7 @@ export default function AlkiApp() {
           onModeler={() => setScreen("modeler")}
           onProgress={() => setScreen("progress")}
           cultivationState={cultivationState}
+          progressLogs={progressLogs}
           avatarUrl={avatarUrl}
           onCaptureAvatar={() => setShowAvatarCapture(true)}
           onResetAvatar={() => setAvatarUrl(null)}
