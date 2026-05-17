@@ -9,11 +9,11 @@ import * as THREE from "three";
  *
  * Two render modes:
  *   1. Photoreal GLB (when `avatarUrl` is provided): renders an
- *      Avaturn-exported GLB and applies parametric body morphing
- *      via mesh scale + uniform morph targets where available.
+ *      Avaturn-exported GLB, auto-framed via bounding-box measurement,
+ *      with parametric body-comp morphing applied via mesh scale.
  *   2. Parametric humanoid fallback (when `avatarUrl` is null):
  *      renders the primitive-based humanoid driven by
- *      { fat, muscle, isMale }. This is the Rev 1 visual.
+ *      { fat, muscle, isMale }.
  *
  * Both modes accept the same `params` object so the rest of the
  * app does not need to change between modes.
@@ -172,45 +172,59 @@ function Humanoid({ params, glow, autoRotate = true }) {
 // ──────────────────────────────────────────────────────────────
 // GLB AVATAR (photoreal — Avaturn export)
 // ──────────────────────────────────────────────────────────────
-function GLBAvatar({ url, params, glow, autoRotate = true }) {
-  const { fat, muscle, isMale } = params;
+function GLBAvatar({ url, params, glow, autoRotate = true, framing = "full" }) {
+  const { fat, muscle } = params;
   const groupRef = useRef();
   const { scene } = useGLTF(url);
 
   // Clone so multiple instances (current + projected) don't share state
   const cloned = useMemo(() => scene.clone(true), [scene]);
 
-  // Apply a parametric "shape pass" over the rig:
-  //  - subtle non-uniform scale to express body comp
-  //  - rim/emissive tint if glow
-  // This is the best we can do without per-vertex morph targets on
-  // the Avaturn rig itself. Rev 2 will swap this for proper β-driven
-  // morph targets when we have a SHAPY-style shape layer.
+  // Measure the model on first load to compute scale + center offset.
+  // Avaturn models are ~1.7m tall with origin at feet, but we frame
+  // everything to a normalized "unit-1.7m model centered around y=0.85"
+  // so the camera framing in the outer Canvas can be universal.
+  const fitTransform = useMemo(() => {
+    if (!cloned) return { scale: 1, offsetY: 0, height: 1.7 };
+    const box = new THREE.Box3().setFromObject(cloned);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    const modelHeight = Math.max(size.y, 0.001);
+    const targetHeight = 1.7; // canonical target height in scene units
+    const scale = targetHeight / modelHeight;
+
+    // After scaling, we want feet at y=0 (so model occupies y=0..1.7).
+    // box.min.y * scale would be the new floor; we shift up by -box.min.y * scale.
+    const floorAfterScale = box.min.y * scale;
+    const offsetY = -floorAfterScale;
+
+    return { scale, offsetY, height: targetHeight, centerX: -center.x * scale, centerZ: -center.z * scale };
+  }, [cloned]);
+
   useEffect(() => {
     if (!cloned) return;
 
-    // Body-comp scale heuristic — visible enough to read on small previews
-    // but conservative enough not to distort facial geometry.
+    // Body-comp scale heuristic — visible enough to read on previews
+    // but conservative enough to never distort the head or face.
     const torsoScaleX = 1.0 + fat * 0.10 - muscle * 0.02 + (muscle * 0.04);
-    const torsoScaleY = 1.0; // height stays constant
+    const torsoScaleY = 1.0;
     const torsoScaleZ = 1.0 + fat * 0.08 + muscle * 0.03;
 
     cloned.traverse((obj) => {
       if (obj.isMesh) {
-        // Find common Avaturn body mesh names. Avaturn rigs vary;
-        // we apply a small global tweak as a safe fallback.
         const lower = (obj.name || "").toLowerCase();
-        const isBody = lower.includes("body") || lower.includes("torso") || lower.includes("avatar");
-        const isHead = lower.includes("head") || lower.includes("face") || lower.includes("hair");
+        const isHead = lower.includes("head") || lower.includes("face") || lower.includes("hair") || lower.includes("eye") || lower.includes("teeth") || lower.includes("tongue");
+        const isBody = !isHead && (lower.includes("body") || lower.includes("torso") || lower.includes("avatar"));
 
         if (isHead) {
-          // Never distort the head — that's the user's face.
           obj.scale.set(1, 1, 1);
         } else if (isBody) {
           obj.scale.set(torsoScaleX, torsoScaleY, torsoScaleZ);
         }
 
-        // Material polish: warmer skin response, less plastic
         if (obj.material && !obj.userData._alkiTuned) {
           if (obj.material.roughness !== undefined) {
             obj.material.roughness = Math.min(1, (obj.material.roughness ?? 0.7) + 0.05);
@@ -236,8 +250,16 @@ function GLBAvatar({ url, params, glow, autoRotate = true }) {
     }
   });
 
+  // For "head" framing (small profile bubble), nudge the model down
+  // so the head dominates the visible area.
+  const verticalOffset = framing === "head" ? -1.4 : -0.85;
+
   return (
-    <group ref={groupRef} position={[0, -0.85, 0]} scale={1}>
+    <group
+      ref={groupRef}
+      position={[fitTransform.centerX ?? 0, verticalOffset + fitTransform.offsetY, fitTransform.centerZ ?? 0]}
+      scale={fitTransform.scale}
+    >
       <primitive object={cloned} />
     </group>
   );
@@ -253,10 +275,29 @@ export default function Body3DAvatar({
   size = "large",       // "small" | "large"
   interactive = true,
   autoRotate = true,
-  avatarUrl = null,     // GLB URL from Avaturn (optional)
+  avatarUrl = null,
 }) {
-  const camPos = size === "small" ? [0, 0.3, 2.4] : [0, 0.3, 2.6];
-  const camFov = size === "small" ? 22 : 24;
+  // Camera framing depends BOTH on size AND on whether we have a GLB.
+  // Small + GLB → close-up of head/shoulders (avatar reveal vibe).
+  // Large + GLB → full body, slightly wider FOV to fit Avaturn's taller mesh.
+  // Parametric mode keeps the original tight framing.
+  const isGLB = !!avatarUrl;
+  const framing = size === "small" ? "head" : "full";
+
+  let camPos, camFov;
+  if (isGLB) {
+    if (size === "small") {
+      camPos = [0, 0.0, 1.0];   // closer for head/shoulders bubble
+      camFov = 28;
+    } else {
+      camPos = [0, 0.15, 3.4];  // pulled back to fit ~1.7m model
+      camFov = 28;
+    }
+  } else {
+    // Parametric humanoid — original tight framing
+    camPos = size === "small" ? [0, 0.3, 2.4] : [0, 0.3, 2.6];
+    camFov = size === "small" ? 22 : 24;
+  }
 
   const wrapStyle = size === "small"
     ? { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 100 }
@@ -273,7 +314,7 @@ export default function Body3DAvatar({
           style={{ background: "transparent" }}
         >
           {/* Premium 3-point lighting — Apple Fitness+ feel */}
-          <ambientLight intensity={0.32} />
+          <ambientLight intensity={0.4} />
           <directionalLight
             position={[2.5, 4, 3]}
             intensity={1.15}
@@ -282,18 +323,15 @@ export default function Body3DAvatar({
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
           />
-          {/* Cool fill on opposite side */}
           <directionalLight position={[-2.5, 2, 2]} intensity={0.5} color="#a8c8ff" />
-          {/* Top rim — separates the silhouette from the dark UI */}
           <directionalLight position={[0, 3.5, -2]} intensity={0.55} color="#ffffff" />
-          {/* Projected variant gets a brand-green rim */}
           {glow && (
             <directionalLight position={[0, 2, -3]} intensity={1.3} color="#22d68a" />
           )}
 
           <Suspense fallback={null}>
-            {avatarUrl ? (
-              <GLBAvatar url={avatarUrl} params={params} glow={glow} autoRotate={autoRotate} />
+            {isGLB ? (
+              <GLBAvatar url={avatarUrl} params={params} glow={glow} autoRotate={autoRotate} framing={framing} />
             ) : (
               <Humanoid params={params} glow={glow} autoRotate={autoRotate} />
             )}
@@ -317,6 +355,7 @@ export default function Body3DAvatar({
               maxPolarAngle={Math.PI / 1.9}
               autoRotate={false}
               dampingFactor={0.08}
+              target={isGLB && size === "large" ? [0, 0.85, 0] : [0, 0.3, 0]}
             />
           )}
         </Canvas>
