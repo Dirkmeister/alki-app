@@ -184,7 +184,7 @@ const GOALS = [
 // No blocking. Every compound is always available. Ranked by relevance.
 // Advisories inform; they never gatekeep.
 function getRecommendations(profile) {
-  const { sex, age, heightFt, heightIn, weight, bodyFat, goals, adv = {} } = profile;
+  const { sex, age, heightFt, heightIn, weight, bodyFat, goals = [], adv = {} } = profile;
 
   // Parse optional advanced body stats — only applied when user actually entered them
   const visceralFat  = parseFloat(adv.visceralFat)  || null;
@@ -1279,8 +1279,15 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setEditing(false);
   }, [activeEidolon]);
 
-  const recommendations = useMemo(() => getRecommendations(profile), [profile]);
-  const stackAnalysis = useMemo(() => selectedCompounds.length > 0 ? analyzeStack(selectedCompounds, profile) : { isBlocked: false, issues: [] }, [selectedCompounds, profile]);
+  const recommendations = useMemo(() => {
+    try { return getRecommendations(profile); }
+    catch (e) { console.error('getRecommendations error:', e); return []; }
+  }, [profile]);
+  const stackAnalysis = useMemo(() => {
+    if (selectedCompounds.length === 0) return { isBlocked: false, issues: [], compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null };
+    try { return analyzeStack(selectedCompounds, profile); }
+    catch (e) { console.error('analyzeStack error:', e); return { isBlocked: false, issues: [], compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null }; }
+  }, [selectedCompounds, profile]);
 
   useEffect(() => { setTimeout(() => setAnimateIn(true), 100); }, []);
 
@@ -1620,6 +1627,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           <div style={{ ...S.label, marginBottom: 10 }}>Your Research Protocol</div>
           {selectedCompounds.map(id => {
             const c = COMPOUNDS.find(x => x.id === id);
+            if (!c) return null;
             return (
               <div key={id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 14 }}>
                 <span style={{ fontWeight: 600 }}>{c.name}</span>
