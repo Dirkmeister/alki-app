@@ -1533,6 +1533,17 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const recommendedIds = new Set(recommended.map(r => r.compound.id));
   const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
 
+  // ── Resolve profile with latest log data when protocol is locked ──
+  const effectiveProfile = useMemo(() => {
+    if (!activeProtocol || editing || !progressLogs || !progressLogs.length) return profile;
+    const latest = progressLogs[0];
+    return {
+      ...profile,
+      weight: latest.weight || profile.weight,
+      bodyFat: latest.body_fat || profile.bodyFat
+    };
+  }, [profile, activeProtocol, editing, progressLogs]);
+
   if (showTransform) {
     return (
       <div style={S.inner}>
@@ -1684,18 +1695,6 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       </div>
     );
   }
-
-  // ── Resolve profile with latest log data when protocol is locked ──
-  // If user has logged newer BF/weight, the avatar should reflect that
-  const effectiveProfile = useMemo(() => {
-    if (!activeProtocol || editing || !progressLogs || !progressLogs.length) return profile;
-    const latest = progressLogs[0];
-    return {
-      ...profile,
-      weight: latest.weight || profile.weight,
-      bodyFat: latest.body_fat || profile.bodyFat
-    };
-  }, [profile, activeProtocol, editing, progressLogs]);
 
   return (
     <div style={{ ...S.inner, opacity: animateIn ? 1 : 0, transition: "opacity 0.6s ease" }}>
