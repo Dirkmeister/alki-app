@@ -9,25 +9,18 @@ import * as THREE from "three";
  *
  * Two render modes:
  *   1. Photoreal GLB (when `avatarUrl` is provided): renders an
- *      Avaturn-exported GLB, auto-framed via bounding-box measurement,
- *      with parametric body-comp morphing applied via mesh scale.
+ *      Avaturn-exported GLB and applies parametric body morphing
+ *      via mesh scale + uniform morph targets where available.
  *   2. Parametric humanoid fallback (when `avatarUrl` is null):
  *      renders the primitive-based humanoid driven by
- *      { fat, muscle, isMale }.
+ *      { fat, muscle, isMale }. This is the Rev 1 visual.
  *
- * Coordinate convention (both modes):
- *   - Model feet land on y = 0
- *   - Model head-top is at y ≈ 1.7
- *   - Mid-torso ≈ y = 0.95
- *
- * That convention is enforced inside each <Humanoid />
- * and <GLBAvatar />, so the outer Canvas camera + target work
- * identically for both modes.
+ * Both modes accept the same `params` object so the rest of the
+ * app does not need to change between modes.
  */
 
 // ──────────────────────────────────────────────────────────────
 // PARAMETRIC HUMANOID (fallback)
-// Anchored: feet at y=0, head at y≈1.7
 // ──────────────────────────────────────────────────────────────
 function Humanoid({ params, glow, autoRotate = true }) {
   const { fat, muscle, isMale } = params;
@@ -51,7 +44,6 @@ function Humanoid({ params, glow, autoRotate = true }) {
   const headR     = 0.105 + fat * 0.020;
   const deltR     = armR + muscle * 0.022;
 
-  // Y positions — feet at 0, head ≈ 1.72
   const headY     = 1.62;
   const neckTop   = 1.52;
   const neckBot   = 1.43;
@@ -94,9 +86,8 @@ function Humanoid({ params, glow, autoRotate = true }) {
     );
   };
 
-  // NO outer offset — feet sit at y=0 as the convention requires.
   return (
-    <group ref={groupRef} position={[0, 0, 0]}>
+    <group ref={groupRef} position={[0, -0.85, 0]}>
       <mesh position={[0, headY, 0]} castShadow>
         <sphereGeometry args={[headR, 32, 32]} />
         <meshStandardMaterial {...skinMat} />
@@ -124,7 +115,6 @@ function Humanoid({ params, glow, autoRotate = true }) {
       <Limb x={0} yTop={chestY} yBot={waistY} rTop={chestW / 2} rBot={waistW / 2} />
       <Limb x={0} yTop={waistY} yBot={hipY} rTop={waistW / 2} rBot={hipW / 2} />
 
-      {/* Male: pec mass hint */}
       {isMale && muscle > 0.4 && (
         <>
           <mesh position={[-chestW / 4, chestY + 0.05, chestW / 4]} castShadow>
@@ -181,88 +171,62 @@ function Humanoid({ params, glow, autoRotate = true }) {
 
 // ──────────────────────────────────────────────────────────────
 // GLB AVATAR (photoreal — Avaturn export)
-// Normalized to: feet at y=0, head ≈ y=1.7
 // ──────────────────────────────────────────────────────────────
 function GLBAvatar({ url, params, glow, autoRotate = true }) {
-  const { fat, muscle } = params;
+  const { fat, muscle, isMale } = params;
   const groupRef = useRef();
   const { scene } = useGLTF(url);
 
-  // Clone so multiple instances (current + projected) don't share state.
+  // Clone so multiple instances (current + projected) don't share state
   const cloned = useMemo(() => scene.clone(true), [scene]);
 
-  // Auto-fit: measure box, recenter X/Z, lift floor to y=0, scale to 1.7m.
-  const fit = useMemo(() => {
-    if (!cloned) return { scale: 1, offsetX: 0, offsetY: 0, offsetZ: 0 };
-
-    // Reset any previous transform we applied, so re-measure is accurate.
-    cloned.position.set(0, 0, 0);
-    cloned.scale.set(1, 1, 1);
-
-    const box = new THREE.Box3().setFromObject(cloned);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-
-    const modelHeight = Math.max(size.y, 0.001);
-    const targetHeight = 1.7;
-    const scale = targetHeight / modelHeight;
-
-    // After scaling:
-    //   new floor y = box.min.y * scale
-    //   new midX   = (box.min.x + box.max.x) / 2 * scale
-    //   new midZ   = (box.min.z + box.max.z) / 2 * scale
-    const offsetY = -box.min.y * scale;                       // lift feet to y=0
-    const offsetX = -((box.min.x + box.max.x) / 2) * scale;   // center X
-    const offsetZ = -((box.min.z + box.max.z) / 2) * scale;   // center Z
-
-    return { scale, offsetX, offsetY, offsetZ };
-  }, [cloned]);
-
-  // Apply per-mesh body-comp tweaks WITHOUT touching the head.
+  // Apply a parametric "shape pass" over the rig:
+  //  - subtle non-uniform scale to express body comp
+  //  - rim/emissive tint if glow
+  // This is the best we can do without per-vertex morph targets on
+  // the Avaturn rig itself. Rev 2 will swap this for proper β-driven
+  // morph targets when we have a SHAPY-style shape layer.
   useEffect(() => {
     if (!cloned) return;
-    const torsoScaleX = 1.0 + fat * 0.10 - muscle * 0.02 + muscle * 0.04;
-    const torsoScaleY = 1.0;
+
+    // Body-comp scale heuristic — visible enough to read on small previews
+    // but conservative enough not to distort facial geometry.
+    const torsoScaleX = 1.0 + fat * 0.10 - muscle * 0.02 + (muscle * 0.04);
+    const torsoScaleY = 1.0; // height stays constant
     const torsoScaleZ = 1.0 + fat * 0.08 + muscle * 0.03;
 
     cloned.traverse((obj) => {
-      if (!obj.isMesh) return;
-      const lower = (obj.name || "").toLowerCase();
-      const isHead =
-        lower.includes("head") ||
-        lower.includes("face") ||
-        lower.includes("hair") ||
-        lower.includes("eye") ||
-        lower.includes("teeth") ||
-        lower.includes("tongue") ||
-        lower.includes("beard") ||
-        lower.includes("brow");
-      const isBody = !isHead && (
-        lower.includes("body") ||
-        lower.includes("torso") ||
-        lower.includes("avatar")
-      );
+      if (obj.isMesh) {
+        // Find common Avaturn body mesh names. Avaturn rigs vary;
+        // we apply a small global tweak as a safe fallback.
+        const lower = (obj.name || "").toLowerCase();
+        const isBody = lower.includes("body") || lower.includes("torso") || lower.includes("avatar");
+        const isHead = lower.includes("head") || lower.includes("face") || lower.includes("hair");
 
-      if (isHead) {
-        obj.scale.set(1, 1, 1);
-      } else if (isBody) {
-        obj.scale.set(torsoScaleX, torsoScaleY, torsoScaleZ);
-      }
+        if (isHead) {
+          // Never distort the head — that's the user's face.
+          obj.scale.set(1, 1, 1);
+        } else if (isBody) {
+          obj.scale.set(torsoScaleX, torsoScaleY, torsoScaleZ);
+        }
 
-      if (obj.material && !obj.userData._alkiTuned) {
-        if (obj.material.roughness !== undefined) {
-          obj.material.roughness = Math.min(1, (obj.material.roughness ?? 0.7) + 0.05);
-          obj.material.metalness = 0;
+        // Material polish: warmer skin response, less plastic
+        if (obj.material && !obj.userData._alkiTuned) {
+          if (obj.material.roughness !== undefined) {
+            obj.material.roughness = Math.min(1, (obj.material.roughness ?? 0.7) + 0.05);
+            obj.material.metalness = 0;
+          }
+          if (glow && obj.material.emissive) {
+            obj.material.emissive = new THREE.Color("#0e4a2a");
+            obj.material.emissiveIntensity = 0.18;
+          }
+          obj.material.needsUpdate = true;
+          obj.userData._alkiTuned = true;
         }
-        if (glow && obj.material.emissive) {
-          obj.material.emissive = new THREE.Color("#0e4a2a");
-          obj.material.emissiveIntensity = 0.18;
-        }
-        obj.material.needsUpdate = true;
-        obj.userData._alkiTuned = true;
+
+        obj.castShadow = true;
+        obj.receiveShadow = false;
       }
-      obj.castShadow = true;
-      obj.receiveShadow = false;
     });
   }, [cloned, fat, muscle, glow]);
 
@@ -273,33 +237,14 @@ function GLBAvatar({ url, params, glow, autoRotate = true }) {
   });
 
   return (
-    <group
-      ref={groupRef}
-      position={[fit.offsetX, fit.offsetY, fit.offsetZ]}
-      scale={fit.scale}
-    >
+    <group ref={groupRef} position={[0, -0.85, 0]} scale={1}>
       <primitive object={cloned} />
     </group>
   );
 }
 
 // ──────────────────────────────────────────────────────────────
-// CAMERA RIG — sets camera position AND target every frame.
-// OrbitControls would handle this when interactive, but small
-// preview tiles render without controls, so we need this.
-// ──────────────────────────────────────────────────────────────
-function CameraRig({ position, target }) {
-  useFrame(({ camera }) => {
-    camera.position.set(position[0], position[1], position[2]);
-    camera.lookAt(target[0], target[1], target[2]);
-    camera.updateProjectionMatrix();
-  });
-  return null;
-}
-
-// ──────────────────────────────────────────────────────────────
 // OUTER COMPONENT
-// One camera convention for both modes since both place feet at y=0.
 // ──────────────────────────────────────────────────────────────
 export default function Body3DAvatar({
   params,
@@ -308,44 +253,13 @@ export default function Body3DAvatar({
   size = "large",       // "small" | "large"
   interactive = true,
   autoRotate = true,
-  avatarUrl = null,
+  avatarUrl = null,     // GLB URL from Avaturn (optional)
 }) {
-  const isGLB = !!avatarUrl;
-
-  // Camera setups (model is 1.7m tall, feet at y=0):
-  //   - LARGE: full body. Camera at mid-body height, pulled back.
-  //   - SMALL: head-and-shoulders portrait. Camera near head, close.
-  let camPos, camFov, targetY, ctrlMinPol, ctrlMaxPol;
-
-  if (size === "small") {
-    // Profile-card bubble — head + upper chest portrait.
-    // Aspect ratio of this tile is portrait (~1:1.4), so vertical fov
-    // gives a narrow horizontal frustum. Camera must be far enough back
-    // for shoulders (~0.55m wide) to fit horizontally.
-    camPos = [0, 1.45, 2.0];
-    camFov = 22;
-    targetY = 1.45;
-    ctrlMinPol = Math.PI / 2.4;
-    ctrlMaxPol = Math.PI / 1.95;
-  } else if (isGLB) {
-    // GLB full-body — 1.7m model, 1:1.6 portrait aspect.
-    // Need to see y=0 to y=1.75 with margin. Camera at mid-body.
-    camPos = [0, 0.95, 3.6];
-    camFov = 32;
-    targetY = 0.95;
-    ctrlMinPol = Math.PI / 2.6;
-    ctrlMaxPol = Math.PI / 1.9;
-  } else {
-    // Parametric full-body — same 1.7m model height.
-    camPos = [0, 0.95, 3.2];
-    camFov = 34;
-    targetY = 0.95;
-    ctrlMinPol = Math.PI / 2.6;
-    ctrlMaxPol = Math.PI / 1.9;
-  }
+  const camPos = size === "small" ? [0, 0.3, 2.4] : [0, 0.3, 2.6];
+  const camFov = size === "small" ? 22 : 24;
 
   const wrapStyle = size === "small"
-    ? { width: "100%", aspectRatio: "1 / 1.4", maxWidth: 100 }
+    ? { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 100 }
     : { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 200 };
 
   return (
@@ -358,8 +272,8 @@ export default function Body3DAvatar({
           gl={{ antialias: true, alpha: true, preserveDrawingBuffer: false }}
           style={{ background: "transparent" }}
         >
-          {/* Premium 3-point lighting */}
-          <ambientLight intensity={0.42} />
+          {/* Premium 3-point lighting — Apple Fitness+ feel */}
+          <ambientLight intensity={0.32} />
           <directionalLight
             position={[2.5, 4, 3]}
             intensity={1.15}
@@ -368,21 +282,24 @@ export default function Body3DAvatar({
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
           />
+          {/* Cool fill on opposite side */}
           <directionalLight position={[-2.5, 2, 2]} intensity={0.5} color="#a8c8ff" />
+          {/* Top rim — separates the silhouette from the dark UI */}
           <directionalLight position={[0, 3.5, -2]} intensity={0.55} color="#ffffff" />
+          {/* Projected variant gets a brand-green rim */}
           {glow && (
             <directionalLight position={[0, 2, -3]} intensity={1.3} color="#22d68a" />
           )}
 
           <Suspense fallback={null}>
-            {isGLB ? (
+            {avatarUrl ? (
               <GLBAvatar url={avatarUrl} params={params} glow={glow} autoRotate={autoRotate} />
             ) : (
               <Humanoid params={params} glow={glow} autoRotate={autoRotate} />
             )}
             {size === "large" && (
               <ContactShadows
-                position={[0, 0, 0]}
+                position={[0, -0.86, 0]}
                 opacity={0.45}
                 scale={3}
                 blur={2.4}
@@ -392,18 +309,14 @@ export default function Body3DAvatar({
             )}
           </Suspense>
 
-          {/* Always-on camera rig keeps framing correct even without OrbitControls */}
-          <CameraRig position={camPos} target={[0, targetY, 0]} />
-
           {interactive && (
             <OrbitControls
               enablePan={false}
               enableZoom={false}
-              minPolarAngle={ctrlMinPol}
-              maxPolarAngle={ctrlMaxPol}
+              minPolarAngle={Math.PI / 2.6}
+              maxPolarAngle={Math.PI / 1.9}
               autoRotate={false}
               dampingFactor={0.08}
-              target={[0, targetY, 0]}
             />
           )}
         </Canvas>
