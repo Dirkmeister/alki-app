@@ -318,23 +318,27 @@ export default function Body3DAvatar({
   let camPos, camFov, targetY, ctrlMinPol, ctrlMaxPol;
 
   if (size === "small") {
-    // Profile-card bubble — head + upper chest portrait
-    camPos = [0, 1.55, 1.2];
-    camFov = 28;
-    targetY = 1.5;
+    // Profile-card bubble — head + upper chest portrait.
+    // Aspect ratio of this tile is portrait (~1:1.4), so vertical fov
+    // gives a narrow horizontal frustum. Camera must be far enough back
+    // for shoulders (~0.55m wide) to fit horizontally.
+    camPos = [0, 1.45, 2.0];
+    camFov = 22;
+    targetY = 1.45;
     ctrlMinPol = Math.PI / 2.4;
     ctrlMaxPol = Math.PI / 1.95;
   } else if (isGLB) {
-    // GLB full-body — pulled back, wider FOV
-    camPos = [0, 0.95, 3.4];
-    camFov = 30;
+    // GLB full-body — 1.7m model, 1:1.6 portrait aspect.
+    // Need to see y=0 to y=1.75 with margin. Camera at mid-body.
+    camPos = [0, 0.95, 3.6];
+    camFov = 32;
     targetY = 0.95;
     ctrlMinPol = Math.PI / 2.6;
     ctrlMaxPol = Math.PI / 1.9;
   } else {
-    // Parametric full-body — original framing
-    camPos = [0, 0.95, 2.8];
-    camFov = 26;
+    // Parametric full-body — same 1.7m model height.
+    camPos = [0, 0.95, 3.2];
+    camFov = 34;
     targetY = 0.95;
     ctrlMinPol = Math.PI / 2.6;
     ctrlMaxPol = Math.PI / 1.9;
