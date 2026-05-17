@@ -10,6 +10,7 @@ import AvaturnCapture from "./AvaturnCapture";
 import { AVATURN_ENABLED } from "./avaturnConfig";
 import PeptideModeler from "./PeptideModeler";
 import ProgressLog from "./screens/ProgressLog";
+import Home from "./screens/Home";
 import { getCultivationState, getCultivationVisuals, getRegressionFactor } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 // ─────────────────────────────────────────────────────────────
@@ -1175,7 +1176,7 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onQA, onTimeline, onModeler, onProgress, cultivationState, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
+function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, avatarUrl, onCaptureAvatar, onResetAvatar, onSignOut, userEmail }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const recommendations = useMemo(() => getRecommendations(profile), [profile]);
@@ -1551,6 +1552,21 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           View Research Timeline →
         </button>
 
+        {/* Lock In from Transformation View */}
+        <button
+          onClick={() => onLockIn(selectedCompounds)}
+          style={{
+            ...S.btn,
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }}
+        >
+          Lock In This Protocol →
+        </button>
+
         <p style={S.disclaimer}>
           Projected research outcome based on published literature. Individual results are not guaranteed. This is not medical advice. Consult a licensed healthcare provider before initiating any protocol.
         </p>
@@ -1571,6 +1587,11 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
           </span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          {onBackToHome && (
+            <button onClick={onBackToHome} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              ← Home
+            </button>
+          )}
           <button onClick={onProgress} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Progress
           </button>
@@ -1746,6 +1767,24 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </button>
       )}
 
+      {/* Lock In Protocol CTA */}
+      {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
+        <button
+          onClick={() => onLockIn(selectedCompounds)}
+          style={{
+            ...S.btnOutline,
+            marginBottom: 16,
+            borderColor: "rgba(34,214,138,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }}
+        >
+          Lock In This Protocol →
+        </button>
+      )}
+
       {/* Stack Intelligence — compact mode on dashboard shows only critical
           contraindication blocks. Full analysis renders on Transform screen. */}
       <StackIntelligence
@@ -1842,7 +1881,8 @@ async function loadProfile(userId) {
         adv: data.adv || {}
       },
       selectedCompounds: data.selected_compounds || [],
-      avatarUrl: data.avatar_url || null
+      avatarUrl: data.avatar_url || null,
+      activeProtocol: data.active_protocol || null
     };
   } catch (e) {
     console.error("loadProfile error:", e);
@@ -1850,7 +1890,7 @@ async function loadProfile(userId) {
   }
 }
 
-async function saveProfile(userId, profile, selectedCompounds, avatarUrl) {
+async function saveProfile(userId, profile, selectedCompounds, avatarUrl, activeProtocol) {
   if (!supabase || !profile) return;
   try {
     const { error } = await supabase
@@ -1867,6 +1907,7 @@ async function saveProfile(userId, profile, selectedCompounds, avatarUrl) {
         adv: profile.adv || {},
         selected_compounds: selectedCompounds || [],
         avatar_url: avatarUrl || null,
+        active_protocol: activeProtocol || null,
         updated_at: new Date().toISOString()
       });
     if (error) console.error("saveProfile error:", error);
@@ -1999,6 +2040,7 @@ export default function AlkiApp() {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
   const [progressLogs, setProgressLogs] = useState([]);
+  const [activeProtocol, setActiveProtocol] = useState(null);
   const saveTimeout = useRef(null);
 
   // ── Session check on mount ──
@@ -2013,7 +2055,8 @@ export default function AlkiApp() {
             setProfile(saved.profile);
             setSelectedCompounds(saved.selectedCompounds || []);
             setAvatarUrl(saved.avatarUrl || null);
-            setScreen("dashboard");
+            setActiveProtocol(saved.activeProtocol || null);
+            setScreen(saved.activeProtocol ? "home" : "dashboard");
           } else {
             setScreen("onboarding");
           }
@@ -2049,10 +2092,10 @@ export default function AlkiApp() {
     if (!supabase || !user || !profile) return;
     clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
-      saveProfile(user.id, profile, selectedCompounds, avatarUrl);
+      saveProfile(user.id, profile, selectedCompounds, avatarUrl, activeProtocol);
     }, 1500);
     return () => clearTimeout(saveTimeout.current);
-  }, [user, profile, selectedCompounds, avatarUrl]);
+  }, [user, profile, selectedCompounds, avatarUrl, activeProtocol]);
 
   const cultivationState = useMemo(() => getCultivationState(progressLogs), [progressLogs]);
 
@@ -2068,6 +2111,7 @@ export default function AlkiApp() {
     setSelectedCompounds([]);
     setShowTransform(false);
     setAvatarUrl(null);
+    setActiveProtocol(null);
     setScreen("splash");
   };
 
@@ -2078,7 +2122,8 @@ export default function AlkiApp() {
       setProfile(saved.profile);
       setSelectedCompounds(saved.selectedCompounds || []);
       setAvatarUrl(saved.avatarUrl || null);
-      setScreen("dashboard");
+      setActiveProtocol(saved.activeProtocol || null);
+      setScreen(saved.activeProtocol ? "home" : "dashboard");
     } else {
       setScreen("onboarding");
     }
@@ -2128,6 +2173,19 @@ export default function AlkiApp() {
           initialStep={profile ? 3 : 0}
         />
       )}
+      {screen === "home" && profile && (
+        <Home
+          profile={profile}
+          activeProtocol={activeProtocol}
+          cultivationState={cultivationState}
+          avatarUrl={avatarUrl}
+          onProgress={() => setScreen("progress")}
+          onModify={() => { setSelectedCompounds(activeProtocol?.compounds || []); setScreen("dashboard"); }}
+          onNewEidolon={() => { setSelectedCompounds([]); setActiveProtocol(null); setScreen("dashboard"); }}
+          onSignOut={supabase ? handleSignOut : null}
+          userEmail={user?.email || null}
+        />
+      )}
       {screen === "dashboard" && profile && (
         <Dashboard
           profile={profile}
@@ -2136,6 +2194,8 @@ export default function AlkiApp() {
           showTransform={showTransform}
           setShowTransform={setShowTransform}
           onReset={() => { setSelectedCompounds([]); setShowTransform(false); setScreen("onboarding"); }}
+          onLockIn={(compounds) => { const p = { compounds, lockedAt: new Date().toISOString() }; setActiveProtocol(p); setScreen("home"); }}
+          onBackToHome={activeProtocol ? () => setScreen("home") : null}
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
           onModeler={() => setScreen("modeler")}
