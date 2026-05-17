@@ -1605,17 +1605,11 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
               ← Home
             </button>
           )}
-          <button onClick={onProgress} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Progress
-          </button>
           <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Modeler
           </button>
           <button onClick={onQA} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Protocol Q&amp;A
-          </button>
-          <button onClick={onReset} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-            Reset
+            Q&amp;A
           </button>
           {onSignOut && (
             <button onClick={onSignOut} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
@@ -1749,13 +1743,10 @@ function Dashboard({ profile, selectedCompounds, setSelectedCompounds, showTrans
         </div>
       )}
 
-      {/* Log + Modify — only when locked */}
+      {/* Modify/New — only when locked */}
       {!editing && activeProtocol && (
         <>
-          <button onClick={onProgress} style={{ ...S.btn, marginBottom: 12 }}>
-            Log Research Check-in
-          </button>
-          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
             <button onClick={() => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }} style={{ ...S.btnOutline, flex: 1, fontSize: 13, padding: "12px 16px" }}>
               Modify Protocol
             </button>
@@ -1936,7 +1927,9 @@ async function loadProfile(userId) {
       },
       selectedCompounds: data.selected_compounds || [],
       avatarUrl: data.avatar_url || null,
-      activeProtocol: data.active_protocol || null
+      activeProtocol: data.active_protocol || null,
+      eidolons: data.eidolons || [],
+      activeEidolonId: data.active_eidolon_id || null
     };
   } catch (e) {
     console.error("loadProfile error:", e);
@@ -1944,7 +1937,7 @@ async function loadProfile(userId) {
   }
 }
 
-async function saveProfile(userId, profile, selectedCompounds, avatarUrl, activeProtocol) {
+async function saveProfile(userId, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId) {
   if (!supabase || !profile) return;
   try {
     const { error } = await supabase
@@ -1962,6 +1955,8 @@ async function saveProfile(userId, profile, selectedCompounds, avatarUrl, active
         selected_compounds: selectedCompounds || [],
         avatar_url: avatarUrl || null,
         active_protocol: activeProtocol || null,
+        eidolons: eidolons || [],
+        active_eidolon_id: activeEidolonId || null,
         updated_at: new Date().toISOString()
       });
     if (error) console.error("saveProfile error:", error);
@@ -2095,6 +2090,8 @@ export default function AlkiApp() {
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
   const [progressLogs, setProgressLogs] = useState([]);
   const [activeProtocol, setActiveProtocol] = useState(null);
+  const [eidolons, setEidolons] = useState([]);
+  const [activeEidolonId, setActiveEidolonId] = useState(null);
   const saveTimeout = useRef(null);
 
   // ── Session check on mount ──
@@ -2110,6 +2107,8 @@ export default function AlkiApp() {
             setSelectedCompounds(saved.selectedCompounds || []);
             setAvatarUrl(saved.avatarUrl || null);
             setActiveProtocol(saved.activeProtocol || null);
+            setEidolons(saved.eidolons || []);
+            setActiveEidolonId(saved.activeEidolonId || null);
             setScreen("dashboard");
           } else {
             setScreen("onboarding");
@@ -2146,10 +2145,10 @@ export default function AlkiApp() {
     if (!supabase || !user || !profile) return;
     clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
-      saveProfile(user.id, profile, selectedCompounds, avatarUrl, activeProtocol);
+      saveProfile(user.id, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId);
     }, 1500);
     return () => clearTimeout(saveTimeout.current);
-  }, [user, profile, selectedCompounds, avatarUrl, activeProtocol]);
+  }, [user, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId]);
 
   const cultivationState = useMemo(() => getCultivationState(progressLogs), [progressLogs]);
 
@@ -2177,6 +2176,8 @@ export default function AlkiApp() {
       setSelectedCompounds(saved.selectedCompounds || []);
       setAvatarUrl(saved.avatarUrl || null);
       setActiveProtocol(saved.activeProtocol || null);
+      setEidolons(saved.eidolons || []);
+      setActiveEidolonId(saved.activeEidolonId || null);
       setScreen("dashboard");
     } else {
       setScreen("onboarding");
