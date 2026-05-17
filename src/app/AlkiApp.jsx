@@ -1277,6 +1277,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       setEidolons(prev => prev.map(e => e.id === activeEidolon.id ? { ...e, compounds, lockedAt: protocol.lockedAt } : e));
     }
     setEditing(false);
+    setShowTransform(false);
   }, [activeEidolon]);
 
   const recommendations = useMemo(() => {
