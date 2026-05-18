@@ -1791,20 +1791,22 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           View Research Timeline →
         </button>
 
-        {/* Lock In / Confirm Changes from Transformation View */}
-        <button
-          onClick={() => handleLockIn(selectedCompounds)}
-          style={{
-            ...S.btn,
-            marginBottom: 12,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8
-          }}
-        >
-          {isModifying ? 'Confirm Changes →' : 'Lock In This Protocol →'}
-        </button>
+        {/* Lock In / Confirm Changes — only when actively building or modifying. Hidden when just viewing a locked protocol. */}
+        {editing && (
+          <button
+            onClick={() => handleLockIn(selectedCompounds)}
+            style={{
+              ...S.btn,
+              marginBottom: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8
+            }}
+          >
+            {isModifying ? 'Confirm Changes →' : 'Lock In This Protocol →'}
+          </button>
+        )}
 
         <p style={S.disclaimer}>
           Projected research outcome based on published literature. Individual results are not guaranteed. This is not medical advice. Consult a licensed healthcare provider before initiating any protocol.
@@ -2255,45 +2257,49 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             )}
           </div>
 
-          {/* 7. Action grid — 2×2 */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 10,
-            marginTop: 8,
-            marginBottom: 10
-          }}>
-            <button
-              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-              disabled={stackAnalysis.isBlocked}
-              style={{
-                ...S.btnOutline,
-                ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {})
-              }}
-            >
-              View Projection
-            </button>
-            <button
-              onClick={() => {
-                setSelectedCompounds(activeProtocol.compounds || []);
-                setEditing(true);
-              }}
-              style={S.btnOutline}
-            >
-              Modify Stack
-            </button>
-            <button
-              onClick={() => setShowEidolonSwitcher(true)}
-              style={S.btnOutline}
-            >
-              Switch Eidolon
-            </button>
-            <button
-              onClick={createNewEidolon}
-              style={S.btnOutline}
-            >
-              New Eidolon
-            </button>
+          {/* 7. Action grid — top row 2-col (Projection + Timeline), bottom row 3-col (Modify / Switch / New) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8, marginBottom: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <button
+                onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+                disabled={stackAnalysis.isBlocked}
+                style={{
+                  ...S.btnOutline,
+                  ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {})
+                }}
+              >
+                View Projection
+              </button>
+              <button
+                onClick={onTimeline}
+                style={S.btnOutline}
+              >
+                View Timeline
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setSelectedCompounds(activeProtocol.compounds || []);
+                  setEditing(true);
+                }}
+                style={S.btnOutline}
+              >
+                Modify
+              </button>
+              <button
+                onClick={() => setShowEidolonSwitcher(true)}
+                style={S.btnOutline}
+              >
+                Switch
+              </button>
+              <button
+                onClick={createNewEidolon}
+                style={S.btnOutline}
+              >
+                New
+              </button>
+            </div>
           </div>
         </>
       )}
