@@ -391,6 +391,11 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
 }
 
 // ── SVG AVATAR COMPONENT ───────────────────────────────────
+// Athletic wear + anatomical definition. The body is visible because
+// the entire point of the projected eidolon is showing physique change.
+// Definition lines (abs, pecs, obliques, delts, quads) fade in as BF drops:
+// fully visible at ~8% BF, gone by 20% BF. Muscle-driven lines (biceps,
+// quad sweep) scale independently with the muscle param.
 function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
   const { fat, muscle, isMale } = params;
 
@@ -415,6 +420,27 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
   const kneeY = 185;
   const ankleY = 230;
   const footY = 240;
+
+  // ── Definition layer (Plan B) ────────────────────────────────────
+  // Recover BF% from the normalized 0..1 fat param (inverse of resolveAvatarParams).
+  const bfPercent = 6 + fat * 34;
+  // Anatomical definition opacity: fully visible <= 8% BF, fades to 0 by 20% BF.
+  const defOpacity = Math.max(0, Math.min(1, (20 - bfPercent) / 12));
+  // Hide fine anatomical lines at small render sizes (thumbnails, switcher cards).
+  const showDetail = maxWidth >= 150;
+  const defStrokeMinor = `rgba(255,255,255,${defOpacity * 0.4})`;
+  const defStrokeMajor = `rgba(255,255,255,${defOpacity * 0.55})`;
+  // Muscle-driven stroke (biceps, quads) — fades in independently of BF.
+  const muscleOpacity = Math.max(0, (muscle - 0.35) * 0.9);
+  const muscleStroke = `rgba(255,255,255,${muscleOpacity})`;
+
+  // Athletic wear
+  const wearFill = "#1a1a1a";
+  const wearAccent = "#2a2a2a";
+  const shortsTopY = hipY - 6;
+  const shortsBottomY = hipY + 30;
+  const braTopY = chestY - 12;
+  const braBottomY = chestY + 12;
 
   const skinColor = glow ? "#d4a574" : "#c4956a";
   const skinDark = glow ? "#c49464" : "#b4855a";
@@ -464,7 +490,7 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
             Z
           `} fill={skinColor} />
 
-          {/* Pecs / chest detail */}
+          {/* Pec shading (male, muscle-driven) */}
           {isMale && muscle > 0.3 && (
             <>
               <ellipse cx={cx - 10} cy={chestY - 2} rx={chestW / 4.5} ry={6 + muscle * 4} fill={skinDark} opacity="0.2" />
@@ -472,12 +498,42 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
             </>
           )}
 
-          {/* Abs hint */}
-          {fat < 0.35 && isMale && (
-            <line x1={cx} y1={chestY + 6} x2={cx} y2={waistY - 2} stroke={skinDark} strokeWidth="0.8" opacity={0.3 - fat * 0.6} />
+          {/* ── ANATOMICAL DEFINITION (on bare torso) ─────────────── */}
+          {/* Male: pec separation + pec undercurves + 6-pack grid */}
+          {showDetail && defOpacity > 0.02 && isMale && (
+            <g>
+              {/* Pec separation / sternum line */}
+              <line x1={cx} y1={chestY - 6} x2={cx} y2={chestY + 10} stroke={defStrokeMajor} strokeWidth="0.8" />
+              {/* Pec bottom curves */}
+              <path d={`M${cx - chestW / 2 + 4} ${chestY + 8} Q${cx - 5} ${chestY + 13} ${cx - 1.5} ${chestY + 9}`} stroke={defStrokeMinor} strokeWidth="0.7" fill="none" />
+              <path d={`M${cx + 1.5} ${chestY + 9} Q${cx + 5} ${chestY + 13} ${cx + chestW / 2 - 4} ${chestY + 8}`} stroke={defStrokeMinor} strokeWidth="0.7" fill="none" />
+              {/* Linea alba — vertical center line through abs */}
+              <line x1={cx} y1={chestY + 14} x2={cx} y2={waistY + 4} stroke={defStrokeMajor} strokeWidth="0.7" />
+              {/* Three transverse ab lines (6-pack grid) */}
+              {[0.28, 0.55, 0.82].map(t => {
+                const y = chestY + 14 + (waistY + 4 - chestY - 14) * t;
+                const lineW = waistW / 3 + 1;
+                return (
+                  <line key={`ab${t}`} x1={cx - lineW} y1={y} x2={cx + lineW} y2={y} stroke={defStrokeMinor} strokeWidth="0.5" />
+                );
+              })}
+            </g>
           )}
 
-          {/* Arms */}
+          {/* Obliques — both genders, fade with BF */}
+          {showDetail && defOpacity > 0.1 && (
+            <g>
+              <path d={`M${cx - waistW / 2 + 1} ${chestY + 18} Q${cx - waistW / 2 - 1.5} ${waistY + 2} ${cx - hipW / 3} ${hipY - 4}`} stroke={defStrokeMinor} strokeWidth="0.55" fill="none" />
+              <path d={`M${cx + waistW / 2 - 1} ${chestY + 18} Q${cx + waistW / 2 + 1.5} ${waistY + 2} ${cx + hipW / 3} ${hipY - 4}`} stroke={defStrokeMinor} strokeWidth="0.55" fill="none" />
+            </g>
+          )}
+
+          {/* Female midriff tone — single subtle linea alba */}
+          {showDetail && defOpacity > 0.1 && !isMale && (
+            <line x1={cx} y1={chestY + 16} x2={cx} y2={waistY + 4} stroke={defStrokeMinor} strokeWidth="0.5" />
+          )}
+
+          {/* Arms (with deltoid caps + definition) */}
           {[-1, 1].map(side => {
             const sx = cx + side * (shoulderW / 2);
             const elbowX = cx + side * (shoulderW / 2 + 8 + fat * 2);
@@ -507,13 +563,44 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
 
                 {/* Deltoid cap */}
                 <ellipse cx={sx} cy={shoulderY} rx={armW / 2 + muscle * 3} ry={5 + muscle * 4} fill={skinColor} />
+
+                {/* Deltoid cap separation arc (delt-to-arm) */}
+                {showDetail && defOpacity > 0.05 && (
+                  <path
+                    d={`M${sx - side * 0.5} ${shoulderY - 2 - muscle * 2} Q${sx + side * (armW / 2 + 1.5)} ${shoulderY + 3} ${sx - side * 0.5} ${shoulderY + 8 + muscle * 2}`}
+                    stroke={defStrokeMinor}
+                    strokeWidth="0.6"
+                    fill="none"
+                  />
+                )}
+
+                {/* Bicep peak (muscle-driven) */}
+                {showDetail && muscle > 0.4 && (
+                  <path
+                    d={`M${elbowX - side * (armW * 0.4)} ${shoulderY + 22} Q${elbowX - side * (armW * 0.05)} ${shoulderY + 30} ${elbowX - side * (armW * 0.4)} ${shoulderY + 38}`}
+                    stroke={muscleStroke}
+                    strokeWidth="0.5"
+                    fill="none"
+                  />
+                )}
+
+                {/* Forearm definition (BF-driven) */}
+                {showDetail && defOpacity > 0.2 && (
+                  <line
+                    x1={wristX - side * 1.5}
+                    y1={elbowY + 8}
+                    x2={wristX - side * 0.5}
+                    y2={wristY - 4}
+                    stroke={defStrokeMinor}
+                    strokeWidth="0.4"
+                  />
+                )}
               </g>
             );
           })}
 
           {/* Legs */}
           {[-1, 1].map(side => {
-            const hipX = cx + side * (hipW / 2 - thighW / 2 - 1);
             const kneeX = cx + side * (hipW / 3);
             return (
               <g key={`leg${side}`}>
@@ -535,6 +622,106 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
                 `} fill={skinColor} />
                 {/* Foot */}
                 <ellipse cx={kneeX + side * 1} cy={footY} rx={6 + fat} ry={3} fill={skinDark} />
+              </g>
+            );
+          })}
+
+          {/* ── ATHLETIC WEAR — drawn over hips & upper legs ──────── */}
+          {/* Shorts: waistband at hip, tapers to mid-thigh, inseam in center */}
+          <path d={`
+            M${cx - hipW / 2 - 1} ${shortsTopY}
+            L${cx + hipW / 2 + 1} ${shortsTopY}
+            L${cx + hipW / 2 + 1} ${hipY + 4}
+            Q${cx + hipW / 2 + 1} ${shortsBottomY - 8} ${cx + hipW / 3 + thighW / 3 + 1} ${shortsBottomY}
+            L${cx + 3} ${shortsBottomY + 1}
+            L${cx + 1} ${shortsBottomY - 5}
+            L${cx - 1} ${shortsBottomY - 5}
+            L${cx - 3} ${shortsBottomY + 1}
+            L${cx - hipW / 3 - thighW / 3 - 1} ${shortsBottomY}
+            Q${cx - hipW / 2 - 1} ${shortsBottomY - 8} ${cx - hipW / 2 - 1} ${hipY + 4}
+            Z
+          `} fill={wearFill} />
+          {/* Waistband stripe */}
+          <rect x={cx - hipW / 2 - 1} y={shortsTopY} width={hipW + 2} height={2.5} fill={wearAccent} />
+
+          {/* Sports bra (female) — band + straps + center seam */}
+          {!isMale && (
+            <g>
+              {/* Main band */}
+              <path d={`
+                M${cx - chestW / 2 - 1} ${braTopY + 3}
+                Q${cx - chestW / 2 - 1} ${braTopY} ${cx - chestW / 2 + 3} ${braTopY}
+                L${cx + chestW / 2 - 3} ${braTopY}
+                Q${cx + chestW / 2 + 1} ${braTopY} ${cx + chestW / 2 + 1} ${braTopY + 3}
+                L${cx + chestW / 2} ${braBottomY - 2}
+                Q${cx + chestW / 2 - 3} ${braBottomY + 2} ${cx} ${braBottomY + 1}
+                Q${cx - chestW / 2 + 3} ${braBottomY + 2} ${cx - chestW / 2} ${braBottomY - 2}
+                Z
+              `} fill={wearFill} />
+              {/* Center seam */}
+              <line x1={cx} y1={braTopY + 2} x2={cx} y2={braBottomY} stroke={wearAccent} strokeWidth="0.5" />
+              {/* Underbust accent */}
+              <path d={`M${cx - chestW / 2 + 2} ${braBottomY - 1} Q${cx} ${braBottomY + 2} ${cx + chestW / 2 - 2} ${braBottomY - 1}`} stroke={wearAccent} strokeWidth="0.6" fill="none" />
+              {/* Left strap */}
+              <path d={`
+                M${cx - chestW / 2 + 5} ${braTopY + 1}
+                L${cx - shoulderW / 2 + 4} ${shoulderY + 2}
+                L${cx - shoulderW / 2 + 8} ${shoulderY + 2}
+                L${cx - chestW / 2 + 9} ${braTopY + 1}
+                Z
+              `} fill={wearFill} />
+              {/* Right strap */}
+              <path d={`
+                M${cx + chestW / 2 - 5} ${braTopY + 1}
+                L${cx + shoulderW / 2 - 4} ${shoulderY + 2}
+                L${cx + shoulderW / 2 - 8} ${shoulderY + 2}
+                L${cx + chestW / 2 - 9} ${braTopY + 1}
+                Z
+              `} fill={wearFill} />
+            </g>
+          )}
+
+          {/* ── LEG DEFINITION (after shorts, visible on thighs/calves) ── */}
+          {showDetail && [-1, 1].map(side => {
+            const kneeX = cx + side * (hipW / 3);
+            // Quad sweep needs either visible muscle OR low BF to show
+            const quadVisible = muscle > 0.35 || defOpacity > 0.2;
+            if (!quadVisible) return null;
+            // Combined opacity from both BF and muscle signals
+            const quadOp = Math.min(1, defOpacity * 0.45 + Math.max(0, (muscle - 0.35) * 0.7));
+            return (
+              <g key={`legdef${side}`}>
+                {/* Outer quad sweep — diagonal line on outer thigh */}
+                <line
+                  x1={cx + side * (hipW / 2 - 3)}
+                  y1={shortsBottomY + 3}
+                  x2={kneeX + side * (thighW / 3 - 1)}
+                  y2={kneeY - 4}
+                  stroke={`rgba(255,255,255,${quadOp * 0.5})`}
+                  strokeWidth="0.55"
+                />
+                {/* Inner quad — only at higher muscle / lower BF */}
+                {(muscle > 0.5 || defOpacity > 0.4) && (
+                  <line
+                    x1={cx + side * (hipW / 6)}
+                    y1={shortsBottomY + 3}
+                    x2={kneeX - side * (thighW / 3 - 1)}
+                    y2={kneeY - 4}
+                    stroke={`rgba(255,255,255,${quadOp * 0.35})`}
+                    strokeWidth="0.4"
+                  />
+                )}
+                {/* Calf split — gastrocnemius shape */}
+                {(muscle > 0.4 || defOpacity > 0.3) && (
+                  <line
+                    x1={kneeX + side * 2}
+                    y1={kneeY + 6}
+                    x2={kneeX + side * 1.5}
+                    y2={(kneeY + ankleY) / 2 + 4}
+                    stroke={`rgba(255,255,255,${quadOp * 0.4})`}
+                    strokeWidth="0.4"
+                  />
+                )}
               </g>
             );
           })}
