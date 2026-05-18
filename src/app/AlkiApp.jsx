@@ -13,6 +13,8 @@ import ProgressLog from "./screens/ProgressLog";
 import Home from "./screens/Home";
 import { getCultivationState, getCultivationVisuals, getRegressionFactor } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
+import { resolveMorphStates } from "./lib/morphTargets";
+import { getStackVectors } from "./lib/compoundMorphVectors";
 // ─────────────────────────────────────────────────────────────
 // The import above adds 63 compounds via `data/compounds-expanded.js`.
 // The original 8 compounds remain inline below, untouched.
@@ -358,12 +360,20 @@ function getRecommendations(profile) {
 }
 
 // ── AVATAR PARAMETER RESOLVER ──────────────────────────────
+// Produces TWO parameter sets per call site (current + projected),
+// each containing both the legacy 2-dim params (fat, muscle) used by
+// the SVG avatar and the legacy GLB scaler, AND the rich morphState
+// used by the new parametric 3D body model.
+//
+// The morphState only takes effect when a GLB with matching shape
+// keys is loaded. With the current Avaturn GLB (no shape keys) the
+// renderer falls back to the legacy scaling automatically.
 function resolveAvatarParams(profile, selectedCompounds = []) {
   const bf = profile.bodyFat;
   const isMale = profile.sex === "male";
 
-  // Base parameters from body fat %
-  const baseFat = Math.max(0, Math.min(1, (bf - 6) / 34)); // 0 at 6%, 1 at 40%
+  // Legacy 2-dim params (still used by SVG BodyAvatar + legacy GLB path)
+  const baseFat = Math.max(0, Math.min(1, (bf - 6) / 34));
   const baseMuscle = isMale ? 0.5 : 0.35;
 
   let fatMod = 0;
@@ -379,13 +389,31 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
     }
   }
 
+  // Rich morph state for the parametric 3D body model
+  let morphStates = { current: null, projected: null };
+  try {
+    const stackVectors = getStackVectors(selectedCompounds, COMPOUNDS);
+    morphStates = resolveMorphStates(profile, stackVectors);
+  } catch (e) {
+    // If anything in the morph system errors, fall back silently —
+    // SVG and legacy GLB scaling still work without morphState.
+    console.error("[Alki] morph resolve failed:", e);
+  }
+
   return {
-    current: { fat: baseFat, muscle: baseMuscle, skin: 0, isMale },
+    current: {
+      fat: baseFat,
+      muscle: baseMuscle,
+      skin: 0,
+      isMale,
+      morphState: morphStates.current
+    },
     projected: {
       fat: Math.max(0, Math.min(1, baseFat + fatMod)),
       muscle: Math.max(0, Math.min(1, baseMuscle + muscleMod)),
       skin: skinMod,
-      isMale
+      isMale,
+      morphState: morphStates.projected
     }
   };
 }

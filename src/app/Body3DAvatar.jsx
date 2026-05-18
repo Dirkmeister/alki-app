@@ -3,25 +3,81 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, ContactShadows, useGLTF } from "@react-three/drei";
 import { useRef, Suspense, useMemo, useEffect } from "react";
 import * as THREE from "three";
+import { MORPH_KEYS } from "./lib/morphTargets";
 
 /**
- * Body3DAvatar — photoreal GLB renderer only.
+ * Body3DAvatar — GLB renderer with shape-key morphing.
  *
- * This component renders an Avaturn-exported GLB. The 2D SVG
- * parametric `BodyAvatar` in AlkiApp.jsx is the free-tier visual;
- * this 3D renderer is the premium "MAKE IT ME" path.
+ * TWO MODES OF OPERATION:
  *
- * Auto-fits the model to a 1.7m canonical height with feet at y=0
- * and recenters X/Z so the model is always framed correctly.
+ * 1) Shape-key mode (the new path):
+ *    If the loaded GLB has Blender shape keys whose names match
+ *    Alki's canonical MORPH_KEYS, those are driven directly via
+ *    morphTargetInfluences. This is the parametric body model —
+ *    every dimension (fat, muscle by region, vascularity, water,
+ *    skin) is independently controllable.
+ *
+ *    Trigger this mode by passing `params.morphState` — a full
+ *    weight map produced by resolveMorphStates() in
+ *    lib/morphTargets.js.
+ *
+ * 2) Legacy mode (the old path):
+ *    If no morphState is provided OR the GLB has no shape keys,
+ *    the renderer falls back to crude X/Z body scaling from
+ *    params.fat and params.muscle. This is what Avaturn-generated
+ *    GLBs use, and it's what every existing call site already
+ *    passes.
+ *
+ * The detection is automatic. Existing call sites in AlkiApp.jsx
+ * keep working unchanged. New code that wants the parametric
+ * upgrade just passes morphState.
+ *
+ * Material params (skin_tone_shift, skin_quality) are always
+ * applied as material adjustments, regardless of mode.
  */
 
 function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) {
-  const { fat, muscle } = params;
+  const { fat = 0, muscle = 0, morphState = null } = params || {};
   const groupRef = useRef();
   const { scene } = useGLTF(url);
   const cloned = useMemo(() => scene.clone(true), [scene]);
 
-  // Auto-fit: measure box, recenter X/Z, lift floor to y=0, scale to 1.7m.
+  // ── Discover shape keys present in the loaded GLB ────────────────
+  // We scan every skinned/static mesh, collect each one's morph
+  // dictionary, and remember which Alki canonical keys are available.
+  const morphInventory = useMemo(() => {
+    const inventory = []; // [{ mesh, keyMap: { canonical_key: morph_index } }]
+    let totalKeysFound = 0;
+    cloned.traverse(obj => {
+      if (!obj.isMesh) return;
+      const dict = obj.morphTargetDictionary;
+      if (!dict) return;
+      const keyMap = {};
+      for (const canonical of MORPH_KEYS) {
+        if (dict[canonical] !== undefined) {
+          keyMap[canonical] = dict[canonical];
+        }
+      }
+      if (Object.keys(keyMap).length > 0) {
+        inventory.push({ mesh: obj, keyMap });
+        totalKeysFound += Object.keys(keyMap).length;
+      }
+    });
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.log("[Alki morph inventory]", {
+        meshesWithMorphs: inventory.length,
+        totalKeysFound,
+        availableKeys: [...new Set(inventory.flatMap(i => Object.keys(i.keyMap)))]
+      });
+    }
+    return inventory;
+  }, [cloned]);
+
+  const hasMorphTargets = morphInventory.length > 0;
+  const useShapeKeys = hasMorphTargets && !!morphState;
+
+  // ── Auto-fit (unchanged) ─────────────────────────────────────────
   const fit = useMemo(() => {
     if (!cloned) return { scale: 1, offsetX: 0, offsetY: 0, offsetZ: 0 };
     cloned.position.set(0, 0, 0);
@@ -37,8 +93,6 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
     const offsetX = -((box.min.x + box.max.x) / 2) * scale;
     const offsetZ = -((box.min.z + box.max.z) / 2) * scale;
 
-    // Debug logging — prints the raw bbox so we can see exactly where the
-    // model sits. Inspect the browser console after loading the avatar.
     if (typeof window !== "undefined") {
       // eslint-disable-next-line no-console
       console.log("[Alki GLB fit]", {
@@ -48,50 +102,108 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
         scaleFactor: scale.toFixed(3),
         appliedOffset: [offsetX.toFixed(3), offsetY.toFixed(3), offsetZ.toFixed(3)],
         afterFitFeetY: 0,
-        afterFitHeadY: 1.7
+        afterFitHeadY: 1.7,
+        morphMode: useShapeKeys ? "shape_keys" : "legacy_scale"
       });
     }
     return { scale, offsetX, offsetY, offsetZ };
-  }, [cloned]);
+  }, [cloned, useShapeKeys]);
 
-  // Apply body-comp morphing without distorting the head.
+  // ── Apply morph state to shape keys (SHAPE-KEY MODE) ─────────────
   useEffect(() => {
-    if (!cloned) return;
+    if (!cloned || !useShapeKeys || !morphState) return;
+    for (const { mesh, keyMap } of morphInventory) {
+      if (!mesh.morphTargetInfluences) continue;
+      for (const [canonical, morphIndex] of Object.entries(keyMap)) {
+        const weight = morphState[canonical];
+        if (typeof weight === "number" && !isNaN(weight)) {
+          mesh.morphTargetInfluences[morphIndex] = weight;
+        }
+      }
+    }
+  }, [cloned, morphInventory, useShapeKeys, morphState]);
+
+  // ── Apply legacy fat/muscle scaling (LEGACY MODE) ────────────────
+  useEffect(() => {
+    if (!cloned || useShapeKeys) return;
     const sx = 1.0 + fat * 0.10 + muscle * 0.02;
     const sz = 1.0 + fat * 0.08 + muscle * 0.03;
 
     cloned.traverse((obj) => {
       if (!obj.isMesh) return;
       const lower = (obj.name || "").toLowerCase();
-      const isHead = ["head","face","hair","eye","teeth","tongue","beard","brow"]
+      const isHead = ["head", "face", "hair", "eye", "teeth", "tongue", "beard", "brow"]
         .some(k => lower.includes(k));
-      const isBody = !isHead && ["body","torso","avatar"]
+      const isBody = !isHead && ["body", "torso", "avatar"]
         .some(k => lower.includes(k));
 
       if (isHead) obj.scale.set(1, 1, 1);
       else if (isBody) obj.scale.set(sx, 1, sz);
+    });
+  }, [cloned, fat, muscle, useShapeKeys]);
 
-      if (obj.material && !obj.userData._alkiTuned) {
+  // ── Apply material adjustments (both modes) ──────────────────────
+  useEffect(() => {
+    if (!cloned) return;
+    const skinToneShift = morphState?.skin_tone_shift ?? 0;
+    const skinQuality = morphState?.skin_quality ?? 0;
+
+    cloned.traverse((obj) => {
+      if (!obj.isMesh || !obj.material) return;
+      const lower = (obj.name || "").toLowerCase();
+      const isSkin = !["hair", "eye", "teeth", "tongue", "cloth", "shirt", "pant", "short"]
+        .some(k => lower.includes(k));
+
+      // One-time tune: roughness, metalness, optional emissive for glow
+      if (!obj.userData._alkiTunedBase) {
         if (obj.material.roughness !== undefined) {
           obj.material.roughness = Math.min(1, (obj.material.roughness ?? 0.7) + 0.05);
           obj.material.metalness = 0;
         }
-        if (glow && obj.material.emissive) {
-          obj.material.emissive = new THREE.Color("#0e4a2a");
-          obj.material.emissiveIntensity = 0.18;
-        }
-        obj.material.needsUpdate = true;
-        obj.userData._alkiTuned = true;
+        obj.userData._alkiTunedBase = true;
       }
+
+      // Glow overlay (projected state)
+      if (glow && obj.material.emissive) {
+        obj.material.emissive = new THREE.Color("#0e4a2a");
+        obj.material.emissiveIntensity = 0.18;
+      } else if (obj.material.emissive) {
+        obj.material.emissiveIntensity = 0;
+      }
+
+      // Skin material modulation (skin meshes only)
+      if (isSkin && obj.material.color) {
+        // Cache the original color the first time we touch it
+        if (!obj.userData._alkiOrigColor) {
+          obj.userData._alkiOrigColor = obj.material.color.clone();
+        }
+        const orig = obj.userData._alkiOrigColor;
+
+        // Melanotan II: shift skin tone darker/warmer
+        if (skinToneShift > 0) {
+          const tanColor = new THREE.Color("#a8693d");
+          obj.material.color.copy(orig).lerp(tanColor, skinToneShift * 0.4);
+        } else {
+          obj.material.color.copy(orig);
+        }
+
+        // GHK-Cu: smoother skin = lower roughness, slight luminosity
+        if (skinQuality > 0 && obj.material.roughness !== undefined) {
+          if (obj.userData._alkiOrigRoughness === undefined) {
+            obj.userData._alkiOrigRoughness = obj.material.roughness;
+          }
+          const orig_r = obj.userData._alkiOrigRoughness;
+          obj.material.roughness = Math.max(0.25, orig_r - skinQuality * 0.25);
+        }
+      }
+
+      obj.material.needsUpdate = true;
       obj.castShadow = true;
     });
-  }, [cloned, fat, muscle, glow]);
+  }, [cloned, glow, morphState]);
 
   useFrame((_, delta) => {
     if (autoRotate && groupRef.current) {
-      // Rotate around the rotateAround pivot rather than the group origin
-      // (feet). For the small head-portrait view this keeps the head fixed
-      // in frame as the body rotates underneath.
       groupRef.current.rotation.y += delta * 0.2;
     }
   });
@@ -116,12 +228,7 @@ export default function Body3DAvatar({
   interactive = true,
   autoRotate = true,
 }) {
-  // Two framing setups. Camera positions and FOVs chosen empirically
-  // so the 1.7m model (feet at y=0, head at y≈1.72) fits each canvas.
   const isSmall = size === "small";
-  // SMALL: head portrait. Camera far back with tight FOV so the model
-  // fills frame with head at center and shoulders just inside.
-  // LARGE: full body. Camera at mid-body, well back to capture feet-to-head.
   const camPos = isSmall ? [0, 1.55, 3.0] : [0, 0.95, 3.6];
   const camFov = isSmall ? 15 : 30;
   const targetY = isSmall ? 1.55 : 0.95;
@@ -140,7 +247,6 @@ export default function Body3DAvatar({
           gl={{ antialias: true, alpha: true }}
           style={{ background: "transparent" }}
         >
-          {/* Premium 3-point lighting */}
           <ambientLight intensity={0.42} />
           <directionalLight
             position={[2.5, 4, 3]}
