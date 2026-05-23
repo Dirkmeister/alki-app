@@ -16,6 +16,11 @@ export const AVATURN_SUBDOMAIN = "demo";
 
 // We treat `demo` as enabled — it really is the free-tier path,
 // per Avaturn's own quickstart. Only an empty subdomain disables.
-export const AVATURN_ENABLED = AVATURN_SUBDOMAIN !== "";
+//
+// DISABLED (May 2026): the parametric HumGen 3D body replaced Avaturn as
+// the real avatar. Avaturn was the abandoned photoreal-head path. All
+// Avaturn code is kept intact for possible future face-capture use — set
+// this back to `AVATURN_SUBDOMAIN !== ""` to re-enable.
+export const AVATURN_ENABLED = false;
 
 export const AVATURN_URL = `https://${AVATURN_SUBDOMAIN}.avaturn.dev`;

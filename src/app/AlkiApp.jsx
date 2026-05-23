@@ -23,6 +23,20 @@ import { getStackVectors } from "./lib/compoundMorphVectors";
 // hero <Body3DAvatar debugPanel={SHOW_AVATAR_DEBUG} /> below.
 const SHOW_AVATAR_DEBUG = true;
 // ─────────────────────────────────────────────────────────────
+// Default 3D parametric body. This is the always-on avatar. "Reset"
+// returns to this (not null). Female mesh TBD (Phase 3) — same shape-key
+// vocabulary, will branch on profile.sex when available.
+const DEFAULT_AVATAR_URL = "/alki_humgen_male.glb";
+// ─────────────────────────────────────────────────────────────
+// Public site URL — used for auth redirect links (password reset) so the
+// email ALWAYS points at the deployed app, never localhost. Set
+// NEXT_PUBLIC_SITE_URL in Vercel project settings to the production URL
+// (e.g. https://alki.vercel.app). Falls back to current origin only if the
+// env var is missing, so local dev still functions.
+const SITE_URL =
+  (typeof process !== "undefined" && process.env && process.env.NEXT_PUBLIC_SITE_URL) ||
+  (typeof window !== "undefined" ? window.location.origin : "");
+// ─────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
 // The import above adds 63 compounds via `data/compounds-expanded.js`.
 // The original 8 compounds remain inline below, untouched.
@@ -2753,6 +2767,27 @@ function AuthScreen({ onAuth, onBack, onSkip }) {
     if (err) setError(err.message);
   };
 
+  // Send a password-reset email. Supabase mails a secure recovery link;
+  // clicking it returns the user to the app, where onAuthStateChange fires
+  // a PASSWORD_RECOVERY event and routes them to the set-new-password screen.
+  // NOTE: the redirectTo origin must be registered in Supabase dashboard →
+  // Authentication → URL Configuration → Redirect URLs (localhost for dev,
+  // the Vercel domain for production).
+  const handlePasswordReset = async () => {
+    setError(null);
+    setMessage(null);
+    if (!email) { setError("Enter your email above, then tap Send reset link."); return; }
+    setLoading(true);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: SITE_URL,
+    });
+    setLoading(false);
+    if (err) { setError(err.message); }
+    else {
+      setMessage("If an account exists for that email, a password reset link is on its way. Check your inbox (and spam).");
+    }
+  };
+
   return (
     <div style={S.inner}>
       <div style={{ padding: "16px 0 8px" }}>
@@ -2789,6 +2824,17 @@ function AuthScreen({ onAuth, onBack, onSkip }) {
         <div style={{ marginBottom: 16 }}>
           <label style={S.label}>Password</label>
           <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && mode === "signin" && handleSubmit()} />
+          {mode === "signin" && (
+            <div style={{ textAlign: "right", marginTop: 8 }}>
+              <button
+                onClick={handlePasswordReset}
+                disabled={loading}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline", textUnderlineOffset: 2 }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
         </div>
         {mode === "signup" && (
           <div style={{ marginBottom: 16 }}>
@@ -2823,6 +2869,74 @@ function AuthScreen({ onAuth, onBack, onSkip }) {
   );
 }
 
+// ── SET NEW PASSWORD (password recovery) ───────────────────
+// Shown after the user clicks the reset link in their email. By the time
+// this renders, Supabase has already established a temporary recovery
+// session (via the PASSWORD_RECOVERY auth event), so updateUser can set
+// the new password directly — no old password required.
+function SetNewPassword({ onDone }) {
+  const [password, setPassword] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [done, setDone] = useState(false);
+
+  const handleUpdate = async () => {
+    setError(null);
+    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (password !== confirmPw) { setError("Passwords don't match."); return; }
+    setLoading(true);
+    const { error: err } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (err) { setError(err.message); return; }
+    setDone(true);
+  };
+
+  return (
+    <div style={S.inner}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <h1 style={{ fontSize: 40, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(26,232,122,0.2)" }}>KI</span>
+          </h1>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 8 }}>
+            {done ? "Password updated." : "Set a new password."}
+          </p>
+        </div>
+
+        {error && (
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 13, color: "#fca5a5", marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
+        {done ? (
+          <>
+            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(26,232,122,0.1)", border: "1px solid rgba(26,232,122,0.2)", fontSize: 13, color: "#1ae87a", marginBottom: 20, lineHeight: 1.5 }}>
+              Your password has been changed. You can use it to sign in from now on.
+            </div>
+            <button onClick={onDone} style={S.btn}>Continue</button>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <label style={S.label}>New Password</label>
+              <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={S.input} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={S.label}>Confirm New Password</label>
+              <input type="password" placeholder="••••••••" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && handleUpdate()} />
+            </div>
+            <button onClick={handleUpdate} disabled={loading} style={{ ...S.btn, ...(loading ? S.btnDisabled : {}) }}>
+              {loading ? "Working..." : "Update Password"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── APP ROOT ───────────────────────────────────────────────
 export default function AlkiApp() {
   const [screen, setScreen] = useState(supabase ? "loading" : "splash");
@@ -2830,7 +2944,9 @@ export default function AlkiApp() {
   const [profile, setProfile] = useState(null);
   const [selectedCompounds, setSelectedCompounds] = useState([]);
   const [showTransform, setShowTransform] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(null);
+  // 3D parametric body is the default avatar (always on). Avaturn path is
+  // disabled (see handleCaptureAvatar / AVATURN_ENABLED) but kept for later.
+  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR_URL);
   const [avatarHeadshot, setAvatarHeadshot] = useState(null);
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
   const [progressLogs, setProgressLogs] = useState([]);
@@ -2854,13 +2970,25 @@ export default function AlkiApp() {
     if (!supabase) return;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // If the user arrived via a password-recovery link, the URL carries a
+      // recovery token and onAuthStateChange will fire PASSWORD_RECOVERY and
+      // route to the reset screen. Don't let the normal session routing below
+      // steal the screen out from under it.
+      const isRecovery = typeof window !== "undefined" &&
+        (window.location.hash.includes("type=recovery") ||
+         window.location.search.includes("type=recovery"));
+      if (isRecovery) {
+        setScreen("reset_password");
+        return;
+      }
       if (session?.user) {
         setUser(session.user);
         loadProfile(session.user.id).then(saved => {
           if (saved) {
             setProfile(saved.profile);
             setSelectedCompounds(saved.selectedCompounds || []);
-            if (saved.avatarUrl) setAvatarUrl(saved.avatarUrl);
+            // 3D default always on; only override if a saved avatar exists.
+            setAvatarUrl(saved.avatarUrl || DEFAULT_AVATAR_URL);
             setActiveProtocol(saved.activeProtocol || null);
             setEidolons(saved.eidolons || []);
             setActiveEidolonId(saved.activeEidolonId || null);
@@ -2882,12 +3010,16 @@ export default function AlkiApp() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (event === "SIGNED_OUT") {
+        if (event === "PASSWORD_RECOVERY") {
+          // User arrived via a password-reset email link. Supabase has set
+          // a temporary recovery session; route to the set-new-password screen.
+          setScreen("reset_password");
+        } else if (event === "SIGNED_OUT") {
           setUser(null);
           setProfile(null);
           setSelectedCompounds([]);
           setShowTransform(false);
-          setAvatarUrl(null);
+          setAvatarUrl(DEFAULT_AVATAR_URL);
           setScreen("splash");
         }
       }
@@ -2922,7 +3054,9 @@ export default function AlkiApp() {
   }, []);
 
   const handleResetAvatar = useCallback(() => {
-    setAvatarUrl(null);
+    // 3D body is always on, so "reset" returns to the default parametric
+    // body (not null, which would drop to the 2D SVG with no way back).
+    setAvatarUrl(DEFAULT_AVATAR_URL);
     setAvatarHeadshot(null);
     try {
       localStorage.removeItem("alki_avatar_url");
@@ -2936,7 +3070,7 @@ export default function AlkiApp() {
     setProfile(null);
     setSelectedCompounds([]);
     setShowTransform(false);
-    setAvatarUrl(null);
+    setAvatarUrl(DEFAULT_AVATAR_URL);
     setActiveProtocol(null);
     setScreen("splash");
   };
@@ -2947,7 +3081,8 @@ export default function AlkiApp() {
     if (saved) {
       setProfile(saved.profile);
       setSelectedCompounds(saved.selectedCompounds || []);
-      if (saved.avatarUrl) setAvatarUrl(saved.avatarUrl);
+      // 3D default always on; only override if a saved avatar exists.
+      setAvatarUrl(saved.avatarUrl || DEFAULT_AVATAR_URL);
       setActiveProtocol(saved.activeProtocol || null);
       setEidolons(saved.eidolons || []);
       setActiveEidolonId(saved.activeEidolonId || null);
@@ -2967,7 +3102,7 @@ export default function AlkiApp() {
 
   return (
     <div style={S.app}>
-      {showAvatarCapture && (
+      {AVATURN_ENABLED && showAvatarCapture && (
         <AvaturnCapture
           onAvatarCreated={handleAvatarCreated}
           onCancel={() => setShowAvatarCapture(false)}
@@ -2991,6 +3126,25 @@ export default function AlkiApp() {
           onAuth={handleAuthComplete}
           onBack={() => setScreen("agegate")}
           onSkip={() => setScreen("onboarding")}
+        />
+      )}
+      {screen === "reset_password" && (
+        <SetNewPassword
+          onDone={async () => {
+            // After setting a new password the user holds a valid session.
+            // Clear the recovery token from the URL, then route them in.
+            try {
+              if (typeof window !== "undefined" && window.history?.replaceState) {
+                window.history.replaceState(null, "", window.location.pathname);
+              }
+            } catch (_) {}
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+              await handleAuthComplete(session.user);
+            } else {
+              setScreen("auth");
+            }
+          }}
         />
       )}
       {screen === "onboarding" && (
