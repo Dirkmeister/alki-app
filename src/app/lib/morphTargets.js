@@ -64,7 +64,7 @@ export const MORPH_TARGETS = [
   {
     key: "muscle_overall",
     range: [0, 1],
-    default: 0.5,
+    default: 0.2,
     category: "muscle",
     notes: "Generic lean mass increase across the body. Apply uniformly if no regional shape keys fire."
   },
@@ -101,7 +101,14 @@ export const MORPH_TARGETS = [
     range: [0, 1],
     default: 0,
     category: "muscle",
-    notes: "Quad sweep + glute development + calf split. Increases thigh circumference and creates the outer-quad shelf."
+    notes: "Quad sweep + glute development. Increases thigh circumference and creates the outer-quad shelf. Does NOT include calves (see muscle_calves)."
+  },
+  {
+    key: "muscle_calves",
+    range: [0, 1],
+    default: 0,
+    category: "muscle",
+    notes: "Calf (gastrocnemius/soleus) circumference. Driven proportionally with muscle_legs so lower legs track quad/glute mass instead of staying thin."
   },
 
   // ── Definition (compositional, not strictly geometry) ──────────
@@ -158,6 +165,16 @@ export const MORPH_BY_KEY = Object.fromEntries(MORPH_TARGETS.map(m => [m.key, m]
 export function baselineMorphState(profile) {
   const state = Object.fromEntries(MORPH_TARGETS.map(m => [m.key, m.default]));
 
+  // DEBUG: force a pure-neutral body (every morph at 0). Confirmed the
+  // app-neutral matches the Blender neutral, so the pipeline is correct
+  // and all shaping comes from the weights below. Left here (off) as a
+  // quick A/B switch for future calibration.
+  const DEBUG_NEUTRAL = false;
+  if (DEBUG_NEUTRAL) {
+    for (const k of MORPH_KEYS) state[k] = 0;
+    return state;
+  }
+
   if (!profile) return state;
 
   const bf = parseFloat(profile.bodyFat) || 18;
@@ -168,7 +185,11 @@ export function baselineMorphState(profile) {
   // Maps BF% onto a bidirectional axis around the "neutral" ~18% mark.
   // <18% pushes bf_low; >18% pushes bf_high.
   if (bf < 18) {
-    state.bf_low = Math.min(1, (18 - bf) / 12);  // fully lean at 6% BF
+    // CALIBRATION: HumGen's "skinny" morph (bf_low) reads as UNDERWEIGHT,
+    // not lean-muscular — it caves the chest and strips mass. A 10% BF
+    // athlete is lean, not skinny, so we map gently and cap below gaunt.
+    // 10% BF -> ~0.39, 6% BF -> capped 0.55. (Was /12 -> 0.65 at 10%.)
+    state.bf_low = Math.min(0.55, (18 - bf) / 20);
     state.bf_high = 0;
   } else {
     state.bf_high = Math.min(1, (bf - 18) / 17); // fully high at 35% BF
@@ -204,10 +225,41 @@ export function baselineMorphState(profile) {
     }
   }
 
-  // ── Muscle baseline ──────────────────────────────────────────────
-  // Default by sex, refined by skeletal muscle % if provided.
-  state.muscle_overall = sex === "male" ? 0.45 : 0.30;
+  // ── Muscle baseline (frame-aware via FFMI) ───────────────────────
+  // A 140lb / 5'7" lean male and a 210lb / 6'2" lean male must NOT get
+  // the same muscle weight. We estimate fat-free mass index (FFMI)
+  // from weight + height + BF and map it onto HumGen's muscular morph.
+  //
+  // HumGen's "muscular" shape key at 1.0 is an extreme/enhanced
+  // physique, so we deliberately keep natural FFMIs (~17–25) in the
+  // lower half of the range, leaving headroom for compound projections
+  // to push the morph higher.
+  //
+  // FFMI reference: ~18 untrained, ~20 fit, ~22–23 very muscular
+  // natural, ~25 natural limit, >25 enhanced territory.
+  // TUNING: if the baseline body still looks too big/small, adjust the
+  // offsets below (raise offset = leaner baseline).
+  const M_OFFSET = sex === "female" ? 13.5 : 16.5;
+  const M_SPAN   = sex === "female" ? 15 : 16;
 
+  const weight = parseFloat(profile.weight); // lbs
+  const hFt = parseFloat(profile.heightFt);
+  const hIn = parseFloat(profile.heightIn);
+  let heightInches = NaN;
+  if (!isNaN(hFt)) heightInches = hFt * 12 + (isNaN(hIn) ? 0 : hIn);
+  else if (!isNaN(hIn)) heightInches = hIn; // some profiles store total inches
+
+  let muscleBaseline = sex === "male" ? 0.22 : 0.16; // fallback if frame unknown
+  if (!isNaN(weight) && !isNaN(heightInches) && heightInches > 0) {
+    const lbmLb = weight * (1 - bf / 100);   // lean body mass (lb)
+    const lbmKg = lbmLb / 2.2046;
+    const hM = heightInches * 0.0254;
+    const ffmi = lbmKg / (hM * hM);
+    muscleBaseline = (ffmi - M_OFFSET) / M_SPAN;
+  }
+  state.muscle_overall = Math.max(0, Math.min(1, muscleBaseline));
+
+  // Skeletal-muscle % (advanced InBody stat) overrides the estimate.
   const skelStat = parseFloat(adv.skelMuscle);
   if (!isNaN(skelStat) && skelStat > 0) {
     // Sex-adjusted: men 38–46% is normal-good, women 34–42%
@@ -216,17 +268,31 @@ export function baselineMorphState(profile) {
     state.muscle_overall = Math.max(0, Math.min(1, (skelStat - low) / (high - low)));
   }
 
+  // Direct lean-mass measurement amplifies regional defaults for very
+  // muscular users.
   const muscleMassLb = parseFloat(adv.muscleMass);
-  const weight = parseFloat(profile.weight);
   if (!isNaN(muscleMassLb) && !isNaN(weight) && weight > 0) {
     const musclePct = (muscleMassLb / weight) * 100;
-    // High muscle ratio amplifies overall muscle and regional defaults
     if (musclePct > 45) {
-      state.muscle_overall = Math.max(state.muscle_overall, 0.7);
-      state.muscle_shoulders = Math.max(state.muscle_shoulders, 0.4);
-      state.muscle_legs = Math.max(state.muscle_legs, 0.4);
+      state.muscle_overall = Math.max(state.muscle_overall, 0.55);
+      state.muscle_shoulders = Math.max(state.muscle_shoulders, 0.3);
+      state.muscle_legs = Math.max(state.muscle_legs, 0.3);
     }
   }
+
+  // PROPORTION FIX: HumGen's "muscular" morph (muscle_overall) is upper-body
+  // weighted — it broadens chest/shoulders/back but barely touches quads or
+  // glutes. Left alone, overall mass makes the upper body outgrow the lower
+  // body (exactly the "legs and butt look unproportionate" complaint).
+  // Drive muscle_legs from muscle_overall so the lower body keeps pace.
+  // 0.85 ratio: legs track slightly behind upper mass, which reads natural.
+  state.muscle_legs = Math.max(state.muscle_legs, state.muscle_overall * 0.85);
+
+  // CALF FIX: HumGen's quad/glute morph leaves the calves at neutral, so big
+  // quads end up over thin lower legs ("quadfather with chicken legs").
+  // Drive calves from leg mass so the lower leg tracks the thigh. 0.9 ratio:
+  // calves a touch behind quads, which is how most physiques actually look.
+  state.muscle_calves = Math.max(state.muscle_calves, state.muscle_legs * 0.9);
 
   // ── Definition (computed, not direct input) ──────────────────────
   // Abs are only visible at low BF AND with some muscle. This formula

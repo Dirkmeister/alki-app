@@ -1,9 +1,9 @@
 "use client";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, ContactShadows, useGLTF } from "@react-three/drei";
-import { useRef, Suspense, useMemo, useEffect } from "react";
+import { useRef, Suspense, useMemo, useEffect, useState } from "react";
 import * as THREE from "three";
-import { MORPH_KEYS } from "./lib/morphTargets";
+import { MORPH_KEYS, MORPH_TARGETS } from "./lib/morphTargets";
 
 /**
  * Body3DAvatar — GLB renderer with shape-key morphing.
@@ -143,10 +143,21 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
   }, [cloned, fat, muscle, useShapeKeys]);
 
   // ── Apply material adjustments (both modes) ──────────────────────
+  // IMPORTANT: HumGen's GLB export slots its textures wrong — the
+  // freckles overlay lands in baseColorTexture and the real skin
+  // albedo isn't exported at all, which renders the body near-black
+  // with red blotches. Rather than depend on those broken maps, we
+  // strip every texture/vertex-color channel off the skin material
+  // and drive a clean, fully-controlled MeshStandard look. This also
+  // means the 29MB of skin textures in the GLB are unused and can be
+  // stripped from the file entirely (huge win for mobile load).
+  const ALKI_SKIN_BASE = "#c89c79"; // warm neutral mid-tone, reads well on dark UI
+  const ALKI_SKIN_TAN  = "#9a6440"; // Melanotan II target
+
   useEffect(() => {
     if (!cloned) return;
     const skinToneShift = morphState?.skin_tone_shift ?? 0;
-    const skinQuality = morphState?.skin_quality ?? 0;
+    const skinQuality   = morphState?.skin_quality ?? 0;
 
     cloned.traverse((obj) => {
       if (!obj.isMesh || !obj.material) return;
@@ -154,46 +165,47 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
       const isSkin = !["hair", "eye", "teeth", "tongue", "cloth", "shirt", "pant", "short"]
         .some(k => lower.includes(k));
 
-      // One-time tune: roughness, metalness, optional emissive for glow
-      if (!obj.userData._alkiTunedBase) {
-        if (obj.material.roughness !== undefined) {
-          obj.material.roughness = Math.min(1, (obj.material.roughness ?? 0.7) + 0.05);
-          obj.material.metalness = 0;
+      // One-time: neutralize HumGen's broken material channels on skin.
+      // Null out every map slot (PBR + Physical extensions) and disable
+      // vertex colors so nothing darkens or red-tints the body.
+      if (isSkin && !obj.userData._alkiSkinCleaned) {
+        const mapSlots = [
+          "map", "normalMap", "roughnessMap", "metalnessMap", "aoMap",
+          "specularMap", "specularIntensityMap", "specularColorMap",
+          "clearcoatMap", "clearcoatRoughnessMap", "clearcoatNormalMap",
+          "sheenColorMap", "sheenRoughnessMap", "emissiveMap", "bumpMap"
+        ];
+        for (const slot of mapSlots) {
+          if (obj.material[slot] !== undefined) obj.material[slot] = null;
         }
-        obj.userData._alkiTunedBase = true;
+        if ("vertexColors" in obj.material) obj.material.vertexColors = false;
+        if ("clearcoat" in obj.material) obj.material.clearcoat = 0;
+        if ("sheen" in obj.material) obj.material.sheen = 0;
+        if (obj.material.metalness !== undefined) obj.material.metalness = 0;
+        obj.userData._alkiSkinCleaned = true;
       }
 
       // Glow overlay (projected state)
       if (glow && obj.material.emissive) {
         obj.material.emissive = new THREE.Color("#0e4a2a");
-        obj.material.emissiveIntensity = 0.18;
+        obj.material.emissiveIntensity = 0.22;
       } else if (obj.material.emissive) {
         obj.material.emissiveIntensity = 0;
       }
 
-      // Skin material modulation (skin meshes only)
+      // Clean, controlled skin look (skin meshes only)
       if (isSkin && obj.material.color) {
-        // Cache the original color the first time we touch it
-        if (!obj.userData._alkiOrigColor) {
-          obj.userData._alkiOrigColor = obj.material.color.clone();
-        }
-        const orig = obj.userData._alkiOrigColor;
-
-        // Melanotan II: shift skin tone darker/warmer
+        // Base tone, warmed/darkened by Melanotan II
+        const base = new THREE.Color(ALKI_SKIN_BASE);
         if (skinToneShift > 0) {
-          const tanColor = new THREE.Color("#a8693d");
-          obj.material.color.copy(orig).lerp(tanColor, skinToneShift * 0.4);
-        } else {
-          obj.material.color.copy(orig);
+          const tan = new THREE.Color(ALKI_SKIN_TAN);
+          base.lerp(tan, Math.min(1, skinToneShift) * 0.55);
         }
+        obj.material.color.copy(base);
 
-        // GHK-Cu: smoother skin = lower roughness, slight luminosity
-        if (skinQuality > 0 && obj.material.roughness !== undefined) {
-          if (obj.userData._alkiOrigRoughness === undefined) {
-            obj.userData._alkiOrigRoughness = obj.material.roughness;
-          }
-          const orig_r = obj.userData._alkiOrigRoughness;
-          obj.material.roughness = Math.max(0.25, orig_r - skinQuality * 0.25);
+        // Baseline slightly glossy skin; GHK-Cu smooths it further
+        if (obj.material.roughness !== undefined) {
+          obj.material.roughness = Math.max(0.32, 0.7 - skinQuality * 0.3);
         }
       }
 
@@ -227,15 +239,33 @@ export default function Body3DAvatar({
   size = "large",       // "small" | "large"
   interactive = true,
   autoRotate = true,
+  debugPanel = false,   // TEMP: show live morph-weight sliders for calibration
 }) {
   const isSmall = size === "small";
   const camPos = isSmall ? [0, 1.55, 3.0] : [0, 0.95, 3.6];
   const camFov = isSmall ? 15 : 30;
   const targetY = isSmall ? 1.55 : 0.95;
 
+  // ── Live calibration override (debug panel only) ────────────────
+  // When the panel is on, we seed a local copy of the incoming
+  // morphState and let the user scrub each weight live. null = use
+  // the app-computed baseline untouched.
+  const [override, setOverride] = useState(null);
+  useEffect(() => {
+    if (debugPanel && override === null && params?.morphState) {
+      setOverride({ ...params.morphState });
+    }
+  }, [debugPanel, params, override]);
+
+  const effectiveParams =
+    debugPanel && override ? { ...params, morphState: override } : params;
+
   const wrapStyle = isSmall
     ? { width: "100%", aspectRatio: "1 / 1.2", maxWidth: 110 }
     : { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 200 };
+
+  const setKey = (k, v) =>
+    setOverride(prev => ({ ...(prev || {}), [k]: v }));
 
   return (
     <div style={{ textAlign: "center" }}>
@@ -263,7 +293,7 @@ export default function Body3DAvatar({
           )}
 
           <Suspense fallback={null}>
-            <GLBAvatar url={avatarUrl} params={params} glow={glow} autoRotate={autoRotate} />
+            <GLBAvatar url={avatarUrl} params={effectiveParams} glow={glow} autoRotate={autoRotate} />
             {!isSmall && (
               <ContactShadows
                 position={[0, 0, 0]}
@@ -303,6 +333,97 @@ export default function Body3DAvatar({
           {label}
         </div>
       )}
+
+      {debugPanel && override && (
+        <MorphDebugPanel
+          override={override}
+          setKey={setKey}
+          onReset={() => setOverride({ ...params.morphState })}
+          onZero={() =>
+            setOverride(Object.fromEntries(MORPH_KEYS.map(k => [k, 0])))
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+// ── TEMP calibration panel ─────────────────────────────────────────
+// Live sliders for every morph weight. Fixed to the right edge so it
+// doesn't disturb the Modeler layout. Read the JSON at the bottom and
+// paste it back to bake the values into baselineMorphState().
+function MorphDebugPanel({ override, setKey, onReset, onZero }) {
+  const geom = MORPH_TARGETS.filter(m => m.category !== "material");
+  const mat = MORPH_TARGETS.filter(m => m.category === "material");
+  const fmt = v => (typeof v === "number" ? v.toFixed(2) : "0.00");
+  const json = JSON.stringify(
+    Object.fromEntries(MORPH_KEYS.map(k => [k, +(override[k] || 0).toFixed(3)]))
+  );
+
+  const row = (m) => (
+    <div key={m.key} style={{ marginBottom: 8, textAlign: "left" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.85)", fontFamily: "monospace" }}>
+        <span>{m.key}</span>
+        <span style={{ color: "#22d68a" }}>{fmt(override[m.key])}</span>
+      </div>
+      <input
+        type="range"
+        min={m.range?.[0] ?? 0}
+        max={m.range?.[1] ?? 1}
+        step={0.01}
+        value={override[m.key] || 0}
+        onChange={e => setKey(m.key, parseFloat(e.target.value))}
+        style={{ width: "100%", accentColor: "#22d68a", height: 14 }}
+      />
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 64,
+        right: 12,
+        width: 230,
+        maxHeight: "82vh",
+        overflowY: "auto",
+        background: "rgba(12,12,12,0.94)",
+        border: "1px solid #22d68a",
+        borderRadius: 10,
+        padding: 12,
+        zIndex: 9999,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#22d68a", letterSpacing: "0.06em", marginBottom: 8 }}>
+        MORPH CALIBRATION
+      </div>
+      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 10, lineHeight: 1.4 }}>
+        Drag to find proportions that look right, then paste the JSON below back to Claude.
+      </div>
+      {geom.map(row)}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.12)", margin: "8px 0" }} />
+      {mat.map(row)}
+      <div style={{ display: "flex", gap: 6, margin: "10px 0" }}>
+        <button
+          onClick={onReset}
+          style={{ flex: 1, fontSize: 10, padding: "6px 4px", background: "#1a1a1a", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, cursor: "pointer" }}
+        >
+          Reset baseline
+        </button>
+        <button
+          onClick={onZero}
+          style={{ flex: 1, fontSize: 10, padding: "6px 4px", background: "#1a1a1a", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, cursor: "pointer" }}
+        >
+          Zero all
+        </button>
+      </div>
+      <textarea
+        readOnly
+        value={json}
+        onFocus={e => e.target.select()}
+        style={{ width: "100%", height: 70, fontSize: 9, fontFamily: "monospace", background: "#000", color: "#22d68a", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, padding: 6, resize: "vertical" }}
+      />
     </div>
   );
 }

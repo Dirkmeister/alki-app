@@ -15,6 +15,14 @@ import { getCultivationState, getCultivationVisuals, getRegressionFactor } from 
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
 import { getStackVectors } from "./lib/compoundMorphVectors";
+
+// ─── TEMP: avatar morph calibration panel ────────────────────────────
+// Set to true to show the live morph-weight sliders on the home hero
+// avatar (for tuning the 3D body). Set to false to remove everywhere.
+// TO REMOVE COMPLETELY: delete this line + the one usage at the home
+// hero <Body3DAvatar debugPanel={SHOW_AVATAR_DEBUG} /> below.
+const SHOW_AVATAR_DEBUG = true;
+// ─────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
 // The import above adds 63 compounds via `data/compounds-expanded.js`.
 // The original 8 compounds remain inline below, untouched.
@@ -2265,6 +2273,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                   label=""
                   size="large"
                   interactive={true}
+                  debugPanel={SHOW_AVATAR_DEBUG}
                 />
               ) : (
                 <BodyAvatar
@@ -2851,7 +2860,7 @@ export default function AlkiApp() {
           if (saved) {
             setProfile(saved.profile);
             setSelectedCompounds(saved.selectedCompounds || []);
-            setAvatarUrl(saved.avatarUrl || null);
+            if (saved.avatarUrl) setAvatarUrl(saved.avatarUrl);
             setActiveProtocol(saved.activeProtocol || null);
             setEidolons(saved.eidolons || []);
             setActiveEidolonId(saved.activeEidolonId || null);
@@ -2938,7 +2947,7 @@ export default function AlkiApp() {
     if (saved) {
       setProfile(saved.profile);
       setSelectedCompounds(saved.selectedCompounds || []);
-      setAvatarUrl(saved.avatarUrl || null);
+      if (saved.avatarUrl) setAvatarUrl(saved.avatarUrl);
       setActiveProtocol(saved.activeProtocol || null);
       setEidolons(saved.eidolons || []);
       setActiveEidolonId(saved.activeEidolonId || null);
