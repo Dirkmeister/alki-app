@@ -3394,6 +3394,7 @@ export default function AlkiApp() {
       {screen === "timeline" && (
         <CycleTimeline
           stack={selectedCompounds}
+          compoundCatalog={COMPOUNDS}
           initialCycleLength={12}
           onBack={() => setScreen("dashboard")}
         />

@@ -265,7 +265,7 @@ function normalizeStack(stack) {
 
 function calculateSuppressionLevel(stack) {
   const levels = stack
-    .map(c => CYCLE_PROFILES[c.id]?.suppressionLevel)
+    .map(c => c.suppressionLevel || CYCLE_PROFILES[c.id]?.suppressionLevel)
     .filter(Boolean);
   if (levels.includes("high") || levels.includes("complete")) return "high";
   if (levels.includes("moderate")) return "moderate";
@@ -297,15 +297,29 @@ function getPhaseForCompoundWeek(profile, weekNumber, compoundEndWeek) {
   return "active";
 }
 
-function buildTimeline(rawStack, cycleLength) {
+function buildTimeline(rawStack, cycleLength, compoundCatalog) {
   const stack = normalizeStack(rawStack);
-  const suppressionLevel = calculateSuppressionLevel(stack);
+
+  // Resolve profiles: use CYCLE_PROFILES if available, otherwise generate from catalog
+  const resolveProfile = (id) => {
+    if (CYCLE_PROFILES[id]) return CYCLE_PROFILES[id];
+    if (compoundCatalog) {
+      const catalogEntry = compoundCatalog.find(c => c.id === id);
+      if (catalogEntry) return generateFallbackProfile(catalogEntry);
+    }
+    return null;
+  };
+
+  const suppressionLevel = calculateSuppressionLevel(stack.map(item => {
+    const p = resolveProfile(item.id);
+    return p ? { ...item, _profile: p } : item;
+  }).filter(i => i._profile).map(i => ({ id: i.id, suppressionLevel: i._profile.suppressionLevel })));
   const pct = PCT_PROTOCOLS[suppressionLevel === "none" ? "mild" : suppressionLevel];
 
   // Per-compound cycle end
   const compoundEnds = {};
   for (const item of stack) {
-    const p = CYCLE_PROFILES[item.id];
+    const p = resolveProfile(item.id);
     if (!p) continue;
     if (p.extendsToCycleLength || p.standardCycleWeeks === 0) {
       compoundEnds[item.id] = cycleLength;
@@ -367,7 +381,7 @@ function buildTimeline(rawStack, cycleLength) {
     const asNeeded = [];
 
     for (const item of stack) {
-      const profile = CYCLE_PROFILES[item.id];
+      const profile = resolveProfile(item.id);
       if (!profile) continue;
       const endWeek = compoundEnds[item.id];
       let active = false;
@@ -433,7 +447,7 @@ function buildTimeline(rawStack, cycleLength) {
 
   // Compound lanes (overview viz)
   const lanes = stack.map(item => {
-    const profile = CYCLE_PROFILES[item.id];
+    const profile = resolveProfile(item.id);
     if (!profile) return null;
     const endWeek = compoundEnds[item.id];
     const segments = [];
@@ -1140,6 +1154,7 @@ function SectionLabel({ children, style = {} }) {
 
 export default function CycleTimeline({
   stack = [],
+  compoundCatalog = [],
   initialCycleLength = 8,
   minCycleLength = 4,
   maxCycleLength = 24,
@@ -1149,8 +1164,8 @@ export default function CycleTimeline({
   const [selectedWeek, setSelectedWeek] = useState(1);
 
   const timeline = useMemo(
-    () => buildTimeline(stack, cycleLength),
-    [stack, cycleLength]
+    () => buildTimeline(stack, cycleLength, compoundCatalog),
+    [stack, cycleLength, compoundCatalog]
   );
 
   // Clamp selectedWeek if cycleLength shrinks
@@ -1409,3 +1424,66 @@ export default function CycleTimeline({
 // ============================================================
 
 export { CYCLE_PROFILES, PCT_PROTOCOLS, buildTimeline, calculateSuppressionLevel };
+
+// ============================================================
+// FALLBACK PROFILE GENERATOR
+// ============================================================
+// Generates a usable cycle profile from the compound catalog
+// entry when CYCLE_PROFILES doesn't have a manual entry.
+
+function generateFallbackProfile(compound) {
+  if (!compound) return null;
+  const c = compound;
+
+  // Parse cycle length from the cycle string (e.g. "4–6 weeks on, 2 weeks off" → 6)
+  let standardWeeks = 12;
+  if (c.cycle) {
+    const m = c.cycle.match(/(\d+)\s*(?:–|-|to)\s*(\d+)\s*week/i) || c.cycle.match(/(\d+)\s*week/i);
+    if (m) standardWeeks = parseInt(m[2] || m[1]) || 12;
+    if (/ongoing|indefinite|as needed/i.test(c.cycle)) standardWeeks = 0;
+  }
+
+  // Detect frequency from dosing string
+  let frequency = "daily";
+  let days = undefined;
+  let timing = "AM";
+  if (c.dosing) {
+    if (/weekly|once.?week/i.test(c.dosing)) { frequency = "weekly"; days = [0]; }
+    else if (/2x.?week|twice.?week/i.test(c.dosing)) { frequency = "2x-week"; days = [1, 4]; }
+    else if (/as.?needed|prn/i.test(c.dosing)) { frequency = "as-needed"; }
+    else if (/5.?on|weekday/i.test(c.dosing)) { frequency = "5-on-2-off"; days = [1, 2, 3, 4, 5]; }
+  }
+
+  // Timing heuristic
+  if (c.category === "Growth Hormone" || /sleep|bed|pm|evening/i.test(c.dosing || "")) timing = "PM";
+  if (/as.?needed/i.test(c.dosing || "")) timing = "As needed";
+
+  // Parse dose
+  let doseStr = c.dosing || "per protocol";
+  const doseMatch = doseStr.match(/([\d.,\/]+\s*(?:mcg|mg|iu|ml))/i);
+  const doseAmount = doseMatch ? doseMatch[1] : doseStr.split(",")[0].trim();
+
+  // Suppression heuristic
+  let suppressionLevel = "none";
+  if (c.category === "SARM") suppressionLevel = "moderate";
+  if (c.category === "Hormonal") suppressionLevel = "high";
+
+  return {
+    id: c.id,
+    name: c.name,
+    category: c.category || "Other",
+    dose: { amount: doseAmount, unit: "" },
+    route: c.route || "SubQ",
+    timing,
+    frequency,
+    days,
+    suppressionLevel,
+    rampUpWeeks: 0,
+    taperWeeks: 0,
+    runsThroughPCT: false,
+    extendsToCycleLength: standardWeeks === 0,
+    standardCycleWeeks: standardWeeks,
+    note: c.tagline || "",
+    _generated: true,
+  };
+}

@@ -83,7 +83,9 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
         .then(({ data, error }) => {
           if (!error && data) {
             setLogs(data);
-            if (onLogsChanged) onLogsChanged(data);
+            // Don't call onLogsChanged here — the App root holds the
+            // FULL log set (all eidolons). Overwriting it with a filtered
+            // subset breaks cultivation state for other eidolons.
           }
           setLoading(false);
         });
@@ -93,7 +95,7 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
         const all = JSON.parse(localStorage.getItem("alki_progress_logs") || "[]");
         const filtered = eidolonId ? all.filter(l => l.eidolon_id === eidolonId) : all;
         setLogs(filtered);
-        if (onLogsChanged && filtered.length) onLogsChanged(filtered);
+        // Don't push filtered subset to parent — same reason as Supabase path
       } catch (_) {}
       setLoading(false);
     }
@@ -150,7 +152,8 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
     if (saved) {
       const updated = [entry, ...logs];
       setLogs(updated);
-      if (onLogsChanged) onLogsChanged(updated);
+      // Push only the new entry to the parent's full log set (functional update)
+      if (onLogsChanged) onLogsChanged(prev => [entry, ...(prev || [])]);
       setShowForm(false);
       setNotes("");
     } else {
