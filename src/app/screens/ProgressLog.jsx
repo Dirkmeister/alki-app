@@ -55,6 +55,7 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState,
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
   // Form state
@@ -69,27 +70,37 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState,
 
   // Load logs on mount
   useEffect(() => {
-    if (!supabase || !userId) { setLoading(false); return; }
-    supabase
-      .from("progress_logs")
-      .select("*")
-      .eq("user_id", userId)
-      .order("logged_at", { ascending: false })
-      .limit(50)
-      .then(({ data, error }) => {
-        if (!error && data) {
-          setLogs(data);
-          if (onLogsChanged) onLogsChanged(data);
-        }
-        setLoading(false);
-      });
+    // Try Supabase first, fall back to localStorage
+    if (supabase && userId) {
+      supabase
+        .from("progress_logs")
+        .select("*")
+        .eq("user_id", userId)
+        .order("logged_at", { ascending: false })
+        .limit(50)
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setLogs(data);
+            if (onLogsChanged) onLogsChanged(data);
+          }
+          setLoading(false);
+        });
+    } else {
+      // Anonymous / baseline — load from localStorage
+      try {
+        const local = JSON.parse(localStorage.getItem("alki_progress_logs") || "[]");
+        setLogs(local);
+        if (onLogsChanged && local.length) onLogsChanged(local);
+      } catch (_) {}
+      setLoading(false);
+    }
   }, [userId]);
 
   const handleSave = async () => {
-    if (!supabase || !userId) return;
     setSaving(true);
     const entry = {
-      user_id: userId,
+      id: 'local_' + Date.now(),
+      user_id: userId || 'anonymous',
       logged_at: new Date().toISOString(),
       weight: parseFloat(weight) || null,
       body_fat: parseFloat(bodyFat) || null,
@@ -98,18 +109,48 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState,
       sleep_quality: sleepQuality,
       notes: notes.trim() || null
     };
-    const { data, error } = await supabase
-      .from("progress_logs")
-      .insert(entry)
-      .select()
-      .single();
+
+    let saved = false;
+
+    // Path 1: Supabase (authenticated user)
+    if (supabase && userId) {
+      try {
+        const { id: _, ...supaEntry } = entry; // strip local id
+        const { data, error } = await supabase
+          .from("progress_logs")
+          .insert(supaEntry)
+          .select()
+          .single();
+        if (!error && data) {
+          entry.id = data.id; // use Supabase-generated id
+          saved = true;
+        } else {
+          console.error("Progress log save error:", error);
+        }
+      } catch (e) {
+        console.error("Progress log save error:", e);
+      }
+    }
+
+    // Path 2: localStorage fallback (anonymous / baseline / offline)
+    if (!saved) {
+      try {
+        const existing = JSON.parse(localStorage.getItem("alki_progress_logs") || "[]");
+        existing.unshift(entry);
+        localStorage.setItem("alki_progress_logs", JSON.stringify(existing.slice(0, 100)));
+        saved = true;
+      } catch (_) {}
+    }
+
     setSaving(false);
-    if (!error && data) {
-      const updated = [data, ...logs];
+    if (saved) {
+      const updated = [entry, ...logs];
       setLogs(updated);
       if (onLogsChanged) onLogsChanged(updated);
       setShowForm(false);
       setNotes("");
+    } else {
+      setSaveError("Failed to save — try again.");
     }
   };
 
@@ -237,19 +278,24 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState,
 
           <div style={{ display: "flex", gap: 10 }}>
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); setSaveError(null); }}
               style={{ ...S.btnOutline, flex: 1, padding: "12px 16px", fontSize: 14 }}
             >
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => { setSaveError(null); handleSave(); }}
               disabled={!canSave || saving}
               style={{ ...S.btn, flex: 2, padding: "12px 16px", fontSize: 14, ...(!canSave || saving ? S.btnDisabled : {}) }}
             >
               {saving ? "Saving..." : "Log Progress"}
             </button>
           </div>
+          {saveError && (
+            <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 12, color: "#fca5a5" }}>
+              {saveError}
+            </div>
+          )}
         </div>
       )}
 
