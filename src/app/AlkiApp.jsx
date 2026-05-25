@@ -2758,9 +2758,22 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    try { return localStorage.getItem("alki_remember_email") ? true : false; } catch(_) { return false; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+
+  // Pre-fill email from localStorage if "Remember me" was checked
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("alki_remember_email");
+      if (saved) setEmail(saved);
+    } catch(_) {}
+  }, []);
 
   const handleSubmit = async () => {
     setError(null);
@@ -2771,6 +2784,11 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
       if (password !== confirmPw) { setError("Passwords don't match."); return; }
     }
     setLoading(true);
+    // Persist or clear remembered email
+    try {
+      if (rememberMe && email) localStorage.setItem("alki_remember_email", email);
+      else localStorage.removeItem("alki_remember_email");
+    } catch(_) {}
     if (mode === "signin") {
       const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
@@ -2850,9 +2868,22 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
           <label style={S.label}>Email</label>
           <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
         </div>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, position: "relative" }}>
           <label style={S.label}>Password</label>
-          <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && mode === "signin" && handleSubmit()} />
+          <input type={showPw ? "text" : "password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={{ ...S.input, paddingRight: 48 }} onKeyDown={e => e.key === "Enter" && mode === "signin" && handleSubmit()} />
+          <button
+            type="button"
+            onClick={() => setShowPw(v => !v)}
+            style={{
+              position: "absolute", right: 14, top: 34, background: "none", border: "none",
+              color: showPw ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.25)",
+              fontSize: 16, cursor: "pointer", padding: "4px", lineHeight: 1,
+            }}
+            tabIndex={-1}
+            title={showPw ? "Hide password" : "Show password"}
+          >
+            {showPw ? "👁" : "👁‍🗨"}
+          </button>
           {mode === "signin" && (
             <div style={{ textAlign: "right", marginTop: 8 }}>
               <button
@@ -2866,10 +2897,46 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
           )}
         </div>
         {mode === "signup" && (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 16, position: "relative" }}>
             <label style={S.label}>Confirm Password</label>
-            <input type="password" placeholder="••••••••" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={S.input} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+            <input type={showConfirmPw ? "text" : "password"} placeholder="••••••••" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ ...S.input, paddingRight: 48 }} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPw(v => !v)}
+              style={{
+                position: "absolute", right: 14, top: 34, background: "none", border: "none",
+                color: showConfirmPw ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.25)",
+                fontSize: 16, cursor: "pointer", padding: "4px", lineHeight: 1,
+              }}
+              tabIndex={-1}
+              title={showConfirmPw ? "Hide password" : "Show password"}
+            >
+              {showConfirmPw ? "👁" : "👁‍🗨"}
+            </button>
           </div>
+        )}
+
+        {/* Remember me */}
+        {mode === "signin" && (
+          <label style={{
+            display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
+            cursor: "pointer", fontSize: 13, color: "rgba(255,255,255,0.45)",
+            userSelect: "none",
+          }}>
+            <div
+              onClick={() => setRememberMe(v => !v)}
+              style={{
+                width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                background: rememberMe ? S.accent : "rgba(255,255,255,0.06)",
+                border: `1.5px solid ${rememberMe ? S.accent : "rgba(255,255,255,0.15)"}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s ease", cursor: "pointer",
+              }}
+            >
+              {rememberMe && <span style={{ color: "#060608", fontSize: 12, fontWeight: 800, lineHeight: 1 }}>✓</span>}
+            </div>
+            <span onClick={() => setRememberMe(v => !v)}>Remember me</span>
+          </label>
         )}
 
         <button onClick={handleSubmit} disabled={loading} style={{ ...S.btn, ...(loading ? S.btnDisabled : {}), marginBottom: 20 }}>
