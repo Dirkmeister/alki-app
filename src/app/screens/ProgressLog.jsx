@@ -51,7 +51,7 @@ function ScoreInput({ label, value, onChange, icon }) {
   );
 }
 
-export default function ProgressLog({ onBack, userId, profile, cultivationState, onLogsChanged }) {
+export default function ProgressLog({ onBack, userId, eidolonId, profile, cultivationState, onLogsChanged }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,10 +72,12 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState,
   useEffect(() => {
     // Try Supabase first, fall back to localStorage
     if (supabase && userId) {
-      supabase
+      let query = supabase
         .from("progress_logs")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId);
+      if (eidolonId) query = query.eq("eidolon_id", eidolonId);
+      query
         .order("logged_at", { ascending: false })
         .limit(50)
         .then(({ data, error }) => {
@@ -86,21 +88,23 @@ export default function ProgressLog({ onBack, userId, profile, cultivationState,
           setLoading(false);
         });
     } else {
-      // Anonymous / baseline — load from localStorage
+      // Anonymous / baseline — load from localStorage, filtered by eidolon
       try {
-        const local = JSON.parse(localStorage.getItem("alki_progress_logs") || "[]");
-        setLogs(local);
-        if (onLogsChanged && local.length) onLogsChanged(local);
+        const all = JSON.parse(localStorage.getItem("alki_progress_logs") || "[]");
+        const filtered = eidolonId ? all.filter(l => l.eidolon_id === eidolonId) : all;
+        setLogs(filtered);
+        if (onLogsChanged && filtered.length) onLogsChanged(filtered);
       } catch (_) {}
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, eidolonId]);
 
   const handleSave = async () => {
     setSaving(true);
     const entry = {
       id: 'local_' + Date.now(),
       user_id: userId || 'anonymous',
+      eidolon_id: eidolonId || null,
       logged_at: new Date().toISOString(),
       weight: parseFloat(weight) || null,
       body_fat: parseFloat(bodyFat) || null,

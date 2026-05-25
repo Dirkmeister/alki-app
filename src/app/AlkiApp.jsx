@@ -3202,7 +3202,12 @@ export default function AlkiApp() {
     return () => clearTimeout(saveTimeout.current);
   }, [user, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId]);
 
-  const cultivationState = useMemo(() => getCultivationState(progressLogs), [progressLogs]);
+  const cultivationState = useMemo(() => {
+    // Filter progress logs to the active eidolon for cultivation state
+    if (!activeEidolonId || !progressLogs.length) return getCultivationState(progressLogs);
+    const eidolonLogs = progressLogs.filter(l => l.eidolon_id === activeEidolonId || !l.eidolon_id);
+    return getCultivationState(eidolonLogs);
+  }, [progressLogs, activeEidolonId]);
 
   const handleAvatarCreated = useCallback((url, headshotDataUrl) => {
     setAvatarUrl(url);
@@ -3377,6 +3382,7 @@ export default function AlkiApp() {
         <ProgressLog
           onBack={() => setScreen("dashboard")}
           userId={user?.id}
+          eidolonId={activeEidolonId}
           profile={profile}
           cultivationState={cultivationState}
           onLogsChanged={setProgressLogs}
