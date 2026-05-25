@@ -10,18 +10,28 @@ import AvaturnCapture from "./AvaturnCapture";
 import { AVATURN_ENABLED } from "./avaturnConfig";
 import PeptideModeler from "./PeptideModeler";
 import ProgressLog from "./screens/ProgressLog";
-import Home from "./screens/Home";
-import { getCultivationState, getCultivationVisuals, getRegressionFactor } from "./lib/cultivation";
+import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
 import { getStackVectors } from "./lib/compoundMorphVectors";
 
-// ─── TEMP: avatar morph calibration panel ────────────────────────────
-// Set to true to show the live morph-weight sliders on the home hero
-// avatar (for tuning the 3D body). Set to false to remove everywhere.
-// TO REMOVE COMPLETELY: delete this line + the one usage at the home
-// hero <Body3DAvatar debugPanel={SHOW_AVATAR_DEBUG} /> below.
-const SHOW_AVATAR_DEBUG = true;
+// ─── DEV TOOLS ────────────────────────────────────────────────────────
+// Avatar morph calibration panel. Toggled via:
+//   • URL param:  ?debug   (enables & persists)   ?debug=0  (disables)
+//   • Console:    localStorage.setItem('alki_dev', '1')  then reload
+// Hidden from end users by default.
+function getDevMode() {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('debug')) {
+    const val = params.get('debug');
+    if (val === '0' || val === 'false') { try { localStorage.removeItem('alki_dev'); } catch(_){} return false; }
+    try { localStorage.setItem('alki_dev', '1'); } catch(_){}
+    return true;
+  }
+  try { return localStorage.getItem('alki_dev') === '1'; } catch(_) { return false; }
+}
+const SHOW_AVATAR_DEBUG = getDevMode();
 // ─────────────────────────────────────────────────────────────
 // Default 3D parametric body. This is the always-on avatar. "Reset"
 // returns to this (not null). Female mesh TBD (Phase 3) — same shape-key
