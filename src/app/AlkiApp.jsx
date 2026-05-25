@@ -14,6 +14,7 @@ import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
 import { getStackVectors } from "./lib/compoundMorphVectors";
+import FeedbackFAB from "./FeedbackFAB";
 
 // ─── DEV TOOLS ────────────────────────────────────────────────────────
 // Avatar morph calibration panel. Toggled via:
@@ -3228,6 +3229,11 @@ export default function AlkiApp() {
           compoundCatalog={COMPOUNDS}
           onBack={() => setScreen("dashboard")}
         />
+      )}
+
+      {/* Dev/testing feedback button — visible on all screens past splash */}
+      {screen !== "loading" && (
+        <FeedbackFAB currentScreen={screen} userEmail={user?.email || null} />
       )}
     </div>
   );
