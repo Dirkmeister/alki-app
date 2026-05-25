@@ -2117,8 +2117,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               // Cancel modify — restore the locked protocol's compounds
               setSelectedCompounds(activeProtocol.compounds || []);
               setEditing(false);
-            }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              ← Home
+            }} style={{ background: "none", border: "none", color: "rgba(239,68,68,0.6)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Discard Changes
             </button>
           )}
           <button onClick={() => setShowGoalsEditor(v => !v)} style={{ background: "none", border: "none", color: showGoalsEditor ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
