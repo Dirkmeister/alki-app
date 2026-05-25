@@ -16,23 +16,6 @@ import { resolveMorphStates } from "./lib/morphTargets";
 import { getStackVectors } from "./lib/compoundMorphVectors";
 import FeedbackFAB from "./FeedbackFAB";
 
-// ─── DEV TOOLS ────────────────────────────────────────────────────────
-// Avatar morph calibration panel. Toggled via:
-//   • URL param:  ?debug   (enables & persists)   ?debug=0  (disables)
-//   • Console:    localStorage.setItem('alki_dev', '1')  then reload
-// Hidden from end users by default.
-function getDevMode() {
-  if (typeof window === 'undefined') return false;
-  const params = new URLSearchParams(window.location.search);
-  if (params.has('debug')) {
-    const val = params.get('debug');
-    if (val === '0' || val === 'false') { try { localStorage.removeItem('alki_dev'); } catch(_){} return false; }
-    try { localStorage.setItem('alki_dev', '1'); } catch(_){}
-    return true;
-  }
-  try { return localStorage.getItem('alki_dev') === '1'; } catch(_) { return false; }
-}
-const SHOW_AVATAR_DEBUG = getDevMode();
 // ─────────────────────────────────────────────────────────────
 // Default 3D parametric body. This is the always-on avatar. "Reset"
 // returns to this (not null). Female mesh TBD (Phase 3) — same shape-key
@@ -1580,6 +1563,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [editing, setEditing] = useState(!activeProtocol);
   const [showGoalsEditor, setShowGoalsEditor] = useState(false);
   const [showEidolonSwitcher, setShowEidolonSwitcher] = useState(false);
+  const [showAvatarDebug, setShowAvatarDebug] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
 
@@ -2298,7 +2282,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                   label=""
                   size="large"
                   interactive={true}
-                  debugPanel={SHOW_AVATAR_DEBUG}
+                  debugPanel={showAvatarDebug}
                 />
               ) : (
                 <BodyAvatar
@@ -2310,8 +2294,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             </div>
           </div>
 
-          {/* Avatar customization chip */}
-          <div style={{ textAlign: "center", marginBottom: 16 }}>
+          {/* Avatar customization chip + debug toggle */}
+          <div style={{ textAlign: "center", marginBottom: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
             {avatarUrl ? (
               <button
                 onClick={onResetAvatar}
@@ -2351,6 +2335,24 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 {AVATURN_ENABLED ? "✦ Make it me" : "Make it me · setup"}
               </button>
             )}
+            <button
+              onClick={() => setShowAvatarDebug(v => !v)}
+              title="Toggle morph debug panel"
+              style={{
+                background: showAvatarDebug ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${showAvatarDebug ? "rgba(26,232,122,0.25)" : "rgba(255,255,255,0.07)"}`,
+                color: showAvatarDebug ? S.accent : "rgba(255,255,255,0.3)",
+                fontSize: 13,
+                padding: "4px 10px",
+                borderRadius: 100,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                lineHeight: 1,
+                transition: "all 0.15s ease",
+              }}
+            >
+              ⚙
+            </button>
           </div>
 
           {/* 3. Stat pills */}
