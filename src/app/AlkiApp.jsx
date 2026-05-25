@@ -1576,6 +1576,8 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) 
 function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [showAllRecommended, setShowAllRecommended] = useState(false);
   const [editing, setEditing] = useState(!activeProtocol);
   const [showGoalsEditor, setShowGoalsEditor] = useState(false);
   const [showEidolonSwitcher, setShowEidolonSwitcher] = useState(false);
@@ -2005,18 +2007,18 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             <StatTile
               label="Skin Quality"
               delta={projectedChanges.skinChange}
-              unit=""
+              unit="pts"
               goodDirection="up"
               isScore
-              note={projectedChanges.skinChange === 0 ? "No change" : null}
+              note={projectedChanges.skinChange === 0 ? "No change" : "Relative improvement score (0–20 scale)"}
             />
             <StatTile
               label="Recovery"
               delta={projectedChanges.recoveryChange}
-              unit=""
+              unit="pts"
               goodDirection="up"
               isScore
-              note={projectedChanges.recoveryChange === 0 ? "No change" : null}
+              note={projectedChanges.recoveryChange === 0 ? "No change" : "Relative improvement score (0–20 scale)"}
             />
           </div>
         </div>
@@ -2659,22 +2661,64 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           )}
 
           {/* Recommended compounds */}
+          {/* Category filter tabs */}
+          {(() => {
+            const cats = [...new Set(recommended.map(r => r.compound.category))];
+            if (cats.length <= 1) return null;
+            return (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                {["All", ...cats].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => { setCategoryFilter(cat); setShowAllRecommended(false); }}
+                    style={{
+                      padding: "6px 12px", borderRadius: 100, fontSize: 11, fontWeight: 600,
+                      background: categoryFilter === cat ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${categoryFilter === cat ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.08)"}`,
+                      color: categoryFilter === cat ? S.accent : "rgba(255,255,255,0.4)",
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
           <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
-            Matched to Your Profile — {recommended.length} compound{recommended.length !== 1 ? "s" : ""}
+            Matched to Your Profile — {recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length} compound{recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length !== 1 ? "s" : ""}
           </div>
-          {recommended.length === 0 && (
-            <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
-              No compounds match your current profile and goals. Try adjusting your goals, or browse the full library below.
-            </div>
-          )}
-          {recommended.map(rec => (
-            <CompoundCard
-              key={rec.compound.id}
-              rec={rec}
-              isSelected={selectedCompounds.includes(rec.compound.id)}
-              onToggle={() => toggleCompound(rec.compound.id)}
-            />
-          ))}
+          {(() => {
+            const filtered = recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter);
+            const visible = showAllRecommended ? filtered : filtered.slice(0, 6);
+            const hasMore = filtered.length > 6 && !showAllRecommended;
+            return (
+              <>
+                {filtered.length === 0 && (
+                  <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
+                    No compounds match your current profile and goals. Try adjusting your goals, or browse the full library below.
+                  </div>
+                )}
+                {visible.map(rec => (
+                  <CompoundCard
+                    key={rec.compound.id}
+                    rec={rec}
+                    isSelected={selectedCompounds.includes(rec.compound.id)}
+                    onToggle={() => toggleCompound(rec.compound.id)}
+                  />
+                ))}
+                {hasMore && (
+                  <button
+                    onClick={() => setShowAllRecommended(true)}
+                    style={{ ...S.btnOutline, marginTop: 8, marginBottom: 4, fontSize: 12, padding: "10px 16px" }}
+                  >
+                    Show {filtered.length - 6} more matched compounds
+                  </button>
+                )}
+              </>
+            );
+          })()}
 
           {/* Browse all — collapsible */}
           {otherCompounds.length > 0 && (
@@ -2706,6 +2750,32 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 </>
               )}
             </>
+          )}
+
+          {/* Sticky bottom CTA bar — floats at bottom of viewport while scrolling */}
+          {selectedCompounds.length > 0 && (
+            <div style={{
+              position: "sticky", bottom: 0, left: 0, right: 0,
+              padding: "12px 0 16px", zIndex: 50,
+              background: "linear-gradient(to top, #0a0a0a 70%, transparent)",
+              pointerEvents: "none",
+            }}>
+              <button
+                onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+                disabled={stackAnalysis.isBlocked}
+                style={{
+                  ...S.btn,
+                  ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  pointerEvents: "auto",
+                  boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+                }}
+              >
+                {stackAnalysis.isBlocked
+                  ? "Resolve Contraindications"
+                  : `View Eidolon Projection (${selectedCompounds.length}) →`}
+              </button>
+            </div>
           )}
         </>
       )}
@@ -3300,7 +3370,7 @@ export default function AlkiApp() {
             // Fresh start with pre-filled average values — always runs
             // the full new-user flow, never saves to Supabase (no user).
             setUser(null);
-            setProfile(BASELINE_PROFILE);
+            setProfile({ ...BASELINE_PROFILE, goals: [] }); // goals blank for active choice
             setSelectedCompounds([]);
             setShowTransform(false);
             setActiveProtocol(null);

@@ -19,13 +19,13 @@ import { generateStacks, detectPhase } from "./stackGenerator";
  */
 
 const PHASE_LABELS = {
-  cut_high_bf: "Fat Loss — High BF",
-  cut_moderate_bf: "Fat Loss — Moderate BF",
-  recomp: "Body Recomposition",
-  lean_bulk: "Lean Bulk",
+  cut_high_bf: "Fat Loss Protocol",
+  cut_moderate_bf: "Lean-Down Protocol",
+  recomp: "Simultaneous Cut & Build",
+  lean_bulk: "Lean Mass Protocol",
   ultra_lean: "Ultra-Lean Maintenance",
-  recovery: "Recovery / Repair",
-  longevity: "Longevity / Anti-Aging",
+  recovery: "Recovery & Repair",
+  longevity: "Longevity & Anti-Aging",
 };
 
 const INTENSITY_LABELS = {

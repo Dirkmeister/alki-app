@@ -161,7 +161,7 @@ const PATTERNS = {
   cut_moderate_bf: [
     {
       id: "gh_recomp_cut",
-      name: "GH-Axis Recomposition Cut",
+      name: "GH-Axis Moderate Cut",
       approach: "Body recomposition via GH peptides + tissue repair",
       intensity: "conservative",
       slots: [
@@ -273,7 +273,7 @@ const PATTERNS = {
   recomp: [
     {
       id: "gh_recomp",
-      name: "GH-Axis Recomposition",
+      name: "GH-Axis Simultaneous Cut & Build",
       approach: "Body recomposition via GH peptides + recovery anchor",
       intensity: "conservative",
       slots: [
@@ -288,7 +288,7 @@ const PATTERNS = {
     },
     {
       id: "sarm_recomp",
-      name: "Mild SARM Recomp",
+      name: "Mild SARM Cut & Build",
       approach: "Mild AR anchor + GH support + recovery",
       intensity: "moderate",
       slots: [
