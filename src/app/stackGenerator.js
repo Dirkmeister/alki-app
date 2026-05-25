@@ -57,9 +57,43 @@ function detectPhase(profile) {
   const wantsAntiAging = goals.includes("anti_aging") || goals.includes("skin");
   const wantsPerformance = goals.includes("performance") || goals.includes("energy");
 
-  // Override: low skeletal muscle is the dominant signal regardless of stated goal
+  // BF thresholds — sex-branched
+  const highBF   = sex === "female" ? 28 : 22;
+  const modBF    = sex === "female" ? 22 : 15;
+  const leanBF   = sex === "female" ? 18 : 12;
+  const ultraBF  = sex === "female" ? 15 : 10;
+
+  // Override: low skeletal muscle is the dominant signal
   if (skelMuscle !== null && skelMuscle < lowSMThreshold && !wantsFatLoss) {
     return "lean_bulk";
+  }
+
+  // ── Multi-goal combinations (most users pick 2-3) ─────────
+
+  // Fat loss + muscle = true recomp — but only at moderate BF.
+  // At high BF, fat loss dominates. At low BF, lean bulk dominates.
+  if (wantsFatLoss && wantsMuscle) {
+    if (bodyFat >= highBF) return "cut_high_bf";       // fat loss is priority at high BF
+    if (bodyFat >= modBF)  return "cut_moderate_bf";    // moderate = cut-leaning recomp
+    if (bodyFat >= leanBF) return "lean_bulk";           // already lean, muscle is priority
+    return "ultra_lean";
+  }
+
+  // ── Single primary goal ───────────────────────────────────
+
+  // Fat loss only
+  if (wantsFatLoss) {
+    if (bodyFat >= highBF) return "cut_high_bf";
+    if (bodyFat >= modBF)  return "cut_moderate_bf";
+    if (bodyFat >= leanBF) return "cut_moderate_bf";    // still cuttable, not recomp
+    return "ultra_lean";                                 // already very lean
+  }
+
+  // Muscle only
+  if (wantsMuscle) {
+    if (bodyFat < ultraBF)  return "ultra_lean";
+    if (bodyFat <= highBF)  return "lean_bulk";          // widened: up to 22% M / 28% F
+    return "lean_bulk";                                  // even at higher BF, they want muscle
   }
 
   // Pure recovery focus
@@ -67,35 +101,20 @@ function detectPhase(profile) {
     return "recovery";
   }
 
-  // Anti-aging focus (35+ tilts toward longevity architecture)
-  if (wantsAntiAging && !wantsFatLoss && !wantsMuscle && age >= 35) {
-    return "longevity";
-  }
-
-  // Fat loss phases — BF-stratified
-  if (wantsFatLoss) {
-    const minBF = sex === "female" ? 28 : 22;
-    if (bodyFat >= minBF) return "cut_high_bf";
-    if (bodyFat >= (sex === "female" ? 22 : 15)) return "cut_moderate_bf";
-    // User wants fat loss but is already lean — recomp territory
-    return "recomp";
-  }
-
-  // Muscle / lean bulk — BF-stratified
-  if (wantsMuscle) {
-    if (bodyFat < 10) return "ultra_lean";          // already very lean, has to be careful
-    if (bodyFat < (sex === "female" ? 25 : 18)) return "lean_bulk";
-    return "recomp";  // higher BF, want muscle → recomp first
-  }
-
-  // Performance only → recomp default
-  if (wantsPerformance) return "recomp";
-
-  // Anti-aging without age criterion → recovery default
+  // Anti-aging / skin focus
+  if (wantsAntiAging && age >= 35) return "longevity";
   if (wantsAntiAging) return "recovery";
 
-  // Fallback
-  return "recomp";
+  // Performance / energy
+  if (wantsPerformance) {
+    if (bodyFat >= highBF) return "cut_high_bf";         // performance at high BF = cut first
+    return "lean_bulk";                                  // performance at normal BF = build
+  }
+
+  // Fallback — use BF to decide
+  if (bodyFat >= highBF) return "cut_high_bf";
+  if (bodyFat >= modBF)  return "cut_moderate_bf";
+  return "lean_bulk";
 }
 
 // ============================================================
