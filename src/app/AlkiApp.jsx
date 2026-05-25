@@ -1587,26 +1587,60 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const isModifying = editing && activeEidolon?.lockedAt != null;
 
   // ── Eidolon helpers ──
+  // Ref keeps the latest eidolons accessible inside callbacks without
+  // stale closures — critical for switch/create that read+write the array.
+  const eidolonsRef = useRef(eidolons);
+  eidolonsRef.current = eidolons;
+  const selectedCompoundsRef = useRef(selectedCompounds);
+  selectedCompoundsRef.current = selectedCompounds;
+  const activeProtocolRef = useRef(activeProtocol);
+  activeProtocolRef.current = activeProtocol;
+
+  // Persist the current eidolon's working state back to the array.
+  // Called before any switch/create so dirty builder state isn't lost.
+  const flushCurrentEidolon = useCallback(() => {
+    if (!activeEidolonId) return;
+    const curCompounds = selectedCompoundsRef.current || [];
+    const curProtocol = activeProtocolRef.current;
+    setEidolons(prev => prev.map(e => {
+      if (e.id !== activeEidolonId) return e;
+      // If locked, sync the locked compounds. If unlocked, save builder selections.
+      if (curProtocol?.lockedAt) {
+        return { ...e, compounds: curProtocol.compounds || [], lockedAt: curProtocol.lockedAt };
+      }
+      return { ...e, compounds: curCompounds };
+    }));
+  }, [activeEidolonId]);
+
   const switchToEidolon = useCallback((eidId) => {
-    const eid = eidolons.find(e => e.id === eidId);
+    // 1. Save current eidolon's dirty state
+    flushCurrentEidolon();
+    // 2. Read the LATEST eidolons from ref, not closure
+    const latest = eidolonsRef.current || [];
+    const eid = latest.find(e => e.id === eidId);
     if (!eid) return;
+    // 3. Full clean swap — every piece of eidolon-dependent state
     setActiveEidolonId(eidId);
     setProfile(prev => ({ ...prev, goals: eid.goals || [] }));
     if (eid.lockedAt && eid.compounds?.length) {
-      setActiveProtocol({ compounds: eid.compounds, lockedAt: eid.lockedAt });
-      setSelectedCompounds(eid.compounds);
+      setActiveProtocol({ compounds: [...eid.compounds], lockedAt: eid.lockedAt });
+      setSelectedCompounds([...eid.compounds]);
       setEditing(false);
     } else {
       setActiveProtocol(null);
-      setSelectedCompounds(eid.compounds || []);
+      setSelectedCompounds(eid.compounds ? [...eid.compounds] : []);
       setEditing(true);
     }
     setShowTransform(false);
     setShowEidolonSwitcher(false);
-  }, [eidolons]);
+    setShowGoalsEditor(false);
+    setEditingName(false);
+  }, [flushCurrentEidolon]);
 
   const createNewEidolon = useCallback(() => {
-    const num = (eidolons?.length || 0) + 1;
+    // Save current eidolon's state before creating a new one
+    flushCurrentEidolon();
+    const num = (eidolonsRef.current?.length || 0) + 1;
     const eid = { id: 'e_' + Date.now(), name: `Eidolon ${num}`, goals: [...(profile?.goals || [])], compounds: [], lockedAt: null };
     setEidolons(prev => [...(prev || []), eid]);
     setActiveEidolonId(eid.id);
@@ -1616,7 +1650,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setShowTransform(false);
     setShowGoalsEditor(false);
     setShowEidolonSwitcher(false);
-  }, [eidolons, profile?.goals]);
+    setEditingName(false);
+  }, [flushCurrentEidolon, profile?.goals]);
 
   const commitEidolonName = useCallback(() => {
     const trimmed = (nameInput || "").trim();
@@ -2078,7 +2113,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {activeProtocol && editing && (
-            <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => {
+              // Cancel modify — restore the locked protocol's compounds
+              setSelectedCompounds(activeProtocol.compounds || []);
+              setEditing(false);
+            }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               ← Home
             </button>
           )}
