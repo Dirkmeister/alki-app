@@ -43,6 +43,22 @@ const SITE_URL =
 // Complete MVP: Onboarding → Intelligence → Avatar → Transform
 // ═══════════════════════════════════════════════════════════
 
+// ─────────────────────────────────────────────────────────────
+// Baseline test profile — average male, useful neutral starting point
+// for evaluating stacks and testing the new-user flow without creating
+// an account. Triggered from the auth screen.
+const BASELINE_PROFILE = {
+  sex: "male",
+  age: 28,
+  heightFt: 5,
+  heightIn: 10,
+  weight: 185,
+  bodyFat: 20,
+  goals: ["fat_loss", "muscle", "recovery"],
+  adv: { skelMuscle: "", fatFreeMass: "", subFat: "", visceralFat: "", bodyWater: "", muscleMass: "", boneMass: "", bmr: "" }
+};
+// ─────────────────────────────────────────────────────────────
+
 // ── COMPOUND DATABASE ──────────────────────────────────────
 const COMPOUNDS = [
   {
@@ -2737,7 +2753,7 @@ async function saveProfile(userId, profile, selectedCompounds, avatarUrl, active
 }
 
 // ── AUTH SCREEN ────────────────────────────────────────────
-function AuthScreen({ onAuth, onBack, onSkip }) {
+function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
   const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -2873,6 +2889,24 @@ function AuthScreen({ onAuth, onBack, onSkip }) {
             </button>
           </div>
         )}
+
+        {onBaseline && (
+          <div style={{ textAlign: "center", marginTop: 12 }}>
+            <button onClick={onBaseline} style={{
+              background: "none",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.3)",
+              fontSize: 11,
+              cursor: "pointer",
+              fontFamily: "'JetBrains Mono', monospace",
+              padding: "8px 16px",
+              borderRadius: 8,
+              letterSpacing: "0.04em",
+            }}>
+              ⚙ Baseline User (Dev)
+            </button>
+          </div>
+        )}
       </div>
 
       <p style={{ ...S.disclaimer, paddingBottom: 20 }}>
@@ -2966,6 +3000,7 @@ export default function AlkiApp() {
   const [activeProtocol, setActiveProtocol] = useState(null);
   const [eidolons, setEidolons] = useState([]);
   const [activeEidolonId, setActiveEidolonId] = useState(null);
+  const [onboardingStartStep, setOnboardingStartStep] = useState(null);
   const saveTimeout = useRef(null);
 
   // ── Load saved avatar (URL + headshot PNG) from localStorage on mount ──
@@ -3139,6 +3174,21 @@ export default function AlkiApp() {
           onAuth={handleAuthComplete}
           onBack={() => setScreen("agegate")}
           onSkip={() => setScreen("onboarding")}
+          onBaseline={() => {
+            // Fresh start with pre-filled average values — always runs
+            // the full new-user flow, never saves to Supabase (no user).
+            setUser(null);
+            setProfile(BASELINE_PROFILE);
+            setSelectedCompounds([]);
+            setShowTransform(false);
+            setActiveProtocol(null);
+            setEidolons([]);
+            setActiveEidolonId(null);
+            setAvatarUrl(DEFAULT_AVATAR_URL);
+            setAvatarHeadshot(null);
+            setOnboardingStartStep(0);
+            setScreen("onboarding");
+          }}
         />
       )}
       {screen === "reset_password" && (
@@ -3167,11 +3217,12 @@ export default function AlkiApp() {
             setEidolons(prev => [...(prev || []).filter(e => e.id !== eid.id), eid]);
             setActiveEidolonId(eid.id);
             setProfile(p);
+            setOnboardingStartStep(null);
             setScreen("dashboard");
           }}
-          onExitHome={() => { setProfile(null); setSelectedCompounds([]); setShowTransform(false); setScreen("splash"); }}
+          onExitHome={() => { setProfile(null); setSelectedCompounds([]); setShowTransform(false); setOnboardingStartStep(null); setScreen("splash"); }}
           prefill={profile}
-          initialStep={profile ? 3 : 0}
+          initialStep={onboardingStartStep ?? (profile ? 3 : 0)}
         />
       )}
       {screen === "dashboard" && profile && (
