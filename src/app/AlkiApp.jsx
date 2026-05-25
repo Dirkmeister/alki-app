@@ -55,7 +55,7 @@ const BASELINE_PROFILE = {
   weight: 185,
   bodyFat: 20,
   goals: ["fat_loss", "muscle", "recovery"],
-  adv: { skelMuscle: "", fatFreeMass: "", subFat: "", visceralFat: "", bodyWater: "", muscleMass: "", boneMass: "", bmr: "" }
+  adv: { skelMuscle: "39.4", fatFreeMass: "148", subFat: "16.2", visceralFat: "8", bodyWater: "55.8", muscleMass: "73", boneMass: "7.4", bmr: "1810" }
 };
 // ─────────────────────────────────────────────────────────────
 
