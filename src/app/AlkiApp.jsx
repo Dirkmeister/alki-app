@@ -3017,17 +3017,44 @@ export default function AlkiApp() {
   useEffect(() => {
     if (!supabase) return;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      // If the user arrived via a password-recovery link, the URL carries a
-      // recovery token and onAuthStateChange will fire PASSWORD_RECOVERY and
-      // route to the reset screen. Don't let the normal session routing below
-      // steal the screen out from under it.
-      const isRecovery = typeof window !== "undefined" &&
-        (window.location.hash.includes("type=recovery") ||
-         window.location.search.includes("type=recovery"));
+    // Track whether onAuthStateChange fires PASSWORD_RECOVERY before
+    // getSession routing runs. This prevents a recovery session from
+    // bypassing the set-new-password screen.
+    let recoveryFired = false;
+
+    // Subscribe FIRST so PASSWORD_RECOVERY can fire before getSession resolves.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "PASSWORD_RECOVERY") {
+          recoveryFired = true;
+          setScreen("reset_password");
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          setProfile(null);
+          setSelectedCompounds([]);
+          setShowTransform(false);
+          setAvatarUrl(DEFAULT_AVATAR_URL);
+          setScreen("splash");
+        }
+      }
+    );
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // Check URL for recovery markers AND the event-driven flag.
+      const isRecovery = recoveryFired ||
+        (typeof window !== "undefined" && (
+          window.location.hash.includes("type=recovery") ||
+          window.location.search.includes("type=recovery")
+        ));
       if (isRecovery) {
         setScreen("reset_password");
         return;
+      }
+      // If URL has PKCE auth params, wait briefly for onAuthStateChange
+      // to potentially fire PASSWORD_RECOVERY before routing to dashboard.
+      if (typeof window !== "undefined" && window.location.search.includes("code=")) {
+        await new Promise(r => setTimeout(r, 500));
+        if (recoveryFired) { setScreen("reset_password"); return; }
       }
       if (session?.user) {
         setUser(session.user);
@@ -3056,22 +3083,6 @@ export default function AlkiApp() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "PASSWORD_RECOVERY") {
-          // User arrived via a password-reset email link. Supabase has set
-          // a temporary recovery session; route to the set-new-password screen.
-          setScreen("reset_password");
-        } else if (event === "SIGNED_OUT") {
-          setUser(null);
-          setProfile(null);
-          setSelectedCompounds([]);
-          setShowTransform(false);
-          setAvatarUrl(DEFAULT_AVATAR_URL);
-          setScreen("splash");
-        }
-      }
-    );
     return () => subscription.unsubscribe();
   }, []);
 
