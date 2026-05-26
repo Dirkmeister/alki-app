@@ -1573,7 +1573,7 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) 
   );
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -1584,6 +1584,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [showAvatarDebug, setShowAvatarDebug] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [dosePulse, setDosePulse] = useState(false); // #16 — daily-dose completion pulse
   // #6 — builder lane: null (chooser) | "recommend" | "build".
   const [builderPath, setBuilderPath] = useState(null);
 
@@ -2258,6 +2259,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* ═══ COMMITTED MODE — Avatar-First Home ═══ */}
       {!editing && activeProtocol && (
         <>
+          <style>{`@keyframes alkiDosePulse { 0% { opacity: 0.1; transform: translateX(-50%) scale(1); } 35% { opacity: 0.5; transform: translateX(-50%) scale(1.18); } 100% { opacity: 0.1; transform: translateX(-50%) scale(1); } }`}</style>
           {/* 1. Eidolon name — large, centered, inline-editable */}
           <div style={{ textAlign: "center", marginTop: 6, marginBottom: 0 }}>
             {editingName ? (
@@ -2336,7 +2338,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               borderRadius: "50%",
               background: "radial-gradient(circle at center, rgba(26,232,122,0.10) 0%, rgba(26,232,122,0.04) 40%, transparent 70%)",
               pointerEvents: "none",
-              filter: "blur(6px)"
+              filter: "blur(6px)",
+              animation: dosePulse ? "alkiDosePulse 1.6s ease" : undefined
             }} />
             <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
               {avatarUrl ? (
@@ -2488,6 +2491,80 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 </div>
                 <div style={{ color: cv.statusColor, fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                   {cultivationState?.streak > 0 ? cultivationState.streak : "→"}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 4b. Today's Protocol — daily dose checklist (#16) */}
+          {(() => {
+            const compIds = activeProtocol?.compounds || [];
+            if (compIds.length === 0) return null;
+            const eid = activeEidolonId || "solo";
+            const today = new Date().toISOString().slice(0, 10);
+            const dayLog = ((doseLog || {})[eid] || {})[today] || { taken: [], done: false };
+            const takenSet = new Set(dayLog.taken || []);
+            const total = compIds.length;
+            const doneCount = compIds.filter(id => takenSet.has(id)).length;
+            const allDone = doneCount === total && total > 0;
+
+            const toggleDose = (cid) => {
+              const cur = new Set((((doseLog || {})[eid] || {})[today] || {}).taken || []);
+              if (cur.has(cid)) cur.delete(cid); else cur.add(cid);
+              const takenArr = compIds.filter(id => cur.has(id));
+              const nowDone = takenArr.length === compIds.length;
+              const wasDone = dayLog.done;
+              setDoseLog(prev => {
+                const eidLog = { ...((prev || {})[eid] || {}) };
+                eidLog[today] = { taken: takenArr, done: nowDone };
+                return { ...(prev || {}), [eid]: eidLog };
+              });
+              if (nowDone && !wasDone) { setDosePulse(true); setTimeout(() => setDosePulse(false), 1600); }
+            };
+
+            return (
+              <div style={{ ...S.card, borderColor: allDone ? "rgba(34,214,138,0.3)" : "rgba(255,255,255,0.08)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div style={{ ...S.label, marginBottom: 0 }}>Today's Protocol</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: allDone ? S.accent : "rgba(255,255,255,0.4)" }}>
+                    {doneCount}/{total}{allDone ? " · Complete ✓" : ""}
+                  </div>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden", marginBottom: 14 }}>
+                  <div style={{ width: `${(doneCount / total) * 100}%`, height: "100%", borderRadius: 2, background: "linear-gradient(90deg,#22d68a,#1ae87a)", transition: "width 0.3s ease" }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {compIds.map(cid => {
+                    const c = COMPOUNDS.find(x => x.id === cid);
+                    if (!c) return null;
+                    const checked = takenSet.has(cid);
+                    return (
+                      <button key={cid} onClick={() => toggleDose(cid)} style={{
+                        display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+                        padding: "10px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                        background: checked ? "rgba(34,214,138,0.08)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${checked ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.07)"}`,
+                        transition: "all 0.15s ease"
+                      }}>
+                        <span style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          background: checked ? S.accent : "transparent",
+                          border: `1.5px solid ${checked ? S.accent : "rgba(255,255,255,0.25)"}`,
+                          color: "#0a0a0a", fontSize: 13, fontWeight: 800
+                        }}>{checked ? "✓" : ""}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: checked ? "#fff" : "rgba(255,255,255,0.8)" }}>{c.name}</span>
+                          {c.dosing && <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 1, lineHeight: 1.4 }}>{c.dosing}</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: allDone ? "rgba(34,214,138,0.6)" : "rgba(255,255,255,0.3)", textAlign: "center", marginTop: 12, lineHeight: 1.5 }}>
+                  {allDone
+                    ? "Protocol complete for today. Your Eidolon is cultivating — see you tomorrow."
+                    : "Check off each compound as you take it. Completing every day keeps your streak alive."}
                 </div>
               </div>
             );
@@ -3241,6 +3318,7 @@ export default function AlkiApp() {
   const [avatarHeadshot, setAvatarHeadshot] = useState(null);
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
   const [progressLogs, setProgressLogs] = useState([]);
+  const [doseLog, setDoseLog] = useState({}); // #16 — { [eidolonId]: { [YYYY-MM-DD]: { taken:[ids], done:bool } } }
   const [activeProtocol, setActiveProtocol] = useState(null);
   const [eidolons, setEidolons] = useState([]);
   const [activeEidolonId, setActiveEidolonId] = useState(null);
@@ -3248,6 +3326,14 @@ export default function AlkiApp() {
   const saveTimeout = useRef(null);
 
   // ── Load saved avatar (URL + headshot PNG) from localStorage on mount ──
+  // ── #16 — load/save daily dose log ──
+  useEffect(() => {
+    try { const d = localStorage.getItem("alki_dose_log"); if (d) setDoseLog(JSON.parse(d)); } catch (_) {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("alki_dose_log", JSON.stringify(doseLog)); } catch (_) {}
+  }, [doseLog]);
+
   useEffect(() => {
     try {
       const savedUrl = localStorage.getItem("alki_avatar_url");
@@ -3342,10 +3428,18 @@ export default function AlkiApp() {
 
   const cultivationState = useMemo(() => {
     // Filter progress logs to the active eidolon for cultivation state
-    if (!activeEidolonId || !progressLogs.length) return getCultivationState(progressLogs);
-    const eidolonLogs = progressLogs.filter(l => l.eidolon_id === activeEidolonId || !l.eidolon_id);
-    return getCultivationState(eidolonLogs);
-  }, [progressLogs, activeEidolonId]);
+    const eidolonLogs = (!activeEidolonId || !progressLogs.length)
+      ? progressLogs
+      : progressLogs.filter(l => l.eidolon_id === activeEidolonId || !l.eidolon_id);
+    // #16 hybrid: completed dose-days keep the streak alive & state progressing.
+    // Weekly weight/BF logs still drive measured gains (effectiveProfile / trend).
+    const dl = doseLog[activeEidolonId || "solo"] || {};
+    const doseDays = Object.keys(dl)
+      .filter(d => dl[d] && dl[d].done)
+      .map(d => ({ logged_at: new Date(d + "T12:00:00").toISOString(), eidolon_id: activeEidolonId, _dose: true }));
+    const merged = [...eidolonLogs, ...doseDays].sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at));
+    return getCultivationState(merged);
+  }, [progressLogs, activeEidolonId, doseLog]);
 
   const handleAvatarCreated = useCallback((url, headshotDataUrl) => {
     setAvatarUrl(url);
@@ -3514,6 +3608,8 @@ export default function AlkiApp() {
           setEidolons={setEidolons}
           activeEidolonId={activeEidolonId}
           setActiveEidolonId={setActiveEidolonId}
+          doseLog={doseLog}
+          setDoseLog={setDoseLog}
         />
       )}
       {screen === "progress" && (
