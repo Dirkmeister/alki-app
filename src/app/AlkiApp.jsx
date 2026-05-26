@@ -2135,7 +2135,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             gap: 8
           }}
         >
-          View Research Timeline →
+          Protocol Timeline
         </button>
 
         {/* Lock In / Confirm Changes — only when actively building or modifying. Hidden when just viewing a locked protocol. */}
@@ -2711,7 +2711,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 onClick={onTimeline}
                 style={S.btnOutline}
               >
-                View Timeline
+                Protocol Timeline
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -2855,7 +2855,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               {/* Timeline CTA */}
               {!stackAnalysis.isBlocked && (
                 <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  View Research Timeline →
+                  Protocol Timeline
                 </button>
               )}
 

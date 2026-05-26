@@ -1114,7 +1114,7 @@ function Header({ onBack }) {
         color: TOKENS.accent,
         marginBottom: 4,
       }}>
-        Cycle Timeline
+        Protocol Timeline
       </div>
       <h1 style={{
         margin: 0,
