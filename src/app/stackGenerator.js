@@ -2,53 +2,48 @@
 
 /**
  * ============================================================
- * ALKI — STACK GENERATOR
+ * ALKI — STACK GENERATOR  (v2 — risk-ladder tuning)
  * ============================================================
  *
- * Composes fresh stacks from the user's profile. Does not pick from
- * pre-written presets. Each call returns 2–3 architecturally distinct
- * stacks varying on two axes: RISK INTENSITY (conservative → aggressive)
- * and APPROACH (the architectural pattern used).
+ * Composes fresh stacks from the user's profile. Each call returns an
+ * ordered RISK LADDER of 2–3 architecturally distinct stacks:
  *
- * METHOD (Umbrella Labs Section 6 framing):
+ *     Conservative  →  Moderate  →  Aggressive
+ *
+ * The ladder is built by selecting, for each intensity tier, the FIRST
+ * pattern that is buildable for this user's profile + body-fat band.
+ * Each phase lists a preferred pattern per tier followed by non-SARM
+ * fallbacks, so the ladder never collapses to a single tier just because
+ * a body-fat gate excluded the SARM/GH option (the old #10 failure mode).
+ *
+ * Method (Umbrella Labs Section 6 framing):
  *   1. Determine the user's primary phase from profile + goals.
- *   2. For each output stack, select a different ARCHITECTURAL PATTERN
- *      that serves that phase (anchor + complementary + recovery + support).
- *   3. For each role in the pattern, pick the best compound from the
- *      catalog that fits the user's profile, risk band, and the slot's
- *      mechanism requirements.
- *   4. Layer in mandatory support (PCT, hepatic, CV, lifestyle).
- *   5. Enforce: no receptor overlap unless intentional, no contraindications,
- *      no duplicate-class compounds.
+ *   2. For each intensity tier, pick the first buildable architectural
+ *      pattern (anchor + complementary + recovery + support).
+ *   3. Fill each role with the best catalog compound for the profile,
+ *      risk band, and body-fat gate.
+ *   4. Layer in mandatory support (PCT, hepatic, thyroid, CV, lifestyle).
+ *   5. Enforce: no contraindications, no duplicate-class compounds, no
+ *      educational-reference-only / experimental compounds.
  *
- * The generator is DETERMINISTIC — same profile always produces the
- * same stacks. No LLM. No randomness.
+ * DETERMINISTIC — same profile always produces the same ladder. No LLM,
+ * no randomness.
  *
  * USAGE:
  *   import { generateStacks } from "./stackGenerator";
  *   const stacks = generateStacks(profile, COMPOUNDS);
- *   // stacks: [{ id, name, approach, intensity, compounds: [{id,role,why}],
- *   //           axes, support, pct, designNote, riskLabel, riskColor, gate }]
+ *   // stacks: [{ id, name, approach, intensity, compounds:[{id,role,...}],
+ *   //           axes, support, pct, designNote, riskLabel, riskColor, phase }]
  * ============================================================
  */
 
 // ============================================================
-// PHASE DETECTION
+// PHASE DETECTION   (unchanged from #8 rewrite)
 // ============================================================
 
-/**
- * Determine the user's primary biological phase from profile.
- * Returns one of: "cut_high_bf", "cut_moderate_bf", "recomp",
- * "lean_bulk", "ultra_lean", "recovery", "longevity".
- *
- * Multiple goals collapse into the dominant phase. Advanced stats
- * sharpen the decision (low skel muscle → lean_bulk even if user
- * also picked fat_loss).
- */
 function detectPhase(profile) {
   const { sex, age, bodyFat, goals = [], adv = {} } = profile;
   const skelMuscle = parseFloat(adv.skelMuscle) || null;
-  const visceralFat = parseFloat(adv.visceralFat) || null;
   const lowSMThreshold = sex === "female" ? 34 : 38;
 
   const wantsFatLoss = goals.includes("fat_loss");
@@ -57,61 +52,47 @@ function detectPhase(profile) {
   const wantsAntiAging = goals.includes("anti_aging") || goals.includes("skin");
   const wantsPerformance = goals.includes("performance") || goals.includes("energy");
 
-  // BF thresholds — sex-branched
   const highBF   = sex === "female" ? 28 : 22;
   const modBF    = sex === "female" ? 22 : 15;
   const leanBF   = sex === "female" ? 18 : 12;
   const ultraBF  = sex === "female" ? 15 : 10;
 
-  // Override: low skeletal muscle is the dominant signal
   if (skelMuscle !== null && skelMuscle < lowSMThreshold && !wantsFatLoss) {
     return "lean_bulk";
   }
 
-  // ── Multi-goal combinations (most users pick 2-3) ─────────
-
-  // Fat loss + muscle = true recomp — but only at moderate BF.
-  // At high BF, fat loss dominates. At low BF, lean bulk dominates.
   if (wantsFatLoss && wantsMuscle) {
-    if (bodyFat >= highBF) return "cut_high_bf";       // fat loss is priority at high BF
-    if (bodyFat >= modBF)  return "cut_moderate_bf";    // moderate = cut-leaning recomp
-    if (bodyFat >= leanBF) return "lean_bulk";           // already lean, muscle is priority
+    if (bodyFat >= highBF) return "cut_high_bf";
+    if (bodyFat >= modBF)  return "cut_moderate_bf";
+    if (bodyFat >= leanBF) return "lean_bulk";
     return "ultra_lean";
   }
 
-  // ── Single primary goal ───────────────────────────────────
-
-  // Fat loss only
   if (wantsFatLoss) {
     if (bodyFat >= highBF) return "cut_high_bf";
     if (bodyFat >= modBF)  return "cut_moderate_bf";
-    if (bodyFat >= leanBF) return "cut_moderate_bf";    // still cuttable, not recomp
-    return "ultra_lean";                                 // already very lean
+    if (bodyFat >= leanBF) return "cut_moderate_bf";
+    return "ultra_lean";
   }
 
-  // Muscle only
   if (wantsMuscle) {
     if (bodyFat < ultraBF)  return "ultra_lean";
-    if (bodyFat <= highBF)  return "lean_bulk";          // widened: up to 22% M / 28% F
-    return "lean_bulk";                                  // even at higher BF, they want muscle
+    if (bodyFat <= highBF)  return "lean_bulk";
+    return "lean_bulk";
   }
 
-  // Pure recovery focus
   if (wantsRecovery && !wantsFatLoss && !wantsMuscle) {
     return "recovery";
   }
 
-  // Anti-aging / skin focus
   if (wantsAntiAging && age >= 35) return "longevity";
   if (wantsAntiAging) return "recovery";
 
-  // Performance / energy
   if (wantsPerformance) {
-    if (bodyFat >= highBF) return "cut_high_bf";         // performance at high BF = cut first
-    return "lean_bulk";                                  // performance at normal BF = build
+    if (bodyFat >= highBF) return "cut_high_bf";
+    return "lean_bulk";
   }
 
-  // Fallback — use BF to decide
   if (bodyFat >= highBF) return "cut_high_bf";
   if (bodyFat >= modBF)  return "cut_moderate_bf";
   return "lean_bulk";
@@ -119,10 +100,9 @@ function detectPhase(profile) {
 
 // ============================================================
 // ARCHITECTURAL PATTERNS
-// Each pattern is a list of "slots" (roles). The generator fills
-// each slot with the best compound from the catalog for this user.
-// Patterns are scoped to phases — every phase has 2–3 patterns
-// available, each representing a different APPROACH.
+// Ordered within each phase as: conservative → moderate → aggressive,
+// with the PREFERRED variant before any fallback of the same tier.
+// The generator emits the first buildable pattern per tier.
 // ============================================================
 
 const PATTERNS = {
@@ -138,10 +118,24 @@ const PATTERNS = {
         { role: "Lean mass preservation", mechanism: "gh_axis", required: true },
         { role: "Joint / connective tissue", mechanism: "tissue_repair", required: false },
       ],
-      designTemplate: (compounds, profile) =>
-        `${compounds[0]?.name} drives appetite suppression and dramatic caloric deficit. ` +
-        `${compounds[1]?.name} provides the GH/IGF-1 signal that counteracts the lean mass loss typical of standalone GLP-1 protocols — this pairing is the single most important architecture for the ${profile.bodyFat}% body fat demographic.` +
-        (compounds[2] ? ` ${compounds[2].name} protects joints and connective tissue under reduced caloric intake.` : ""),
+      designTemplate: (c, p) =>
+        `${c[0]?.name} drives appetite suppression and a sustained caloric deficit. ` +
+        `${c[1]?.name} supplies the GH/IGF-1 signal that offsets the lean mass loss typical of standalone GLP-1 protocols — the single most important architecture for the ${p.bodyFat}% body fat demographic.` +
+        (c[2] ? ` ${c[2].name} protects joints and connective tissue under reduced intake.` : ""),
+    },
+    {
+      id: "glp1_basic",
+      name: "GLP-1 Foundation",
+      approach: "Appetite suppression with recovery support",
+      intensity: "conservative",
+      slots: [
+        { role: "Primary fat loss anchor", mechanism: "glp1", required: true },
+        { role: "Joint / connective tissue", mechanism: "tissue_repair", required: false },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} drives appetite suppression and a sustained caloric deficit — the foundation of the high-body-fat research phase.` +
+        (c[1] ? ` ${c[1].name} supports connective tissue while training resumes.` : "") +
+        ` Protein intake and resistance training carry the lean-mass protection here.`,
     },
     {
       id: "metabolic_layered",
@@ -153,10 +147,10 @@ const PATTERNS = {
         { role: "Adjunct fat oxidation", mechanism: "lipolysis", required: false },
         { role: "Skin / collagen support", mechanism: "ecm", required: false },
       ],
-      designTemplate: (compounds, profile) =>
-        `${compounds[0]?.name} stimulates endogenous GH release with FDA-documented visceral fat reduction.` +
-        (compounds[1] ? ` ${compounds[1].name} adds a separate fat oxidation mechanism without affecting glucose or muscle.` : "") +
-        (compounds[2] ? ` ${compounds[2].name} addresses collagen and skin quality — Tesamorelin-class fat loss can reveal skin laxity that GHK-Cu directly counteracts.` : ""),
+      designTemplate: (c) =>
+        `${c[0]?.name} stimulates endogenous GH release with FDA-documented visceral fat reduction.` +
+        (c[1] ? ` ${c[1].name} adds a separate fat-oxidation mechanism with no glucose or muscle impact.` : "") +
+        (c[2] ? ` ${c[2].name} addresses collagen and skin quality — rapid fat loss can reveal laxity that GHK-Cu counteracts.` : ""),
     },
     {
       id: "aggressive_cut",
@@ -168,11 +162,27 @@ const PATTERNS = {
         { role: "Lean mass preservation", mechanism: "gh_axis", required: true },
         { role: "Joint support", mechanism: "tissue_repair", required: false },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} is the most aggressive GLP-class compound currently available — triple receptor activation on GLP-1, GIP, and Glucagon. ` +
-        `${compounds[1]?.name} provides the GH/IGF-1 anchor against the increased lean mass loss risk this potency carries.` +
-        (compounds[2] ? ` ${compounds[2].name} supports connective tissue throughout the aggressive deficit.` : "") +
-        ` Glucose monitoring and resistance training are non-negotiable on this protocol.`,
+      designTemplate: (c) =>
+        `${c[0]?.name} is the most aggressive GLP-class compound available — triple receptor activation on GLP-1, GIP, and Glucagon. ` +
+        `${c[1]?.name} provides the GH/IGF-1 anchor against the elevated lean mass loss risk this potency carries.` +
+        (c[2] ? ` ${c[2].name} supports connective tissue throughout the deficit.` : "") +
+        ` Glucose monitoring and resistance training are non-negotiable.`,
+    },
+    {
+      id: "aggressive_metabolic",
+      name: "Aggressive Metabolic Cut",
+      approach: "GLP triple + thyroid adjunct + GH preservation (fallback)",
+      intensity: "aggressive",
+      slots: [
+        { role: "Maximum fat loss agent", mechanism: "glp_triple", required: true },
+        { role: "Metabolic rate adjunct", mechanism: "metabolic_adjunct", required: false },
+        { role: "Joint support", mechanism: "tissue_repair", required: false },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} delivers maximum GLP-class fat loss via triple receptor activation.` +
+        (c[1] ? ` ${c[1].name} raises metabolic rate as an adjunct — used cautiously, titrated, and tapered, never stopped abruptly.` : "") +
+        (c[2] ? ` ${c[2].name} protects connective tissue.` : "") +
+        ` Glucose, heart rate, and resistance training must all be monitored.`,
     },
   ],
 
@@ -188,10 +198,10 @@ const PATTERNS = {
         { role: "Connective tissue support", mechanism: "tissue_repair", required: true },
         { role: "Sustained IGF-1", mechanism: "ghrelin", required: false },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} drives simultaneous fat loss and lean mass support via GH/IGF-1 elevation — the core recomp mechanism. ` +
-        `${compounds[1]?.name} protects joints and tendons under training stress.` +
-        (compounds[2] ? ` ${compounds[2].name} adds non-suppressive oral GH support and 24-hour IGF-1 coverage.` : ""),
+      designTemplate: (c) =>
+        `${c[0]?.name} drives simultaneous fat loss and lean mass support via GH/IGF-1 elevation — the core recomp mechanism. ` +
+        `${c[1]?.name} protects joints and tendons under training stress.` +
+        (c[2] ? ` ${c[2].name} adds non-suppressive oral GH support and 24-hour IGF-1 coverage.` : ""),
     },
     {
       id: "visceral_targeted",
@@ -203,14 +213,47 @@ const PATTERNS = {
         { role: "Connective tissue support", mechanism: "tissue_repair", required: false },
         { role: "Adjunct fat oxidation", mechanism: "lipolysis", required: false },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} provides the strongest human evidence of the GH peptide class for fat loss, with FDA-documented visceral fat reduction.` +
-        (compounds[1] ? ` ${compounds[1].name} protects connective tissue.` : "") +
-        (compounds[2] ? ` ${compounds[2].name} adds a separate lipolytic mechanism with no glucose or muscle impact.` : ""),
+      designTemplate: (c) =>
+        `${c[0]?.name} provides the strongest human evidence in the GH-peptide class for fat loss, with FDA-documented visceral fat reduction.` +
+        (c[1] ? ` ${c[1].name} protects connective tissue.` : "") +
+        (c[2] ? ` ${c[2].name} adds a separate lipolytic mechanism with no glucose or muscle impact.` : ""),
+    },
+    {
+      id: "gh_lipolytic_cut",
+      name: "GH + Lipolytic Cut",
+      approach: "GH axis + direct lipolysis + recovery (lean-cutter fallback)",
+      intensity: "moderate",
+      slots: [
+        { role: "Body recomposition anchor", mechanism: "gh_axis", required: true },
+        { role: "Direct lipolysis", mechanism: "lipolysis", required: true },
+        { role: "Sustained IGF-1", mechanism: "ghrelin", required: false },
+        { role: "Connective tissue support", mechanism: "tissue_repair", required: false },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} drives GH-mediated recomposition while ${c[1]?.name} adds a direct, glucose-neutral lipolytic signal — the moderate option for already-lean cutters where Tesamorelin isn't indicated.` +
+        (c[2] ? ` ${c[2].name} sustains 24-hour IGF-1.` : "") +
+        (c[3] ? ` ${c[3].name} protects connective tissue.` : ""),
+    },
+    {
+      id: "metabolic_cut_aggressive",
+      name: "Aggressive Metabolic Cut",
+      approach: "GHRH + lipolytic + thyroid adjunct",
+      intensity: "aggressive",
+      slots: [
+        { role: "Visceral fat targeting", mechanism: "ghrh", required: true },
+        { role: "Adjunct fat oxidation", mechanism: "lipolysis", required: false },
+        { role: "Metabolic rate adjunct", mechanism: "metabolic_adjunct", required: true },
+        { role: "Connective tissue support", mechanism: "tissue_repair", required: false },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} drives GH-mediated visceral fat loss as the anchor.` +
+        (c.find(x => x.category === "Fat Loss" && x.id === "fragment176") ? ` Fragment 176-191 adds direct lipolysis.` : "") +
+        ` A thyroid adjunct raises metabolic rate for the steepest deficit in this phase — it must be titrated up slowly, tapered down, and never stopped abruptly, with heart-rate monitoring throughout.` +
+        (c[c.length - 1]?.category === "Recovery" ? ` ${c[c.length - 1].name} protects connective tissue under the deficit.` : ""),
     },
   ],
 
-  // ---- Lean bulk (clean muscle gain at moderate BF) ----
+  // ---- Lean bulk (clean muscle gain) ----
   lean_bulk: [
     {
       id: "gh_lean_bulk",
@@ -222,10 +265,10 @@ const PATTERNS = {
         { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: true },
         { role: "Connective tissue support", mechanism: "tissue_repair", required: true },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} drives the physiological GH pulse pre-sleep — the primary repair and recomp window. ` +
-        `${compounds[1]?.name} provides sustained 24-hour IGF-1 elevation orally, non-suppressive — runs indefinitely. ` +
-        `${compounds[2]?.name} protects connective tissue under progressive load. Two independent anabolic mechanisms with zero receptor overlap.`,
+      designTemplate: (c) =>
+        `${c[0]?.name} drives the physiological GH pulse pre-sleep — the primary repair and recomp window. ` +
+        `${c[1]?.name} provides sustained 24-hour IGF-1 elevation orally and non-suppressively, so it runs indefinitely. ` +
+        `${c[2]?.name} protects connective tissue under progressive load. Two independent anabolic mechanisms, zero receptor overlap.`,
     },
     {
       id: "sarm_assisted",
@@ -238,12 +281,43 @@ const PATTERNS = {
         { role: "Connective tissue", mechanism: "tissue_repair", required: true },
         { role: "Cardiovascular support", mechanism: "pde5", required: false },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} drives muscle protein synthesis at the androgen receptor — primary lean mass mechanism. ` +
-        `${compounds[1]?.name} adds a fully independent GH axis with 24-hour IGF-1 elevation; non-suppressive, runs through PCT. ` +
-        `${compounds[2]?.name} protects connective tissue under increasing load.` +
-        (compounds[3] ? ` ${compounds[3].name} provides cardiovascular support and pump throughout the cycle.` : "") +
+      designTemplate: (c) =>
+        `${c[0]?.name} drives muscle protein synthesis at the androgen receptor — the primary lean mass mechanism. ` +
+        `${c[1]?.name} adds a fully independent GH axis with 24-hour IGF-1 elevation; non-suppressive, runs through PCT. ` +
+        `${c[2]?.name} protects connective tissue under increasing load.` +
+        (c[3] ? ` ${c[3].name} provides cardiovascular support and pump throughout the cycle.` : "") +
         ` PCT will be required.`,
+    },
+    {
+      id: "gh_igf_moderate",
+      name: "GH + Direct IGF-1 Bulk",
+      approach: "GH pulse + oral IGF + direct IGF-1 anchor (non-SARM)",
+      intensity: "moderate",
+      slots: [
+        { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
+        { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: true },
+        { role: "Direct IGF-1 anchor", mechanism: "gh_strong", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+      ],
+      designTemplate: (c) =>
+        `A non-SARM step up: ${c[0]?.name} drives the nightly GH pulse, ${c[1]?.name} sustains 24-hour IGF-1, and ${c[2]?.name} adds a direct IGF-1 signal at the muscle for stronger anabolism without androgen-receptor suppression. ` +
+        `${c[3]?.name} protects connective tissue. No PCT required — none of these suppress the HPG axis. Site rotation and conservative IGF-1 dosing are essential.`,
+    },
+    {
+      id: "gh_plus_moderate",
+      name: "GH Axis + Circulatory Support",
+      approach: "GH pulse + oral IGF + recovery + CV support (any body fat)",
+      intensity: "moderate",
+      slots: [
+        { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
+        { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+        { role: "Cardiovascular support", mechanism: "pde5", required: true },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} drives the nightly GH pulse and ${c[1]?.name} sustains daytime IGF-1. ` +
+        `${c[2]?.name} protects connective tissue, and ${c[3]?.name} adds circulatory support and nutrient delivery to working muscle. ` +
+        `A non-suppressive step up from the foundation tier, appropriate across body-fat ranges where SARMs aren't indicated.`,
     },
     {
       id: "aggressive_mass",
@@ -257,16 +331,31 @@ const PATTERNS = {
         { role: "Cardiovascular support", mechanism: "pde5", required: true },
         { role: "Hepatic support flag", mechanism: "hepatic_support", required: true },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} is the premier mass-building AR agonist — significant lean mass over an 8–10 week cycle. ` +
-        `${compounds[1]?.name} adds the independent GH/IGF-1 mechanism. ` +
-        `${compounds[2]?.name} is non-negotiable connective tissue support given the load progression this protocol enables.` +
-        (compounds[3] ? ` ${compounds[3].name} maintains cardiovascular function under cycle stress.` : "") +
-        ` TUDCA 500mg + NAC 600mg daily are mandatory throughout cycle for hepatic protection. Bloodwork before, mid-cycle, and 4 weeks post-PCT.`,
+      designTemplate: (c) =>
+        `${c[0]?.name} is the premier mass-building AR agonist — significant lean mass over an 8–10 week cycle. ` +
+        `${c[1]?.name} adds the independent GH/IGF-1 mechanism. ` +
+        `${c[2]?.name} is non-negotiable connective-tissue support given the load progression this enables.` +
+        (c[3] ? ` ${c[3].name} maintains cardiovascular function under cycle stress.` : "") +
+        ` TUDCA 500mg + NAC 600mg daily are mandatory. Bloodwork before, mid-cycle, and 4 weeks post-PCT.`,
+    },
+    {
+      id: "gh_igf_aggressive",
+      name: "Maximal GH / IGF-1 Bulk",
+      approach: "Direct IGF-1 + GH pulse + oral IGF (non-SARM fallback)",
+      intensity: "aggressive",
+      slots: [
+        { role: "Direct IGF-1 anchor", mechanism: "gh_strong", required: true },
+        { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
+        { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+      ],
+      designTemplate: (c) =>
+        `The most aggressive non-androgenic build available: ${c[0]?.name} delivers a direct IGF-1 signal at the muscle, layered over the ${c[1]?.name} GH pulse and ${c[2]?.name} 24-hour IGF-1 coverage. ` +
+        `${c[3]?.name} protects connective tissue under the resulting load. Direct IGF-1 carries hypoglycemia risk — keep cycles short, rotate sites, and monitor blood glucose.`,
     },
   ],
 
-  // ---- Ultra-lean (already below 10% BF, has to be cautious) ----
+  // ---- Ultra-lean (already very lean, cautious) ----
   ultra_lean: [
     {
       id: "ultra_lean_recovery",
@@ -279,16 +368,49 @@ const PATTERNS = {
         { role: "Systemic healing", mechanism: "tissue_repair_systemic", required: false },
         { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: false },
       ],
-      designTemplate: (compounds) =>
-        `At your body fat level, the priority is preserving and enhancing lean mass rather than driving further fat loss. ` +
-        `${compounds[0]?.name} drives the GH pulse for recomp without depleting necessary mass. ` +
-        `${compounds[1]?.name} supports the connective tissue under the high training intensity that maintains this body fat range.` +
-        (compounds[2] ? ` ${compounds[2].name} conditions the body-wide repair environment.` : "") +
-        (compounds[3] ? ` ${compounds[3].name} provides 24-hour IGF-1 coverage non-suppressively.` : ""),
+      designTemplate: (c) =>
+        `At your body fat level the priority is preserving and enhancing lean mass, not driving further fat loss. ` +
+        `${c[0]?.name} drives the GH pulse for recomp without depleting necessary mass. ` +
+        `${c[1]?.name} supports connective tissue under the high training intensity that maintains this range.` +
+        (c[2] ? ` ${c[2].name} conditions the body-wide repair environment.` : "") +
+        (c[3] ? ` ${c[3].name} provides 24-hour IGF-1 coverage non-suppressively.` : ""),
+    },
+    {
+      id: "ultra_lean_mild_sarm",
+      name: "Mild SARM Recomp",
+      approach: "GH pulse + oral IGF + mild AR anchor",
+      intensity: "moderate",
+      slots: [
+        { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
+        { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: true },
+        { role: "Mild AR anchor", mechanism: "ar_mild", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} and ${c[1]?.name} establish the GH/IGF-1 base, and ${c[2]?.name} — the mildest SARM and standard entry point — adds an androgen-receptor signal for lean accrual at very low body fat. ` +
+        `${c[3]?.name} protects connective tissue. A mild SERM PCT is required even at this gentle dose; bloodwork confirms recovery.`,
+    },
+    {
+      id: "ultra_lean_sarm",
+      name: "AR-Anchored Lean Build",
+      approach: "Strong AR anchor + GH support + full recovery layer",
+      intensity: "aggressive",
+      slots: [
+        { role: "AR mass anchor", mechanism: "ar_strong", required: true },
+        { role: "GH-axis support", mechanism: "ghrelin", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+        { role: "Cardiovascular support", mechanism: "pde5", required: false },
+        { role: "Hepatic support flag", mechanism: "hepatic_support", required: true },
+      ],
+      designTemplate: (c) =>
+        `For the advanced, already-lean researcher: ${c[0]?.name} provides a strong androgen-receptor anabolic signal, with ${c[1]?.name} adding an independent GH/IGF-1 axis. ` +
+        `${c[2]?.name} protects connective tissue.` +
+        (c[3] ? ` ${c[3].name} supports the cardiovascular system under cycle stress.` : "") +
+        ` TUDCA/NAC and full pre/mid/post bloodwork are mandatory, and PCT will be required.`,
     },
   ],
 
-  // ---- Recomp (moderate BF, want muscle + fat loss simultaneously) ----
+  // ---- Recomp (safety fallback; detectPhase rarely returns this) ----
   recomp: [
     {
       id: "gh_recomp",
@@ -300,10 +422,10 @@ const PATTERNS = {
         { role: "Sustained IGF-1", mechanism: "ghrelin", required: false },
         { role: "Connective tissue", mechanism: "tissue_repair", required: true },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} drives simultaneous fat redistribution and lean mass via pulsed GH/IGF-1 — the cleanest recomp mechanism available without suppression.` +
-        (compounds[1] ? ` ${compounds[1].name} provides 24-hour IGF-1 coverage between pulses; runs orally and indefinitely.` : "") +
-        ` ${compounds[compounds.length - 1]?.name} protects connective tissue under the training intensity recomp requires.`,
+      designTemplate: (c) =>
+        `${c[0]?.name} drives simultaneous fat redistribution and lean mass via pulsed GH/IGF-1 — the cleanest recomp mechanism without suppression.` +
+        (c[1] ? ` ${c[1].name} provides 24-hour IGF-1 coverage between pulses; oral and indefinite.` : "") +
+        ` ${c[c.length - 1]?.name} protects connective tissue under the training intensity recomp requires.`,
     },
     {
       id: "sarm_recomp",
@@ -315,14 +437,28 @@ const PATTERNS = {
         { role: "GH support", mechanism: "ghrelin", required: false },
         { role: "Connective tissue", mechanism: "tissue_repair", required: true },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} is the mildest SARM and the standard entry point — recomp signal without aggressive HPG suppression.` +
-        (compounds[1] ? ` ${compounds[1].name} adds non-suppressive GH support that runs through PCT.` : "") +
-        ` ${compounds[compounds.length - 1]?.name} protects joints and tendons throughout the cycle. Mild SERM PCT is required.`,
+      designTemplate: (c) =>
+        `${c[0]?.name} is the mildest SARM and the standard entry point — a recomp signal without aggressive HPG suppression.` +
+        (c[1] ? ` ${c[1].name} adds non-suppressive GH support that runs through PCT.` : "") +
+        ` ${c[c.length - 1]?.name} protects joints and tendons. Mild SERM PCT is required.`,
+    },
+    {
+      id: "gh_igf_recomp_aggressive",
+      name: "Direct IGF-1 Recomp",
+      approach: "Direct IGF-1 + GH pulse + recovery (non-SARM)",
+      intensity: "aggressive",
+      slots: [
+        { role: "Direct IGF-1 anchor", mechanism: "gh_strong", required: true },
+        { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} adds a direct IGF-1 signal over the ${c[1]?.name} GH pulse for the steepest non-androgenic recomp. ` +
+        `${c[2]?.name} protects connective tissue. Short cycles and glucose monitoring are essential.`,
     },
   ],
 
-  // ---- Recovery (injury, training stress, no body comp objective) ----
+  // ---- Recovery (injury / training stress; no body-comp objective) ----
   recovery: [
     {
       id: "peptide_recovery",
@@ -334,11 +470,11 @@ const PATTERNS = {
         { role: "Systemic healing", mechanism: "tissue_repair_systemic", required: true },
         { role: "ECM / collagen", mechanism: "ecm", required: false },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} drives local angiogenesis at injury sites and tendon/ligament repair. ` +
-        `${compounds[1]?.name} conditions the body-wide healing environment via stem cell mobilization.` +
-        (compounds[2] ? ` ${compounds[2].name} adds collagen synthesis and ECM reconstruction — naturally occurring with no suppression.` : "") +
-        ` No HPG suppression. No PCT required. Sustainable indefinitely.`,
+      designTemplate: (c) =>
+        `${c[0]?.name} drives local angiogenesis at injury sites and tendon/ligament repair. ` +
+        `${c[1]?.name} conditions the body-wide healing environment.` +
+        (c[2] ? ` ${c[2].name} adds collagen synthesis and ECM reconstruction with no suppression.` : "") +
+        ` No HPG suppression. No PCT. Sustainable indefinitely.`,
     },
     {
       id: "gh_assisted_recovery",
@@ -351,40 +487,59 @@ const PATTERNS = {
         { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
         { role: "Sustained IGF-1", mechanism: "ghrelin", required: false },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} and ${compounds[1]?.name} handle local and systemic tissue repair simultaneously. ` +
-        `${compounds[2]?.name} maximizes the GH pulse during sleep — the primary repair window.` +
-        (compounds[3] ? ` ${compounds[3].name} maintains IGF-1 elevation chronically through the day.` : "") +
-        ` Every compound here operates at a different biological level with zero receptor overlap.`,
+      designTemplate: (c) =>
+        `${c[0]?.name} and ${c[1]?.name} handle local and systemic tissue repair simultaneously. ` +
+        `${c[2]?.name} maximizes the GH pulse during sleep — the primary repair window.` +
+        (c[3] ? ` ${c[3].name} maintains IGF-1 elevation chronically.` : "") +
+        ` Each compound operates at a different biological level with zero receptor overlap.`,
     },
   ],
 
-  // ---- Longevity (35+, anti-aging focus, no body comp aggression) ----
+  // ---- Longevity (35+, anti-aging focus) ----
   longevity: [
     {
       id: "mito_neuro_longevity",
       name: "Multi-Axis Longevity Support",
-      approach: "Mitochondrial + neurogenic + ECM, no suppression",
+      approach: "ECM + GH axis + tissue repair, no suppression",
       intensity: "conservative",
       slots: [
         { role: "Skin / ECM anchor", mechanism: "ecm", required: true },
         { role: "GH axis support", mechanism: "gh_axis", required: false },
         { role: "Tissue repair", mechanism: "tissue_repair", required: false },
       ],
-      designTemplate: (compounds) =>
-        `${compounds[0]?.name} resets gene expression toward a regenerative profile and is the strongest skin and ECM signal in the catalog.` +
-        (compounds[1] ? ` ${compounds[1].name} restores GH/IGF-1 to a physiological range — naturally declining with age and the single most actionable hormone target for longevity.` : "") +
-        (compounds[2] ? ` ${compounds[2].name} maintains tissue repair capacity under the slower healing of older bodies.` : "") +
+      designTemplate: (c) =>
+        `${c[0]?.name} resets gene expression toward a regenerative profile and is the strongest skin/ECM signal in the catalog.` +
+        (c[1] ? ` ${c[1].name} restores GH/IGF-1 toward a physiological range — naturally declining with age and the single most actionable hormone target for longevity.` : "") +
+        (c[2] ? ` ${c[2].name} maintains tissue-repair capacity under the slower healing of older bodies.` : "") +
         ` No suppression, no PCT, sustainable indefinitely.`,
+    },
+    {
+      id: "longevity_mito",
+      name: "Longevity + Cellular Support",
+      approach: "ECM + GH axis + bioregulator + mitochondrial layer",
+      intensity: "moderate",
+      slots: [
+        { role: "Skin / ECM anchor", mechanism: "ecm", required: true },
+        { role: "GH axis support", mechanism: "gh_axis", required: true },
+        { role: "Cellular bioregulator", mechanism: "longevity_peptide", required: true },
+        { role: "Mitochondrial / metabolic", mechanism: "mitochondrial", required: false },
+        { role: "Tissue repair", mechanism: "tissue_repair", required: false },
+      ],
+      designTemplate: (c) =>
+        `${c[0]?.name} anchors skin and ECM regeneration while ${c[1]?.name} restores the GH/IGF-1 axis. ` +
+        `${c[2]?.name} acts as a cellular bioregulator targeting age-related decline at the gene-expression level.` +
+        (c.find(x => x.category === "Metabolic") ? ` A mitochondrial layer addresses the energy-production decline central to aging.` : "") +
+        (c.find(x => x.category === "Recovery") ? ` Connective-tissue repair capacity is maintained.` : "") +
+        ` Non-suppressive and sustainable.`,
     },
   ],
 };
 
 // ============================================================
-// MECHANISM RESOLVERS
-// Maps each abstract slot mechanism to the actual compounds in the
-// catalog that satisfy it. Returns candidates ordered by preference
-// (strongest match for the slot first).
+// MECHANISM RESOLVERS  (broadened to the full 71-compound catalog)
+// Candidates are ordered by preference; the generator takes the first
+// that passes the profile / body-fat gate. Wider-BF options are listed
+// after the preferred pick so the slot still fills at higher body fat.
 // ============================================================
 
 const MECHANISM_CANDIDATES = {
@@ -392,22 +547,34 @@ const MECHANISM_CANDIDATES = {
   glp1: ["semaglutide"],
   glp_triple: ["retatrutide"],
 
-  // GH axis — injectable GH peptides
-  gh_axis: ["ipacjc", "sermorelin", "cjc1295_nodac"],
+  // GH axis — injectable GH peptides (ipacjc preferred; sermorelin/cjc cover higher BF)
+  gh_axis: ["ipacjc", "ipamorelin", "sermorelin", "cjc1295_nodac", "cjc1295_dac"],
 
-  // GHRH analog specifically for visceral fat
+  // Direct IGF-1 — aggressive, non-androgenic anchor
+  gh_strong: ["igf1lr3"],
+
+  // GHRH analog for visceral fat
   ghrh: ["tesamorelin"],
 
-  // Ghrelin / oral GH path (non-suppressive, runs everywhere)
+  // Ghrelin / oral GH (non-suppressive, runs everywhere)
   ghrelin: ["mk677"],
 
-  // Fat oxidation adjunct (no glucose or muscle impact)
+  // Fat oxidation adjunct (no glucose / muscle impact)
   lipolysis: ["fragment176"],
 
+  // Thyroid / metabolic-rate adjunct (aggressive cut tiers)
+  metabolic_adjunct: ["t3"],
+
+  // Mitochondrial / metabolic efficiency (longevity, endurance)
+  mitochondrial: ["motsc", "sr9009"],
+
+  // Longevity peptide bioregulator (wide BF, non-suppressive)
+  longevity_peptide: ["epitalon"],
+
   // AR — mild entry point
-  ar_mild: ["mk2866"],
-  // AR — stronger mass builder
-  ar_strong: ["lgd4033", "rad140"],
+  ar_mild: ["mk2866", "s4"],
+  // AR — stronger mass builders (intermediate first, advanced fallbacks)
+  ar_strong: ["rad140", "lgd4033", "lgd3303", "rad150"],
 
   // Tissue repair
   tissue_repair: ["bpc157"],
@@ -419,15 +586,12 @@ const MECHANISM_CANDIDATES = {
   // Cardiovascular support (cycle-supportive PDE-5)
   pde5: ["tadalafil"],
 
-  // Hepatic support is a flag, not a compound — surfaces in support layer
+  // Hepatic support — flag, not a compound; surfaces in support layer
   hepatic_support: ["__support_tudca_nac__"],
 };
 
 // ============================================================
 // COMPOUND SELECTION
-// For each slot, pick the best candidate from the catalog given the
-// user's profile and risk band. Skip compounds with displayWarning
-// or experimental_only unless explicitly opted in (future feature).
 // ============================================================
 
 function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
@@ -435,10 +599,8 @@ function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
   const alreadyIds = new Set(alreadySelected.map((c) => c.id));
 
   for (const candidateId of candidates) {
-    // Skip if already in stack (don't duplicate)
     if (alreadyIds.has(candidateId)) continue;
 
-    // Support flags pass through as virtual entries
     if (candidateId.startsWith("__support_")) {
       return { id: candidateId, name: candidateId, isSupportFlag: true };
     }
@@ -446,20 +608,18 @@ function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
     const compound = catalog.find((c) => c.id === candidateId);
     if (!compound) continue;
 
-    // Profile gating — body fat suitability
     const bf = profile.bodyFat;
     if (compound.suitability) {
       if (bf < compound.suitability.minBf) continue;
       if (bf > compound.suitability.maxBf) continue;
     }
 
-    // Skip compounds where contraindications fire
     if (compound.contraindications) {
       if (compound.contraindications.includes("below15bf") && bf < 15) continue;
       if (compound.contraindications.includes("below22bf_glp1") && bf < 22) continue;
     }
 
-    // Skip experimental and warning-flagged compounds (require explicit user opt-in)
+    // Educational-reference-only / experimental compounds require explicit opt-in
     if (compound.experienceLevel === "experimental_only") continue;
     if (compound.displayWarning) continue;
 
@@ -471,7 +631,6 @@ function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
 
 // ============================================================
 // SUPPORT LAYER GENERATION
-// Based on the compounds in the stack, surface required support.
 // ============================================================
 
 function generateSupportLayer(compounds, pattern) {
@@ -479,7 +638,6 @@ function generateSupportLayer(compounds, pattern) {
   const ids = new Set(compounds.map((c) => c.id));
   const categories = new Set(compounds.map((c) => c.category));
 
-  // GLP-1 compounds → protein + resistance training mandatory
   if (ids.has("semaglutide") || ids.has("retatrutide")) {
     support.push({
       label: "Protein intake ≥ 0.8g per lb bodyweight",
@@ -493,7 +651,6 @@ function generateSupportLayer(compounds, pattern) {
     });
   }
 
-  // Retatrutide → glucose monitoring
   if (ids.has("retatrutide")) {
     support.push({
       label: "Weekly glucose check or CGM",
@@ -502,7 +659,6 @@ function generateSupportLayer(compounds, pattern) {
     });
   }
 
-  // Tesamorelin → glucose monitoring
   if (ids.has("tesamorelin")) {
     support.push({
       label: "Fasting glucose monitoring",
@@ -511,12 +667,29 @@ function generateSupportLayer(compounds, pattern) {
     });
   }
 
-  // SARM presence → PCT + bloodwork
+  // Thyroid adjunct (T3 / T4)
+  if (ids.has("t3") || ids.has("t4")) {
+    support.push({
+      label: "Thyroid: titrate up slowly, taper down, never stop abruptly",
+      urgency: "required",
+      reason: "Exogenous thyroid suppresses endogenous output. Abrupt cessation crashes metabolism. Monitor resting heart rate; hold or reduce on palpitations.",
+    });
+  }
+
+  // Direct IGF-1
+  if (ids.has("igf1lr3")) {
+    support.push({
+      label: "IGF-1: short cycles, site rotation, glucose awareness",
+      urgency: "required",
+      reason: "Direct IGF-1 carries hypoglycemia risk and localized tissue growth at injection sites. Keep cycles short (≤4 weeks) and rotate sites.",
+    });
+  }
+
   if (categories.has("SARM")) {
     support.push({
       label: "PCT: Tamoxifen 20mg/day or Enclomiphene 12.5mg/day, 4 weeks post-cycle",
       urgency: "required",
-      reason: "Restores HPG axis function after suppressive cycle. Bloodwork 4 weeks post-PCT to verify recovery.",
+      reason: "Restores HPG axis function after a suppressive cycle. Bloodwork 4 weeks post-PCT to verify recovery.",
     });
     support.push({
       label: "Bloodwork: pre-cycle, week 6, and 4 weeks post-PCT",
@@ -525,7 +698,6 @@ function generateSupportLayer(compounds, pattern) {
     });
   }
 
-  // Hepatic flag from pattern
   if (pattern.slots.some((s) => s.mechanism === "hepatic_support")) {
     support.push({
       label: "TUDCA 500mg + NAC 600mg daily throughout cycle",
@@ -534,7 +706,6 @@ function generateSupportLayer(compounds, pattern) {
     });
   }
 
-  // Aggressive intensity → tadalafil if not already in stack
   if (pattern.intensity === "aggressive" && !ids.has("tadalafil")) {
     support.push({
       label: "Tadalafil 5mg daily (cardiovascular support)",
@@ -548,15 +719,12 @@ function generateSupportLayer(compounds, pattern) {
 
 // ============================================================
 // PCT GENERATION
-// Returns null if no PCT required, or a structured PCT plan.
 // ============================================================
 
 function generatePCT(compounds) {
   const categories = new Set(compounds.map((c) => c.category));
-
   if (!categories.has("SARM")) return null;
 
-  // Determine PCT aggressiveness from the SARMs present
   const hasStrongSARM = compounds.some((c) =>
     ["yk11", "rad140", "lgd4033", "lgd3303", "rad150", "s23"].includes(c.id)
   );
@@ -567,7 +735,7 @@ function generatePCT(compounds) {
       ? "Tamoxifen 20mg/day + Enclomiphene 12.5mg/day"
       : "Tamoxifen 20mg/day OR Enclomiphene 12.5mg/day",
     note: hasStrongSARM
-      ? "Dual SERM protocol given the suppression level of this cycle. Continue MK-677 through PCT if present in stack — non-suppressive."
+      ? "Dual SERM protocol given the suppression level of this cycle. Continue MK-677 through PCT if present — non-suppressive."
       : "Single SERM protocol sufficient for mild SARM cycles. Continue non-suppressive compounds through PCT.",
   };
 }
@@ -579,7 +747,6 @@ function generatePCT(compounds) {
 function classifyRisk(compounds, intensity) {
   if (intensity === "aggressive") return { label: "Moderate–High", color: "#f59e0b" };
   if (intensity === "moderate") {
-    // Moderate intensity with SARM = bumped to moderate
     if (compounds.some((c) => c.category === "SARM")) return { label: "Moderate", color: "#fbbf24" };
     return { label: "Low–Moderate", color: "#a3e635" };
   }
@@ -588,7 +755,6 @@ function classifyRisk(compounds, intensity) {
 
 // ============================================================
 // AXIS SUMMARY
-// Build a human-readable axis label from the compounds.
 // ============================================================
 
 function summarizeAxes(compounds) {
@@ -610,66 +776,77 @@ function summarizeAxes(compounds) {
 }
 
 // ============================================================
-// MAIN ENTRY POINT
+// PATTERN BUILDER
 // ============================================================
+
+function buildPattern(pattern, profile, catalog) {
+  const selected = [];
+
+  for (const slot of pattern.slots) {
+    const compound = selectCompoundForSlot(slot, profile, catalog, selected);
+    if (!compound) {
+      if (slot.required) return null; // required slot unfilled → pattern not buildable
+      continue;
+    }
+    if (compound.isSupportFlag) continue;
+    selected.push({ ...compound, role: slot.role });
+  }
+
+  if (selected.length === 0) return null;
+
+  const support = generateSupportLayer(selected, pattern);
+  const pct = generatePCT(selected);
+  const risk = classifyRisk(selected, pattern.intensity);
+  const axes = summarizeAxes(selected);
+
+  return {
+    id: pattern.id,
+    name: pattern.name,
+    approach: pattern.approach,
+    intensity: pattern.intensity,
+    compounds: selected,
+    support,
+    pct,
+    axes,
+    riskLabel: risk.label,
+    riskColor: risk.color,
+    designNote: pattern.designTemplate(selected, profile),
+    phase: pattern.phase,
+  };
+}
+
+// ============================================================
+// MAIN ENTRY POINT
+// Emits an ordered risk ladder: the first buildable pattern per tier.
+// ============================================================
+
+const INTENSITY_ORDER = ["conservative", "moderate", "aggressive"];
 
 export function generateStacks(profile, catalog) {
   const phase = detectPhase(profile);
   const patterns = PATTERNS[phase] || PATTERNS.recomp;
 
-  const stacks = [];
+  const chosen = {}; // intensity -> built stack (first buildable wins)
 
   for (const pattern of patterns) {
-    const selected = [];
-    let buildable = true;
-
-    // Fill each slot in order; track which compounds are already in the stack
-    for (const slot of pattern.slots) {
-      const compound = selectCompoundForSlot(slot, profile, catalog, selected);
-
-      if (!compound) {
-        // Slot couldn't be filled — fail the pattern only if the slot is required
-        if (slot.required) {
-          buildable = false;
-          break;
-        }
-        continue;
-      }
-
-      // Don't add support flags as actual compounds
-      if (compound.isSupportFlag) continue;
-
-      selected.push({
-        ...compound,
-        role: slot.role,
-      });
-    }
-
-    if (!buildable || selected.length === 0) continue;
-
-    const support = generateSupportLayer(selected, pattern);
-    const pct = generatePCT(selected);
-    const risk = classifyRisk(selected, pattern.intensity);
-    const axes = summarizeAxes(selected);
-
-    stacks.push({
-      id: pattern.id,
-      name: pattern.name,
-      approach: pattern.approach,
-      intensity: pattern.intensity,
-      compounds: selected,
-      support,
-      pct,
-      axes,
-      riskLabel: risk.label,
-      riskColor: risk.color,
-      designNote: pattern.designTemplate(selected, profile),
-      phase,
-    });
+    if (chosen[pattern.intensity]) continue; // tier already filled
+    const built = buildPattern({ ...pattern, phase }, profile, catalog);
+    if (built) chosen[pattern.intensity] = built;
   }
 
-  return stacks;
+  // Fallback safety net: if not a single tier built (extreme profile),
+  // force the most universally buildable conservative recovery stack so
+  // the user is never shown an empty generator.
+  if (Object.keys(chosen).length === 0) {
+    const safety = buildPattern(
+      { ...PATTERNS.recovery[0], phase: "recovery" },
+      profile,
+      catalog
+    );
+    if (safety) chosen.conservative = safety;
+  }
+
+  return INTENSITY_ORDER.filter((i) => chosen[i]).map((i) => chosen[i]);
 }
 
-// Export phase detection for testing / display
 export { detectPhase };
