@@ -1532,7 +1532,7 @@ function BiomarkerRow({ projection }) {
   );
 }
 
-function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) {
+function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose, onCreate }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} />
@@ -1565,7 +1565,12 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose }) 
             </button>
           ))}
         </div>
-        <button onClick={onClose} style={{ width: '100%', marginTop: 16, padding: '12px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+        {onCreate && (
+          <button onClick={onCreate} style={{ width: '100%', marginTop: 12, padding: '12px 16px', background: 'rgba(26,232,122,0.08)', border: '1px solid rgba(26,232,122,0.25)', borderRadius: 10, color: '#1ae87a', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            + New Eidolon
+          </button>
+        )}
+        <button onClick={onClose} style={{ width: '100%', marginTop: 12, padding: '12px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
           Cancel
         </button>
       </div>
@@ -2690,6 +2695,20 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* ═══ BUILDER MODE ═══ */}
       {editing && (
         <>
+          {/* #19 — eidolon context + switcher in builder mode (switching no longer requires lock-in) */}
+          {eidolons && eidolons.length >= 1 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0 14px", gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                Building: <span style={{ color: "#fff" }}>{activeEidolon?.name || "Eidolon 1"}</span>
+              </div>
+              <button
+                onClick={() => setShowEidolonSwitcher(true)}
+                style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "6px 14px", borderRadius: 100, flexShrink: 0, whiteSpace: "nowrap" }}
+              >
+                ⇄ Switch / New
+              </button>
+            </div>
+          )}
           {/* #6 — Guided two-path fork. First-timers pick a lane instead of seeing
               the generator, the matched list, and the full library all at once. */}
           {builderView === null && (
@@ -2923,6 +2942,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           activeEidolonId={activeEidolonId}
           onSelect={switchToEidolon}
           onClose={() => setShowEidolonSwitcher(false)}
+          onCreate={createNewEidolon}
         />
       )}
 
