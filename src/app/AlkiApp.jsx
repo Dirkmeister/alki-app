@@ -2131,9 +2131,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               Discard Changes
             </button>
           )}
-          <button onClick={() => setShowGoalsEditor(v => !v)} style={{ background: "none", border: "none", color: showGoalsEditor ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Goals
-          </button>
+          {editing && (
+            <button onClick={() => setShowGoalsEditor(v => !v)} style={{ background: "none", border: "none", color: showGoalsEditor ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Goals
+            </button>
+          )}
           <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Modeler
           </button>
@@ -2231,8 +2233,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       </div>
       )}
 
-      {/* Inline Goals Editor — collapsible */}
-      {showGoalsEditor && (
+      {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
+      {editing && showGoalsEditor && (
         <div style={{ ...S.card, borderColor: 'rgba(26,232,122,0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ ...S.label, marginBottom: 0 }}>Goals for {activeEidolon?.name || 'Eidolon 1'}</div>
@@ -2632,20 +2634,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 })}
               </div>
             ) : (
-              <button
-                onClick={() => setShowGoalsEditor(true)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: S.accent,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  padding: 0
-                }}
-              >
-                Set your goals →
-              </button>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+                No goals set. Tap <span style={{ color: S.accent, fontWeight: 600 }}>Modify</span> to change goals — they lock while a protocol is active.
+              </div>
             )}
           </div>
 
