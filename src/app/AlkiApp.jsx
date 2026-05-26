@@ -1739,7 +1739,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setShowTransform(false);
   };
 
-  const avatarParams = resolveAvatarParams(profile, selectedCompounds);
+  // #47 — memoize so unrelated re-renders (lock-in, auto-save, animateIn) don't
+  // hand the 3D avatar a fresh morphState object each time, which re-runs its
+  // per-mesh material traversal and compounds the GPU jank on the committed home.
+  const avatarParams = useMemo(
+    () => resolveAvatarParams(profile, selectedCompounds),
+    [profile, selectedCompounds]
+  );
 
   const hasVisualChange = selectedCompounds.some(id => {
     const c = COMPOUNDS.find(x => x.id === id);
