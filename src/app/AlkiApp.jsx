@@ -1584,9 +1584,16 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [showAvatarDebug, setShowAvatarDebug] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  // #6 — builder lane: null (chooser) | "recommend" | "build".
+  const [builderPath, setBuilderPath] = useState(null);
 
   const activeEidolon = eidolons?.find(e => e.id === activeEidolonId) || eidolons?.[0] || null;
   const isModifying = editing && activeEidolon?.lockedAt != null;
+  // #6 — which builder lane to render. A live selection or a modify-flow skips
+  // the chooser and lands in the manual lane; a fresh empty build shows the fork.
+  const builderView = (selectedCompounds.length > 0 || isModifying)
+    ? (builderPath || "build")
+    : builderPath;
 
   // ── Eidolon helpers ──
   // Ref keeps the latest eidolons accessible inside callbacks without
@@ -2615,127 +2622,203 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* ═══ BUILDER MODE ═══ */}
       {editing && (
         <>
-          {/* Stack Generator */}
-          <StackGenerator
-            profile={profile}
-            compoundCatalog={COMPOUNDS}
-            onLoadStack={(compoundIds) => {
-              setSelectedCompounds(compoundIds);
-              setShowTransform(false);
-            }}
-          />
-
-          {/* Timeline CTA */}
-          {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
-            <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              View Research Timeline →
-            </button>
-          )}
-
-          {/* Stack Intelligence — compact */}
-          {selectedCompounds.length > 0 && (
-            <StackIntelligence
-              stackIds={selectedCompounds}
-              userProfile={profile}
-              onRemoveCompound={toggleCompound}
-              mode="compact"
-            />
-          )}
-
-          {/* Recommended compounds */}
-          {/* Category filter tabs */}
-          {(() => {
-            const cats = [...new Set(recommended.map(r => r.compound.category))];
-            if (cats.length <= 1) return null;
-            return (
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-                {["All", ...cats].map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => { setCategoryFilter(cat); setShowAllRecommended(false); }}
-                    style={{
-                      padding: "6px 12px", borderRadius: 100, fontSize: 11, fontWeight: 600,
-                      background: categoryFilter === cat ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${categoryFilter === cat ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.08)"}`,
-                      color: categoryFilter === cat ? S.accent : "rgba(255,255,255,0.4)",
-                      cursor: "pointer", fontFamily: "inherit",
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
-
-          <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
-            Matched to Your Profile — {recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length} compound{recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length !== 1 ? "s" : ""}
-          </div>
-          {(() => {
-            const filtered = recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter);
-            const visible = showAllRecommended ? filtered : filtered.slice(0, 6);
-            const hasMore = filtered.length > 6 && !showAllRecommended;
-            return (
-              <>
-                {filtered.length === 0 && (
-                  <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
-                    No compounds match your current profile and goals. Try adjusting your goals, or browse the full library below.
-                  </div>
-                )}
-                {visible.map(rec => (
-                  <CompoundCard
-                    key={rec.compound.id}
-                    rec={rec}
-                    isSelected={selectedCompounds.includes(rec.compound.id)}
-                    onToggle={() => toggleCompound(rec.compound.id)}
-                  />
-                ))}
-                {hasMore && (
-                  <button
-                    onClick={() => setShowAllRecommended(true)}
-                    style={{ ...S.btnOutline, marginTop: 8, marginBottom: 4, fontSize: 12, padding: "10px 16px" }}
-                  >
-                    Show {filtered.length - 6} more matched compounds
-                  </button>
-                )}
-              </>
-            );
-          })()}
-
-          {/* Browse all — collapsible */}
-          {otherCompounds.length > 0 && (
+          {/* #6 — Guided two-path fork. First-timers pick a lane instead of seeing
+              the generator, the matched list, and the full library all at once. */}
+          {builderView === null && (
             <>
+              <div style={{ ...S.label, marginTop: 8, marginBottom: 12 }}>
+                How do you want to build this protocol?
+              </div>
+
               <button
-                onClick={() => setShowOtherCompounds(v => !v)}
+                onClick={() => setBuilderPath("recommend")}
                 style={{
-                  ...S.btnOutline, marginTop: 20, marginBottom: 12,
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "13px 16px", fontSize: 13
+                  ...S.card, width: "100%", textAlign: "left", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 14, marginBottom: 12,
+                  background: "linear-gradient(135deg, rgba(34,214,138,0.12), rgba(34,214,138,0.03))",
+                  border: "1px solid rgba(34,214,138,0.35)", fontFamily: "inherit",
                 }}
               >
-                <span>{showOtherCompounds ? "Hide" : "Browse"} all compounds ({otherCompounds.length} more)</span>
-                <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: showOtherCompounds ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>⚡</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 700, color: S.accent, marginBottom: 4 }}>
+                    Recommend a Stack
+                  </span>
+                  <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
+                    Alki builds 2–3 research protocols matched to your profile, ranked conservative to aggressive. Best if you're new to peptides.
+                  </span>
+                </span>
+                <span style={{ fontSize: 16, color: S.accent, flexShrink: 0 }}>→</span>
               </button>
-              {showOtherCompounds && (
+
+              <button
+                onClick={() => setBuilderPath("build")}
+                style={{
+                  ...S.card, width: "100%", textAlign: "left", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 14, fontFamily: "inherit",
+                }}
+              >
+                <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>🧪</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                    Build My Own
+                  </span>
+                  <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
+                    Browse compounds matched to your goals and assemble a custom stack. Best if you already know what you're researching.
+                  </span>
+                </span>
+                <span style={{ fontSize: 16, color: "rgba(255,255,255,0.4)", flexShrink: 0 }}>→</span>
+              </button>
+            </>
+          )}
+
+          {/* RECOMMEND LANE — guided generator */}
+          {builderView === "recommend" && (
+            <>
+              <button
+                onClick={() => setBuilderPath("build")}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "4px 0", marginBottom: 4 }}
+              >
+                ← Build my own instead
+              </button>
+              <StackGenerator
+                profile={profile}
+                compoundCatalog={COMPOUNDS}
+                defaultExpanded
+                onLoadStack={(compoundIds) => {
+                  setSelectedCompounds(compoundIds);
+                  setShowTransform(false);
+                }}
+              />
+            </>
+          )}
+
+          {/* SHARED — current selection: timeline + intelligence */}
+          {builderView !== null && selectedCompounds.length > 0 && (
+            <>
+              {/* Timeline CTA */}
+              {!stackAnalysis.isBlocked && (
+                <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  View Research Timeline →
+                </button>
+              )}
+
+              {/* Stack Intelligence — compact */}
+              <StackIntelligence
+                stackIds={selectedCompounds}
+                userProfile={profile}
+                onRemoveCompound={toggleCompound}
+                mode="compact"
+              />
+            </>
+          )}
+
+          {/* BUILD LANE — manual compound selection */}
+          {builderView === "build" && (
+            <>
+              <button
+                onClick={() => setBuilderPath("recommend")}
+                style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "4px 0", marginBottom: 4, marginTop: 4 }}
+              >
+                ⚡ Recommend a stack for me instead
+              </button>
+
+              {/* Recommended compounds */}
+              {/* Category filter tabs */}
+              {(() => {
+                const cats = [...new Set(recommended.map(r => r.compound.category))];
+                if (cats.length <= 1) return null;
+                return (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                    {["All", ...cats].map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => { setCategoryFilter(cat); setShowAllRecommended(false); }}
+                        style={{
+                          padding: "6px 12px", borderRadius: 100, fontSize: 11, fontWeight: 600,
+                          background: categoryFilter === cat ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${categoryFilter === cat ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.08)"}`,
+                          color: categoryFilter === cat ? S.accent : "rgba(255,255,255,0.4)",
+                          cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
+                Matched to Your Profile — {recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length} compound{recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length !== 1 ? "s" : ""}
+              </div>
+              {(() => {
+                const filtered = recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter);
+                const visible = showAllRecommended ? filtered : filtered.slice(0, 6);
+                const hasMore = filtered.length > 6 && !showAllRecommended;
+                return (
+                  <>
+                    {filtered.length === 0 && (
+                      <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
+                        No compounds match your current profile and goals. Try adjusting your goals, or browse the full library below.
+                      </div>
+                    )}
+                    {visible.map(rec => (
+                      <CompoundCard
+                        key={rec.compound.id}
+                        rec={rec}
+                        isSelected={selectedCompounds.includes(rec.compound.id)}
+                        onToggle={() => toggleCompound(rec.compound.id)}
+                      />
+                    ))}
+                    {hasMore && (
+                      <button
+                        onClick={() => setShowAllRecommended(true)}
+                        style={{ ...S.btnOutline, marginTop: 8, marginBottom: 4, fontSize: 12, padding: "10px 16px" }}
+                      >
+                        Show {filtered.length - 6} more matched compounds
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Browse all — collapsible */}
+              {otherCompounds.length > 0 && (
                 <>
-                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>
-                    These compounds fall outside your goals, body fat range, or experience tier. Some are educational reference only — read the full profile before considering.
-                  </p>
-                  {otherCompounds.map(rec => (
-                    <CompoundCard
-                      key={rec.compound.id}
-                      rec={rec}
-                      isSelected={selectedCompounds.includes(rec.compound.id)}
-                      onToggle={() => toggleCompound(rec.compound.id)}
-                    />
-                  ))}
+                  <button
+                    onClick={() => setShowOtherCompounds(v => !v)}
+                    style={{
+                      ...S.btnOutline, marginTop: 20, marginBottom: 12,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "13px 16px", fontSize: 13
+                    }}
+                  >
+                    <span>{showOtherCompounds ? "Hide" : "Browse"} all compounds ({otherCompounds.length} more)</span>
+                    <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: showOtherCompounds ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                  </button>
+                  {showOtherCompounds && (
+                    <>
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>
+                        These compounds fall outside your goals, body fat range, or experience tier. Some are educational reference only — read the full profile before considering.
+                      </p>
+                      {otherCompounds.map(rec => (
+                        <CompoundCard
+                          key={rec.compound.id}
+                          rec={rec}
+                          isSelected={selectedCompounds.includes(rec.compound.id)}
+                          onToggle={() => toggleCompound(rec.compound.id)}
+                        />
+                      ))}
+                    </>
+                  )}
                 </>
               )}
             </>
           )}
 
-          {/* Fixed bottom CTA bar — always visible while building */}
-          {selectedCompounds.length > 0 && (
+          {/* Fixed bottom CTA bar — always visible once a stack exists */}
+          {builderView !== null && selectedCompounds.length > 0 && (
             <>
               {/* Spacer so content isn't hidden behind the fixed bar */}
               <div style={{ height: 80 }} />

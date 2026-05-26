@@ -34,8 +34,8 @@ const INTENSITY_LABELS = {
   aggressive: "Aggressive",
 };
 
-export default function StackGenerator({ profile, compoundCatalog, onLoadStack }) {
-  const [expanded, setExpanded] = useState(false);
+export default function StackGenerator({ profile, compoundCatalog, onLoadStack, defaultExpanded = false }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [openStackId, setOpenStackId] = useState(null);
 
   const stacks = useMemo(
