@@ -314,7 +314,10 @@ function buildTimeline(rawStack, cycleLength, compoundCatalog) {
     const p = resolveProfile(item.id);
     return p ? { ...item, _profile: p } : item;
   }).filter(i => i._profile).map(i => ({ id: i.id, suppressionLevel: i._profile.suppressionLevel })));
-  const pct = PCT_PROTOCOLS[suppressionLevel === "none" ? "mild" : suppressionLevel];
+  // No HPTA suppression (pure peptide/recovery stacks) -> no PCT and no recovery
+  // phase. Forcing a "mild" PCT here previously added an irrelevant PCT + Recovery
+  // block to clean stacks and a contradictory "none / PCT" summary (#28).
+  const pct = suppressionLevel === "none" ? null : PCT_PROTOCOLS[suppressionLevel];
 
   // Per-compound cycle end
   const compoundEnds = {};
@@ -367,7 +370,7 @@ function buildTimeline(rawStack, cycleLength, compoundCatalog) {
     }
     bloodwork.push({
       week: cycleLength + (pct?.durationWeeks || 0) + 1,
-      label: "Post-PCT recovery",
+      label: pct ? "Post-PCT recovery" : "Post-cycle check",
       panel: "Full pre-cycle panel — verify T and LH/FSH recovered",
     });
   }
@@ -553,6 +556,11 @@ function PhaseBar({ phases, totalWeeks }) {
                 color: color.base,
                 whiteSpace: "nowrap",
                 padding: "0 6px",
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                display: "block",
+                boxSizing: "border-box",
               }}>
                 {width > 12 ? p.label : ""}
               </span>
@@ -1089,17 +1097,19 @@ function Header({ onBack }) {
         <button
           onClick={onBack}
           style={{
-            background: "transparent",
-            border: "none",
-            color: TOKENS.textSecondary,
-            fontSize: 13,
-            padding: 0,
+            background: TOKENS.surface,
+            border: `1px solid ${TOKENS.borderStrong}`,
+            color: TOKENS.textPrimary,
+            fontSize: 14,
+            fontWeight: 600,
+            padding: "8px 14px",
+            borderRadius: 10,
             cursor: "pointer",
             fontFamily: FONT_STACK,
             marginBottom: 16,
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
-            gap: 4,
+            gap: 6,
           }}
         >
           ← Back
@@ -1176,6 +1186,11 @@ export default function CycleTimeline({
   }, [timeline.totalWeeks, selectedWeek]);
 
   const selectedWeekData = timeline.weeks[selectedWeek - 1];
+
+  // #29 — surface only the phases/markers actually present in THIS protocol.
+  const usedPhaseKeys = new Set(timeline.phases.map(p => p.type));
+  (timeline.lanes || []).forEach(l => (l.segments || []).forEach(seg => usedPhaseKeys.add(seg.phase)));
+  const hasBloodwork = (timeline.bloodwork || []).length > 0;
 
   const containerStyle = {
     maxWidth: 480,
@@ -1273,7 +1288,26 @@ export default function CycleTimeline({
       <SectionLabel>Protocol phases</SectionLabel>
       <PhaseBar phases={timeline.phases} totalWeeks={timeline.totalWeeks} />
 
-      {/* Suppression / PCT summary */}
+      {/* Legend — directly under the bar, only phases present in this protocol (#29) */}
+      <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: "8px 14px", alignItems: "center" }}>
+        {Object.entries(TOKENS.phase)
+          .filter(([key]) => usedPhaseKeys.has(key))
+          .map(([key, val]) => (
+            <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: TOKENS.textSecondary }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: val.base }} />
+              {val.label}
+            </div>
+          ))}
+        {hasBloodwork && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: TOKENS.textSecondary }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: TOKENS.bloodwork, boxShadow: `0 0 6px ${TOKENS.bloodwork}` }} />
+            Bloodwork
+          </div>
+        )}
+      </div>
+
+      {/* Suppression / PCT summary — only when the stack actually suppresses (#28) */}
+      {timeline.suppressionLevel !== "none" && (
       <div style={{
         marginTop: 16,
         padding: "10px 14px",
@@ -1327,6 +1361,7 @@ export default function CycleTimeline({
           </div>
         </div>
       </div>
+      )}
 
       <SectionLabel style={{ marginTop: 28 }}>Week-by-week</SectionLabel>
       <WeekStrip
@@ -1343,64 +1378,6 @@ export default function CycleTimeline({
           totalWeeks={timeline.totalWeeks}
           cycleLength={cycleLength}
         />
-      </div>
-
-      {/* Legend */}
-      <div style={{
-        marginTop: 24,
-        padding: "14px 16px",
-        background: TOKENS.surface,
-        border: `1px solid ${TOKENS.border}`,
-        borderRadius: 12,
-      }}>
-        <div style={{
-          fontSize: 10,
-          fontFamily: MONO_STACK,
-          fontWeight: 600,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: TOKENS.textTertiary,
-          marginBottom: 10,
-        }}>
-          Legend
-        </div>
-        <div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "10px 14px",
-        }}>
-          {Object.entries(TOKENS.phase).map(([key, val]) => (
-            <div key={key} style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 11,
-              color: TOKENS.textSecondary,
-            }}>
-              <span style={{
-                width: 10, height: 10,
-                borderRadius: 3,
-                background: val.base,
-              }} />
-              {val.label}
-            </div>
-          ))}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 11,
-            color: TOKENS.textSecondary,
-          }}>
-            <span style={{
-              width: 8, height: 8,
-              borderRadius: "50%",
-              background: TOKENS.bloodwork,
-              boxShadow: `0 0 6px ${TOKENS.bloodwork}`,
-            }} />
-            Bloodwork
-          </div>
-        </div>
       </div>
 
       {/* Disclaimer */}
