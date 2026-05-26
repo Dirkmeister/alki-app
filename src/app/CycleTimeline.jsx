@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, Fragment } from "react";
 
 /**
  * ============================================================
@@ -979,8 +979,22 @@ function WeekDetail({ week }) {
   );
 }
 
+// #41/#42 — classify each compound's role so support compounds read as support
+// (not mysterious core picks) in the cycle view.
+const ROLE_ORDER = ["Core protocol", "Recovery support", "On-cycle support"];
+function laneRole(category) {
+  if (category === "Cycle Support" || category === "Hair Support") return "On-cycle support";
+  if (category === "Recovery") return "Recovery support";
+  return "Core protocol";
+}
+
 function CompoundLanes({ lanes, totalWeeks, cycleLength }) {
   if (lanes.length === 0) return null;
+  // Group by role; show role sub-headers only when the stack spans >1 role.
+  const ordered = [...lanes].sort(
+    (a, b) => ROLE_ORDER.indexOf(laneRole(a.category)) - ROLE_ORDER.indexOf(laneRole(b.category))
+  );
+  const multiRole = new Set(lanes.map((l) => laneRole(l.category))).size > 1;
   return (
     <div style={{
       background: TOKENS.surface,
@@ -1001,8 +1015,17 @@ function CompoundLanes({ lanes, totalWeeks, cycleLength }) {
         Stack Timeline
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {lanes.map(lane => (
-          <div key={lane.id}>
+        {ordered.map((lane, idx) => {
+          const role = laneRole(lane.category);
+          const showHeader = multiRole && (idx === 0 || laneRole(ordered[idx - 1].category) !== role);
+          return (
+            <Fragment key={lane.id}>
+              {showHeader && (
+                <div style={{ fontSize: 10, fontFamily: MONO_STACK, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: TOKENS.textSecondary, marginTop: idx === 0 ? 2 : 8, marginBottom: 2 }}>
+                  {role}
+                </div>
+              )}
+              <div>
             <div style={{
               display: "flex",
               justifyContent: "space-between",
@@ -1058,8 +1081,10 @@ function CompoundLanes({ lanes, totalWeeks, cycleLength }) {
                 background: "rgba(255,255,255,0.30)",
               }} />
             </div>
-          </div>
-        ))}
+              </div>
+            </Fragment>
+          );
+        })}
       </div>
     </div>
   );
@@ -1417,7 +1442,7 @@ function generateFallbackProfile(compound) {
   if (c.cycle) {
     const m = c.cycle.match(/(\d+)\s*(?:–|-|to)\s*(\d+)\s*week/i) || c.cycle.match(/(\d+)\s*week/i);
     if (m) standardWeeks = parseInt(m[2] || m[1]) || 12;
-    if (/ongoing|indefinite|as needed/i.test(c.cycle)) standardWeeks = 0;
+    if (/ongoing|indefinite|as needed|sustainable|long.?term/i.test(c.cycle)) standardWeeks = 0;
   }
 
   // Detect frequency from dosing string
