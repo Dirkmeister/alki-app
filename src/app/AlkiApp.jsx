@@ -2625,24 +2625,6 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             }}
           />
 
-          {/* Projection CTA */}
-          {selectedCompounds.length > 0 && (
-            <button
-              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-              disabled={stackAnalysis.isBlocked}
-              style={{
-                ...S.btn,
-                ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
-                marginBottom: 12,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8
-              }}
-            >
-              {stackAnalysis.isBlocked
-                ? "Resolve Contraindications to Continue"
-                : `View Eidolon Projection (${selectedCompounds.length} compound${selectedCompounds.length > 1 ? "s" : ""}) →`}
-            </button>
-          )}
-
           {/* Timeline CTA */}
           {selectedCompounds.length > 0 && !stackAnalysis.isBlocked && (
             <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -2752,30 +2734,33 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             </>
           )}
 
-          {/* Sticky bottom CTA bar — floats at bottom of viewport while scrolling */}
+          {/* Fixed bottom CTA bar — always visible while building */}
           {selectedCompounds.length > 0 && (
-            <div style={{
-              position: "sticky", bottom: 0, left: 0, right: 0,
-              padding: "12px 0 16px", zIndex: 50,
-              background: "linear-gradient(to top, #0a0a0a 70%, transparent)",
-              pointerEvents: "none",
-            }}>
-              <button
-                onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-                disabled={stackAnalysis.isBlocked}
-                style={{
-                  ...S.btn,
-                  ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  pointerEvents: "auto",
-                  boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
-                }}
-              >
-                {stackAnalysis.isBlocked
-                  ? "Resolve Contraindications"
-                  : `View Eidolon Projection (${selectedCompounds.length}) →`}
-              </button>
-            </div>
+            <>
+              {/* Spacer so content isn't hidden behind the fixed bar */}
+              <div style={{ height: 80 }} />
+              <div style={{
+                position: "fixed", bottom: 0, left: 0, right: 0,
+                padding: "12px 20px 20px", zIndex: 100,
+                background: "linear-gradient(to top, #0a0a0a 85%, transparent)",
+              }}>
+                <button
+                  onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+                  disabled={stackAnalysis.isBlocked}
+                  style={{
+                    ...S.btn,
+                    ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    maxWidth: 480, margin: "0 auto",
+                    boxShadow: "0 -4px 24px rgba(0,0,0,0.6)",
+                  }}
+                >
+                  {stackAnalysis.isBlocked
+                    ? "Resolve Contraindications"
+                    : `View Eidolon Projection (${selectedCompounds.length}) →`}
+                </button>
+              </div>
+            </>
           )}
         </>
       )}
