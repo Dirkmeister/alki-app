@@ -837,11 +837,26 @@ const ACCENT = "#22d68a";
 const ACCENT_DIM = "rgba(34,214,138,0.08)";
 const ACCENT_BORDER = "rgba(34,214,138,0.2)";
 
-export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal }) {
-  const initTab = activeCompound ? "Compound" : activeGoal ? "Goal" : "Compound";
+// ── #18 — contextual scoping: match the user's stack (compound display names)
+// to COMPOUND_FAQS keys via normalized substring (handles "RAD-140 (Testolone)" etc.)
+const _normFaq = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function stackFaqKeysFor(contextCompounds) {
+  if (!contextCompounds || !contextCompounds.length) return [];
+  const ctx = contextCompounds.map(_normFaq).filter(Boolean);
+  return Object.keys(COMPOUND_FAQS).filter((k) => {
+    const kn = _normFaq(k);
+    return ctx.some((c) => kn.includes(c) || c.includes(kn));
+  });
+}
+
+export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, contextCompounds = [] }) {
+  const initStackKeys = stackFaqKeysFor(contextCompounds);
+  const initTab = (activeCompound || initStackKeys.length) ? "Compound" : activeGoal ? "Goal" : "Compound";
   const [tab, setTab] = useState(initTab);
   const [selectedCompound, setSelectedCompound] = useState(
-    activeCompound && COMPOUND_FAQS[activeCompound] ? activeCompound : Object.keys(COMPOUND_FAQS)[0]
+    activeCompound && COMPOUND_FAQS[activeCompound]
+      ? activeCompound
+      : (initStackKeys[0] || Object.keys(COMPOUND_FAQS)[0])
   );
   const [selectedGoal, setSelectedGoal] = useState(
     activeGoal && GOAL_FAQS[activeGoal] ? activeGoal : Object.keys(GOAL_FAQS)[0]
@@ -850,6 +865,9 @@ export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal }) {
   const [selectedGeneral, setSelectedGeneral] = useState(0);
   const [openItems, setOpenItems] = useState({});
   const [search, setSearch] = useState("");
+  const [showAllCompounds, setShowAllCompounds] = useState(false); // #18
+  const stackKeys = useMemo(() => stackFaqKeysFor(contextCompounds), [contextCompounds]); // #18
+  const stackKeySet = useMemo(() => new Set(stackKeys), [stackKeys]);
 
   const toggleItem = (key) =>
     setOpenItems((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -954,15 +972,48 @@ export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal }) {
           <div style={S.twoCol}>
             {/* Sidebar */}
             <div style={S.sidebar}>
-              {tab === "Compound" && Object.entries(COMPOUND_FAQS).map(([name, data]) => (
-                <SidebarBtn
-                  key={name}
-                  active={selectedCompound === name}
-                  onClick={() => { setSelectedCompound(name); setOpenItems({}); }}
-                  label={name}
-                  sub={data.category}
-                />
-              ))}
+              {tab === "Compound" && (stackKeys.length === 0
+                ? Object.entries(COMPOUND_FAQS).map(([name, data]) => (
+                    <SidebarBtn
+                      key={name}
+                      active={selectedCompound === name}
+                      onClick={() => { setSelectedCompound(name); setOpenItems({}); }}
+                      label={name}
+                      sub={data.category}
+                    />
+                  ))
+                : (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#22d68a", padding: "2px 4px 8px" }}>Your Stack</div>
+                    {Object.entries(COMPOUND_FAQS).filter(([n]) => stackKeySet.has(n)).map(([name, data]) => (
+                      <SidebarBtn
+                        key={name}
+                        active={selectedCompound === name}
+                        onClick={() => { setSelectedCompound(name); setOpenItems({}); }}
+                        label={name}
+                        sub={data.category}
+                      />
+                    ))}
+                    {Object.keys(COMPOUND_FAQS).length > stackKeys.length && (
+                      <button
+                        onClick={() => setShowAllCompounds((v) => !v)}
+                        style={{ width: "100%", textAlign: "left", background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "10px 4px 6px" }}
+                      >
+                        {showAllCompounds ? "− Hide other compounds" : `+ Show all compounds (${Object.keys(COMPOUND_FAQS).length - stackKeys.length})`}
+                      </button>
+                    )}
+                    {showAllCompounds && Object.entries(COMPOUND_FAQS).filter(([n]) => !stackKeySet.has(n)).map(([name, data]) => (
+                      <SidebarBtn
+                        key={name}
+                        active={selectedCompound === name}
+                        onClick={() => { setSelectedCompound(name); setOpenItems({}); }}
+                        label={name}
+                        sub={data.category}
+                      />
+                    ))}
+                  </>
+                )
+              )}
               {tab === "Goal" && Object.entries(GOAL_FAQS).map(([goal, data]) => (
                 <SidebarBtn
                   key={goal}

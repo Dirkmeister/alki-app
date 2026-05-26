@@ -3613,9 +3613,12 @@ export default function AlkiApp() {
           onLogsChanged={setProgressLogs}
         />
       )}
-      {screen === "qa" && (
-        <AlkiProtocolQA onBack={() => setScreen("dashboard")} />
-      )}
+      {screen === "qa" && (() => {
+        // #18 — scope Q&A to the user's stack: committed → locked stack, else builder selection
+        const qaIds = (activeProtocol?.compounds?.length ? activeProtocol.compounds : selectedCompounds) || [];
+        const qaNames = qaIds.map(id => COMPOUNDS.find(c => c.id === id)?.name).filter(Boolean);
+        return <AlkiProtocolQA onBack={() => setScreen("dashboard")} contextCompounds={qaNames} />;
+      })()}
       {screen === "timeline" && (
         <CycleTimeline
           stack={selectedCompounds}
