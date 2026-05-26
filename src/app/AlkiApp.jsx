@@ -44,6 +44,10 @@ const SITE_URL =
 // ═══════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────
+// App version — bump on every commit so testers can confirm which deploy
+// they're viewing. Shown on the splash/enter screen (upper-left).
+const APP_VERSION = "0.1.76";
+
 // Baseline test profile — average male, useful neutral starting point
 // for evaluating stacks and testing the new-user flow without creating
 // an account. Triggered from the auth screen.
@@ -947,6 +951,10 @@ function SplashScreen({ onEnter }) {
 
   return (
     <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center", position: "relative" }}>
+      {/* Build version — upper-left, bumped each commit */}
+      <div style={{ position: "absolute", top: 16, left: 16, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em", zIndex: 2 }}>
+        v{APP_VERSION}
+      </div>
       {/* Atmospheric gradient orbs */}
       <div style={{ position: "absolute", top: "10%", left: "20%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,232,122,0.06) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none", opacity: phase >= 1 ? 1 : 0, transition: "opacity 1.5s ease" }} />
       <div style={{ position: "absolute", bottom: "15%", right: "10%", width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,120,232,0.04) 0%, transparent 70%)", filter: "blur(40px)", pointerEvents: "none", opacity: phase >= 2 ? 1 : 0, transition: "opacity 1.5s ease" }} />
