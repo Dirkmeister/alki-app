@@ -57,6 +57,21 @@ const BASELINE_PROFILE = {
   goals: ["fat_loss", "muscle", "recovery"],
   adv: { skelMuscle: "39.4", fatFreeMass: "148", subFat: "16.2", visceralFat: "8", bodyWater: "55.8", muscleMass: "73", boneMass: "7.4", bmr: "1810" }
 };
+
+// #47 repro — lean user + the 10-compound "banger" stack that crashed the
+// committed home. Loads straight into the dashboard builder so the crash
+// flow (project → lock in → main) can be reproduced in a couple of taps.
+const CRASH_REPRO_PROFILE = {
+  sex: "male",
+  age: 28,
+  heightFt: 5,
+  heightIn: 7,
+  weight: 138,
+  bodyFat: 7.5,
+  goals: ["muscle", "fat_loss", "recovery"],
+  adv: { skelMuscle: "59.8", fatFreeMass: "128.9", subFat: "7.1", visceralFat: "3", bodyWater: "66.7", muscleMass: "122.7", boneMass: "6.2", bmr: "1633" }
+};
+const CRASH_REPRO_STACK = ["rad140", "lgd4033", "mk677", "fragment176", "sr9009", "bpc157", "cjc1295_nodac", "ipamorelin", "tb500", "tadalafil"];
 // ─────────────────────────────────────────────────────────────
 
 // ── COMPOUND DATABASE ──────────────────────────────────────
@@ -3047,7 +3062,7 @@ async function saveProfile(userId, profile, selectedCompounds, avatarUrl, active
 }
 
 // ── AUTH SCREEN ────────────────────────────────────────────
-function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
+function AuthScreen({ onAuth, onBack, onSkip, onBaseline, onCrashRepro }) {
   const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -3265,6 +3280,24 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
               letterSpacing: "0.04em",
             }}>
               ⚙ Baseline User (Dev)
+            </button>
+          </div>
+        )}
+
+        {onCrashRepro && (
+          <div style={{ textAlign: "center", marginTop: 8 }}>
+            <button onClick={onCrashRepro} style={{
+              background: "none",
+              border: "1px solid rgba(255,77,77,0.25)",
+              color: "rgba(255,77,77,0.6)",
+              fontSize: 11,
+              cursor: "pointer",
+              fontFamily: "'JetBrains Mono', monospace",
+              padding: "8px 16px",
+              borderRadius: 8,
+              letterSpacing: "0.04em",
+            }}>
+              ⚠ Crash Repro · 10-stack (Dev)
             </button>
           </div>
         )}
@@ -3582,6 +3615,21 @@ export default function AlkiApp() {
             setAvatarHeadshot(null);
             setOnboardingStartStep(0);
             setScreen("onboarding");
+          }}
+          onCrashRepro={() => {
+            // #47 repro — load the lean profile + 10-compound stack straight
+            // into the dashboard builder. No Supabase user; nothing persisted.
+            setUser(null);
+            setProfile({ ...CRASH_REPRO_PROFILE });
+            setSelectedCompounds([...CRASH_REPRO_STACK]);
+            setShowTransform(false);
+            setActiveProtocol(null);
+            setEidolons([]);
+            setActiveEidolonId(null);
+            setAvatarUrl(DEFAULT_AVATAR_URL);
+            setAvatarHeadshot(null);
+            setOnboardingStartStep(null);
+            setScreen("dashboard");
           }}
         />
       )}
