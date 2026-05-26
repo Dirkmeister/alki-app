@@ -1,6 +1,6 @@
 "use client";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, ContactShadows, useGLTF } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, useGLTF } from "@react-three/drei";
 import { useRef, Suspense, useMemo, useEffect, useState } from "react";
 import * as THREE from "three";
 import { MORPH_KEYS, MORPH_TARGETS } from "./lib/morphTargets";
@@ -38,6 +38,7 @@ import { MORPH_KEYS, MORPH_TARGETS } from "./lib/morphTargets";
 
 function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) {
   const { fat = 0, muscle = 0, morphState = null } = params || {};
+  const invalidate = useThree((s) => s.invalidate);
   const groupRef = useRef();
   const { scene } = useGLTF(url);
   const cloned = useMemo(() => scene.clone(true), [scene]);
@@ -217,6 +218,11 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
     });
   }, [cloned, glow, morphState]);
 
+  // #47 — frameloop is "demand": the scale/morph/material effects above mutate
+  // the scene imperatively, so request a repaint whenever a visual input changes
+  // (otherwise the model can render blank until the next interaction).
+  useEffect(() => { invalidate(); }, [cloned, fat, muscle, glow, morphState, useShapeKeys, invalidate]);
+
   useFrame((_, delta) => {
     if (autoRotate && groupRef.current) {
       groupRef.current.rotation.y += delta * 0.2;
@@ -274,10 +280,10 @@ export default function Body3DAvatar({
     <div style={{ textAlign: "center" }}>
       <div style={wrapStyle}>
         <Canvas
-          shadows
-          dpr={[1, 2]}
+          frameloop="demand"
+          dpr={[1, 1.5]}
           camera={{ position: camPos, fov: camFov }}
-          gl={{ antialias: true, alpha: true }}
+          gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
           style={{ background: "transparent" }}
         >
           <ambientLight intensity={0.42} />
@@ -285,9 +291,6 @@ export default function Body3DAvatar({
             position={[2.5, 4, 3]}
             intensity={1.15}
             color="#ffffff"
-            castShadow
-            shadow-mapSize-width={1024}
-            shadow-mapSize-height={1024}
           />
           <directionalLight position={[-2.5, 2, 2]} intensity={0.5} color="#a8c8ff" />
           <directionalLight position={[0, 3.5, -2]} intensity={0.55} color="#ffffff" />
@@ -297,16 +300,6 @@ export default function Body3DAvatar({
 
           <Suspense fallback={null}>
             <GLBAvatar url={avatarUrl} params={effectiveParams} glow={glow} autoRotate={autoRotate} />
-            {!isSmall && (
-              <ContactShadows
-                position={[0, 0, 0]}
-                opacity={0.45}
-                scale={3}
-                blur={2.4}
-                far={1.2}
-                resolution={512}
-              />
-            )}
           </Suspense>
 
           {interactive && (
