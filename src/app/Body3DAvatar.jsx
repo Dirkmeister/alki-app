@@ -126,8 +126,11 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
   // ── Apply legacy fat/muscle scaling (LEGACY MODE) ────────────────
   useEffect(() => {
     if (!cloned || useShapeKeys) return;
-    const sx = 1.0 + fat * 0.10 + muscle * 0.02;
-    const sz = 1.0 + fat * 0.08 + muscle * 0.03;
+    // #21 — widened fat/muscle influence so projected vs current reads on a
+    // phone (legacy scale mode is what the current Avaturn GLB uses — no shape
+    // keys). Kept moderate to avoid visibly distorting the human mesh.
+    const sx = 1.0 + fat * 0.18 + muscle * 0.05;
+    const sz = 1.0 + fat * 0.15 + muscle * 0.06;
 
     cloned.traverse((obj) => {
       if (!obj.isMesh) return;

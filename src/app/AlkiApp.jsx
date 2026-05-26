@@ -408,6 +408,13 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
   const baseFat = Math.max(0, Math.min(1, (bf - 6) / 34));
   const baseMuscle = isMale ? 0.5 : 0.35;
 
+  // #21 — projected morph deltas. Per-cycle effects are small: under the old
+  // /100 scaling a -6% BF cut moved the SVG waist ~2px — invisible on a phone.
+  // Fix: scale the BF effect into the SAME 0..1 space as baseFat (the 6–40%
+  // range = ÷34) instead of ÷100, give muscle a calibrated gain, and multiply
+  // the projected delta by MORPH_GAIN so before/after reads clearly on mobile —
+  // without touching the `current` baseline (the user's real body). Tunable.
+  const MORPH_GAIN = 1.8;
   let fatMod = 0;
   let muscleMod = 0;
   let skinMod = 0;
@@ -415,8 +422,8 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
   for (const cid of selectedCompounds) {
     const c = COMPOUNDS.find(x => x.id === cid);
     if (c) {
-      fatMod += c.effects.bf / 100;
-      muscleMod += c.effects.muscle / 100;
+      fatMod += c.effects.bf / 34;
+      muscleMod += c.effects.muscle / 60;
       skinMod += c.effects.skin;
     }
   }
@@ -441,9 +448,9 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
       morphState: morphStates.current
     },
     projected: {
-      fat: Math.max(0, Math.min(1, baseFat + fatMod)),
-      muscle: Math.max(0, Math.min(1, baseMuscle + muscleMod)),
-      skin: skinMod,
+      fat: Math.max(0, Math.min(1, baseFat + fatMod * MORPH_GAIN)),
+      muscle: Math.max(0, Math.min(1, baseMuscle + muscleMod * MORPH_GAIN)),
+      skin: skinMod * MORPH_GAIN,
       isMale,
       morphState: morphStates.projected
     }
