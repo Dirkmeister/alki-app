@@ -111,7 +111,7 @@ export const EXPANDED_COMPOUNDS = [
     cons: ["Hypoglycemia risk — requires food management", "Receptor downregulation requires strict cycling", "Theoretical cancer concern (strongest of GH-axis class)", "Not appropriate as first peptide cycle"],
     effects: { bf: -1, muscle: 5, skin: 0.8, recovery: 1 },
     suitability: { minBf: 8, maxBf: 25, goals: ["muscle", "recovery"] },
-    contraindications: ["below15bf"],
+    contraindications: [],
     visualChange: true,
     riskTier: "moderate",
     experienceLevel: "advanced"
@@ -259,7 +259,7 @@ export const EXPANDED_COMPOUNDS = [
     cons: ["High suppression — full PCT mandatory", "Mood flatness and libido decline mid-cycle", "Lipid impact (HDL reduction)", "Hair loss risk in susceptible users"],
     effects: { bf: -2.5, muscle: 9, skin: 0, recovery: 1 },
     suitability: { minBf: 8, maxBf: 20, goals: ["muscle", "performance"] },
-    contraindications: ["below15bf"],
+    contraindications: [],
     visualChange: true,
     riskTier: "moderate",
     experienceLevel: "intermediate"
@@ -361,7 +361,7 @@ export const EXPANDED_COMPOUNDS = [
     cons: ["More suppression than LGD-4033 without proportional muscle benefit", "Lipid impact pronounced", "Short half-life requires split dosing", "Limited human data"],
     effects: { bf: -1, muscle: 10, skin: 0, recovery: -0.5 },
     suitability: { minBf: 8, maxBf: 18, goals: ["muscle"] },
-    contraindications: ["below15bf"],
+    contraindications: [],
     visualChange: true,
     riskTier: "mod_high",
     experienceLevel: "advanced"
@@ -381,7 +381,7 @@ export const EXPANDED_COMPOUNDS = [
     cons: ["Minimal human research data", "Aggression and mood effects unpredictable", "Stronger suppression than RAD-140", "Liver stress meaningful"],
     effects: { bf: -2, muscle: 10, skin: 0, recovery: -0.5 },
     suitability: { minBf: 8, maxBf: 18, goals: ["muscle", "performance"] },
-    contraindications: ["below15bf"],
+    contraindications: [],
     visualChange: true,
     riskTier: "mod_high",
     experienceLevel: "advanced"
