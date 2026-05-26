@@ -1665,7 +1665,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setShowTransform(false);
     setShowGoalsEditor(false);
     setShowEidolonSwitcher(false);
-    setEditingName(false);
+    // #20 — drop straight into naming the new eidolon
+    setNameInput("");
+    setEditingName(true);
   }, [flushCurrentEidolon, profile?.goals]);
 
   const commitEidolonName = useCallback(() => {
@@ -2698,8 +2700,28 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           {/* #19 — eidolon context + switcher in builder mode (switching no longer requires lock-in) */}
           {eidolons && eidolons.length >= 1 && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0 14px", gap: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                Building: <span style={{ color: "#fff" }}>{activeEidolon?.name || "Eidolon 1"}</span>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                Building:{" "}
+                {editingName ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    onBlur={commitEidolonName}
+                    onKeyDown={e => { if (e.key === "Enter") commitEidolonName(); if (e.key === "Escape") setEditingName(false); }}
+                    maxLength={30}
+                    placeholder={activeEidolon?.name || "Eidolon 1"}
+                    style={{ fontSize: 13, fontWeight: 700, background: "transparent", border: "none", borderBottom: `1.5px solid ${S.accent}`, color: "#fff", outline: "none", fontFamily: "inherit", padding: "2px 6px", maxWidth: 180 }}
+                  />
+                ) : (
+                  <span
+                    onClick={() => { setNameInput(activeEidolon?.name || ""); setEditingName(true); }}
+                    style={{ color: "#fff", cursor: "pointer", borderBottom: "1px dashed rgba(255,255,255,0.25)" }}
+                  >
+                    {activeEidolon?.name || "Eidolon 1"} ✎
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setShowEidolonSwitcher(true)}
