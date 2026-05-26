@@ -76,7 +76,8 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
         .from("progress_logs")
         .select("*")
         .eq("user_id", userId);
-      if (eidolonId) query = query.eq("eidolon_id", eidolonId);
+      // Scope strictly: this eidolon, or solo (untagged) logs when none active.
+      query = eidolonId ? query.eq("eidolon_id", eidolonId) : query.is("eidolon_id", null);
       query
         .order("logged_at", { ascending: false })
         .limit(50)
@@ -93,7 +94,9 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
       // Anonymous / baseline — load from localStorage, filtered by eidolon
       try {
         const all = JSON.parse(localStorage.getItem("alki_progress_logs") || "[]");
-        const filtered = eidolonId ? all.filter(l => l.eidolon_id === eidolonId) : all;
+        const filtered = eidolonId
+          ? all.filter(l => l.eidolon_id === eidolonId)
+          : all.filter(l => !l.eidolon_id);
         setLogs(filtered);
         // Don't push filtered subset to parent — same reason as Supabase path
       } catch (_) {}

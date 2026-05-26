@@ -1899,8 +1899,16 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     if (muscleChange > 1)  muscleNote.push(`+${muscleChange}% lean mass`);
     if (muscleChange < 0)  muscleNote.push(`${muscleChange}% lean mass risk`);
 
+    // #bf — projected body fat can't fall below essential fat (men ~3-5%,
+    // women ~10-12%), and never raises an already-leaner user. Prevents the
+    // physiologically impossible "0%" a stacked GLP protocol used to show.
+    const bfEssential = profile.sex === "female" ? 12 : 5;
+    const bfRaw = Math.round((profile.bodyFat + bfChange) * 10) / 10;
+    const projectedBodyFat = Math.max(Math.min(profile.bodyFat, bfEssential), bfRaw);
+
     return {
       bfChange,
+      projectedBodyFat,
       muscleChange,
       skinChange,
       recoveryChange,
@@ -2046,7 +2054,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             <StatTile
               label="Body Fat"
               current={`${profile.bodyFat}%`}
-              projected={`${Math.max(0, Math.round((profile.bodyFat + projectedChanges.bfChange) * 10) / 10)}%`}
+              projected={`${projectedChanges.projectedBodyFat}%`}
               delta={projectedChanges.bfChange}
               unit="%"
               goodDirection="down"
@@ -3518,9 +3526,11 @@ export default function AlkiApp() {
 
   const cultivationState = useMemo(() => {
     // Filter progress logs to the active eidolon for cultivation state
-    const eidolonLogs = (!activeEidolonId || !progressLogs.length)
+    // Strictly scope to the active eidolon — or to solo (untagged) logs when
+    // none is active — so one eidolon never inherits another's (or legacy) logs.
+    const eidolonLogs = !progressLogs.length
       ? progressLogs
-      : progressLogs.filter(l => l.eidolon_id === activeEidolonId || !l.eidolon_id);
+      : progressLogs.filter(l => activeEidolonId ? l.eidolon_id === activeEidolonId : !l.eidolon_id);
     // #16 hybrid: completed dose-days keep the streak alive & state progressing.
     // Weekly weight/BF logs still drive measured gains (effectiveProfile / trend).
     const dl = doseLog[activeEidolonId || "solo"] || {};
