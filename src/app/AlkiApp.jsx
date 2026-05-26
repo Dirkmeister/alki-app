@@ -2120,6 +2120,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           stackIds={selectedCompounds}
           userProfile={profile}
           onRemoveCompound={toggleCompound}
+          compoundCatalog={COMPOUNDS}
         />
 
         {/* Cycle Timeline CTA — also reachable from the Transformation view */}
@@ -2865,6 +2866,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 userProfile={profile}
                 onRemoveCompound={toggleCompound}
                 mode="compact"
+                compoundCatalog={COMPOUNDS}
               />
             </>
           )}

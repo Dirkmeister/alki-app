@@ -524,9 +524,47 @@ const SUPPORT_DEFS = {
 // STACK ANALYZER — pure function, deterministic
 // ============================================================
 
-function analyzeStack(stackIds, userProfile = {}) {
-  const validIds = (stackIds || []).filter((id) => COMPOUND_INTEL[id]);
-  const compounds = validIds.map((id) => ({ id, ...COMPOUND_INTEL[id] }));
+// #43 — conservative intel fallback for catalog compounds not in COMPOUND_INTEL
+// (most of the expanded catalog). Previously these were dropped, which froze the
+// safety score for manually-built stacks. Mirrors the timeline's fallback pattern.
+const RISK_TIER_MAP = {
+  very_low: { liver: 0,    cardio: 0    },
+  low:      { liver: 0,    cardio: 0.02 },
+  low_mod:  { liver: 0.05, cardio: 0.05 },
+  moderate: { liver: 0.08, cardio: 0.08 },
+  mod_high: { liver: 0.15, cardio: 0.13 },
+  high:     { liver: 0.22, cardio: 0.18 },
+  unknown:  { liver: 0.10, cardio: 0.10 },
+};
+function deriveIntelFromCatalog(c) {
+  const tier = RISK_TIER_MAP[c.riskTier] || { liver: 0.05, cardio: 0.05 };
+  let suppression = 0;
+  if (c.category === "SARM") suppression = 0.4;
+  else if (c.category === "Hormonal") suppression = 0.7;
+  return {
+    id: c.id,
+    name: c.name,
+    category: c.category || "Other",
+    axes: [],
+    synergies: [],
+    redundancies: [],
+    contraindications: [],
+    supportTriggers: [],
+    risk: { suppression, liver: tier.liver, cardio: tier.cardio, dataQuality: "limited_human" },
+    _derived: true,
+  };
+}
+
+function analyzeStack(stackIds, userProfile = {}, compoundCatalog = []) {
+  // Resolve each id to full intel, deriving a fallback from the catalog when the
+  // compound isn't in COMPOUND_INTEL so every selection moves the analysis (#43).
+  const compounds = (stackIds || [])
+    .map((id) => {
+      if (COMPOUND_INTEL[id]) return { id, ...COMPOUND_INTEL[id] };
+      const cat = compoundCatalog.find((c) => c.id === id);
+      return cat ? deriveIntelFromCatalog(cat) : null;
+    })
+    .filter(Boolean);
 
   if (compounds.length === 0) {
     return {
@@ -829,10 +867,10 @@ function scoreColor(score) {
   return RED;
 }
 
-export default function StackIntelligence({ stackIds = [], userProfile = {}, onRemoveCompound, mode = "full" }) {
+export default function StackIntelligence({ stackIds = [], userProfile = {}, onRemoveCompound, mode = "full", compoundCatalog = [] }) {
   const analysis = useMemo(
-    () => analyzeStack(stackIds, userProfile),
-    [stackIds, userProfile]
+    () => analyzeStack(stackIds, userProfile, compoundCatalog),
+    [stackIds, userProfile, compoundCatalog]
   );
 
   if (analysis.compounds.length === 0) {
@@ -843,13 +881,23 @@ export default function StackIntelligence({ stackIds = [], userProfile = {}, onR
   // Used on the Dashboard so the selection flow stays clean.
   // Full analysis lives on the Transform screen.
   if (mode === "compact") {
-    if (analysis.contraindications.length === 0) return null;
+    // #43 — always surface a live risk read while building, not only on contraindications.
     return (
       <div style={styles.container}>
-        <ContraindicationBanner
-          contraindications={analysis.contraindications}
-          onRemoveCompound={onRemoveCompound}
-        />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)" }}>
+            Stack Safety
+          </div>
+          <div style={{ ...styles.riskBadge, color: scoreColor(analysis.safetyScore.overall) }}>
+            {analysis.summary.risk} · {analysis.safetyScore.overall}/100
+          </div>
+        </div>
+        {analysis.contraindications.length > 0 && (
+          <ContraindicationBanner
+            contraindications={analysis.contraindications}
+            onRemoveCompound={onRemoveCompound}
+          />
+        )}
       </div>
     );
   }
