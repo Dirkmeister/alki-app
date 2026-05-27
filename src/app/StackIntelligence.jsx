@@ -604,21 +604,28 @@ function analyzeStack(stackIds, userProfile = {}, compoundCatalog = []) {
     });
   });
 
+  // #43 follow-up — set of resolved stack ids + a lookup that also covers derived
+  // (catalog-fallback) compounds, so redundancy/synergy detection works and a
+  // base compound pointing at a derived one never dereferences undefined.
+  const stackIdSet = new Set(compounds.map((c) => c.id));
+  const intelById = {};
+  compounds.forEach((c) => { intelById[c.id] = c; });
+
   // -------- REDUNDANCIES --------
   const redundancies = [];
   const seenRedundancyPairs = new Set();
 
   compounds.forEach((c) => {
     c.redundancies.forEach((rid) => {
-      if (validIds.includes(rid)) {
+      if (stackIdSet.has(rid)) {
         const pairKey = [c.id, rid].sort().join("|");
         if (!seenRedundancyPairs.has(pairKey)) {
           seenRedundancyPairs.add(pairKey);
-          const other = COMPOUND_INTEL[rid];
+          const other = intelById[rid] || { name: rid, axes: [] };
           redundancies.push({
             type: "explicit",
             axisLabels: c.axes
-              .filter((a) => other.axes.some((oa) => oa.axis === a.axis))
+              .filter((a) => (other.axes || []).some((oa) => oa.axis === a.axis))
               .map((a) => AXES[a.axis]?.label || a.axis),
             compounds: [c.name, other.name],
             severity: "moderate",
@@ -635,12 +642,12 @@ function analyzeStack(stackIds, userProfile = {}, compoundCatalog = []) {
 
   compounds.forEach((c) => {
     c.synergies.forEach((sid) => {
-      if (validIds.includes(sid)) {
+      if (stackIdSet.has(sid)) {
         const pairKey = [c.id, sid].sort().join("|");
         if (!seenSynergyPairs.has(pairKey)) {
           seenSynergyPairs.add(pairKey);
           synergies.push({
-            compounds: [c.name, COMPOUND_INTEL[sid].name],
+            compounds: [c.name, (intelById[sid] || { name: sid }).name],
             message: getSynergyMessage(c.id, sid),
           });
         }

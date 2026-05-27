@@ -46,7 +46,7 @@ const SITE_URL =
 // ─────────────────────────────────────────────────────────────
 // App version — bump on every commit so testers can confirm which deploy
 // they're viewing. Shown on the splash/enter screen (upper-left).
-const APP_VERSION = "0.1.76";
+const APP_VERSION = "0.1.77";
 // Auto build id from Vercel's git commit SHA (wired in next.config.mjs).
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
