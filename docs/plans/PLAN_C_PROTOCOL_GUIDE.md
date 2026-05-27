@@ -3,11 +3,34 @@
 **Priority: Tier 1 — Do With Plans A and B**
 **Depends on: Plan A (home screen provides the entry point to protocols)**
 **Important: Does NOT duplicate or replace the existing Q&A page content.**
-**Status: Not started**
+**Status: BUILT (2026-05-27) — all 6 sections live; expanded-compound data is `needs_review`.**
 
 > Reconstructed from May 17, 2026 session.
 
 ---
+
+## Implementation notes (2026-05-27)
+
+Built as a new `protocol_guide` screen reached from a "View Full Protocol →" CTA
+in committed mode. Files:
+- `src/app/data/protocolProtocols.js` — canonical per-compound data for all 71.
+  The 8 core are hand-authored (`confidence: "high"`) from `CYCLE_PROFILES` + Q&A;
+  the rest are **derived** from each compound's in-repo dosing/cycle/route/category
+  and flagged `confidence: "needs_review"`. `REVIEW_QUEUE` lists them — **Dallas must
+  audit these before treating them as authoritative** (health-adjacent data).
+- `src/app/lib/protocolGuide.js` — pure helpers: `reconstitute`, `buildSupplyList`,
+  `siteRotation`, `buildSchedule`, `mergeTimeline`.
+- `src/app/screens/ProtocolGuideView.jsx` — the 6 sections (sub-components colocated).
+- `src/app/AlkiApp.jsx` — route + `onProtocolGuide` prop + committed-mode CTA.
+
+**Deviation from the approved plan (lower risk):** rather than extracting a
+`cycleEngine.js` and modifying the working `CycleTimeline`, the guide's Weekly
+Schedule is built directly from the authored data (`buildSchedule`) and the guide
+**cross-links** to the full Protocol Timeline (CycleTimeline, untouched). This keeps
+the verified timeline screen unchanged and makes the guide self-contained on the
+authored dataset. Verified end-to-end (Playwright): all 6 sections render, recon
+calc is reactive, supply list omits syringes for orals, Q&A cross-link works,
+build passes, 0 console errors.
 
 ## The Problem
 
@@ -55,13 +78,14 @@ When a user locks in a protocol, they get a personalized implementation guide as
 
 ## Testing Checklist
 
-- [ ] Lock in protocol with 2+ compounds → "View Full Protocol" CTA appears
-- [ ] Supply list correct for locked stack
-- [ ] Reconstitution calculator math is correct (verify manually)
-- [ ] Injection site diagram shows correct SubQ sites
-- [ ] Weekly schedule groups compounds by timing correctly
-- [ ] Cycling protocols show on/off days (5 on/2 off for CJC/Ipamorelin)
-- [ ] What-to-expect timeline merges all compound timelines
-- [ ] GLP-1 shows weekly dosing, dose escalation visible
-- [ ] Disclaimer present at bottom
-- [ ] Scrollable on mobile
+- [x] Lock in protocol with 2+ compounds → "View Full Protocol" CTA appears
+- [x] Supply list correct for locked stack (orals omit syringes; bac water summed)
+- [x] Reconstitution calculator math is correct (5mg/2mL/500mcg = 20 units; reactive)
+- [x] Injection site diagram shows correct SubQ sites (union across injectables)
+- [x] Weekly schedule groups compounds by timing correctly (AM/PM/weekly/as-needed)
+- [x] Cycling protocols show on/off weeks
+- [x] What-to-expect timeline merges compound expectations by week band
+- [x] GLP-1 shows weekly dosing + titration schedule (Semaglutide/Retatrutide)
+- [x] Disclaimer present at bottom + Q&A cross-link
+- [ ] Scrollable on mobile — verified at 414px viewport; pending Austin's device check
+- NOTE: expanded-compound (63) records are derived + `needs_review` — owner audit pending.

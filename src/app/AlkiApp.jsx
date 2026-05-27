@@ -10,6 +10,7 @@ import AvaturnCapture from "./avatar/AvaturnCapture";
 import { AVATURN_ENABLED } from "./avatar/avaturnConfig";
 import PeptideModeler from "./components/PeptideModeler";
 import ProgressLog from "./screens/ProgressLog";
+import ProtocolGuideView from "./screens/ProtocolGuideView";
 import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
@@ -1738,7 +1739,7 @@ function EidolonHero({
   );
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   // #51-57 — two-tier connected filter (goal -> type) + sort + clear.
@@ -2649,9 +2650,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             )}
           </div>
 
-          {/* 7. Primary actions — Projection + Timeline. Eidolon management
-              (Modify / Switch / New) now lives in the "Manage ▾" nav dropdown (#62). */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8, marginBottom: 10 }}>
+          {/* 7. Primary actions — Protocol Guide is the headline post-lock-in
+              action (Plan C); Projection + Timeline below. Eidolon management
+              (Modify / Switch / New) lives in the "Manage ▾" nav dropdown (#62). */}
+          <button onClick={onProtocolGuide} style={{ ...S.btn, marginTop: 8, marginBottom: 10 }}>
+            View Full Protocol →
+          </button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <button
               onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
               disabled={stackAnalysis.isBlocked}
@@ -3657,6 +3662,7 @@ export default function AlkiApp() {
           onBackToHome={null}
           onQA={() => setScreen("qa")}
           onTimeline={() => setScreen("timeline")}
+          onProtocolGuide={() => setScreen("protocol_guide")}
           onModeler={() => setScreen("modeler")}
           onProgress={() => setScreen("progress")}
           cultivationState={cultivationState}
@@ -3697,6 +3703,15 @@ export default function AlkiApp() {
           compoundCatalog={COMPOUNDS}
           initialCycleLength={12}
           onBack={() => setScreen("dashboard")}
+        />
+      )}
+      {screen === "protocol_guide" && (
+        <ProtocolGuideView
+          stackIds={(activeProtocol?.compounds?.length ? activeProtocol.compounds : selectedCompounds) || []}
+          profile={profile}
+          onBack={() => setScreen("dashboard")}
+          onQA={() => setScreen("qa")}
+          onTimeline={() => setScreen("timeline")}
         />
       )}
       {screen === "modeler" && (
