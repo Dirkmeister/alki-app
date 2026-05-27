@@ -2262,21 +2262,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* Profile card — only visible in builder mode; the new avatar-first home replaces it when committed. */}
       {editing && (
       <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16, position: 'relative' }}>
-        {/* Reset avatar icon — top-left */}
-        {avatarUrl && (
-          <button
-            onClick={onResetAvatar}
-            title="Reset avatar"
-            style={{
-              position: 'absolute', top: 10, left: 10,
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 6, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'rgba(255,255,255,0.35)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0
-            }}
-          >
-            ↺
-          </button>
-        )}
+        {/* #63 — removed cryptic top-left ↺ button; "↺ Reset Avatar" below is the real control. */}
         <div style={{ width: 80, flexShrink: 0 }}>
           {avatarHeadshot ? (
             <img
@@ -2907,6 +2893,31 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           {/* SHARED — current selection: timeline + intelligence */}
           {builderView !== null && selectedCompounds.length > 0 && (
             <>
+              {/* #58/#59 — Your Stack: see what's selected at a glance + remove in one tap */}
+              <div style={{ ...S.card, marginBottom: 14 }}>
+                <div style={{ ...S.label, marginBottom: 10 }}>
+                  Your Stack — {selectedCompounds.length} compound{selectedCompounds.length !== 1 ? "s" : ""}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {selectedCompounds.map(cid => {
+                    const c = COMPOUNDS.find(x => x.id === cid);
+                    if (!c) return null;
+                    const col = CAT_COLORS[c.category] || "#888";
+                    return (
+                      <div key={cid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px 6px 12px", borderRadius: 100, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: col, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{c.name}</span>
+                        <button
+                          onClick={() => toggleCompound(cid)}
+                          title={`Remove ${c.name}`}
+                          style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%", width: 18, height: 18, color: "rgba(255,255,255,0.6)", fontSize: 13, lineHeight: 1, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                        >×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Timeline CTA */}
               {!stackAnalysis.isBlocked && (
                 <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
