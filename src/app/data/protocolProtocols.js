@@ -236,6 +236,9 @@ function deriveRecord(c) {
   const perDoseMcg = injectable ? toMcg(dose) : null;
   return {
     id: c.id,
+    // Informational only — surfaced as a banner in the guide, never used to gate
+    // or block (Alki advises, it doesn't gatekeep).
+    displayWarning: c.displayWarning || null,
     routeType,
     injectionDepth: injectable ? (/intramuscular|\bim\b/i.test(c.route || "") ? "im" : "subq") : null,
     injectionSites: injectable ? SUBQ_SITES : [],

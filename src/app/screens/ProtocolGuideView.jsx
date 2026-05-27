@@ -314,6 +314,32 @@ function BloodworkSection({ stackIds, onQA }) {
   );
 }
 
+// ── Compound warnings (informational banner — no guardrails) ─────
+// Surfaces each compound's displayWarning. Purely informational: it never
+// blocks, hides, or disables anything — Alki advises, it doesn't gatekeep.
+function WarningBanner({ stackIds }) {
+  const warnings = getProtocolsForStack(stackIds)
+    .filter(p => p.displayWarning)
+    .map(p => ({ name: p.name, text: p.displayWarning }));
+  if (!warnings.length) return null;
+  return (
+    <div style={{ background: "rgba(255,107,107,0.07)", border: "1px solid rgba(255,107,107,0.3)", borderRadius: 12, padding: 16, marginBottom: 14, fontFamily: FONT }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 15 }}>⚠️</span>
+        <span style={{ fontSize: 11, fontFamily: MONO, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.warn }}>Compound Warnings</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {warnings.map((w, i) => (
+          <div key={i}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{w.name}</div>
+            <div style={{ fontSize: 12, color: T.text2, lineHeight: 1.5, marginTop: 2 }}>{w.text}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Screen ───────────────────────────────────────────────────────
 export default function ProtocolGuideView({ stackIds = [], profile, onBack, onQA, onTimeline }) {
   const ids = Array.isArray(stackIds) ? stackIds.filter(Boolean) : [];
@@ -347,6 +373,7 @@ export default function ProtocolGuideView({ stackIds = [], profile, onBack, onQA
         Your protocol, step by step.
       </h1>
 
+      <WarningBanner stackIds={ids} />
       <SupplyListSection stackIds={ids} />
       <ReconSection stackIds={ids} onQA={onQA} />
       <InjectionSiteSection stackIds={ids} />

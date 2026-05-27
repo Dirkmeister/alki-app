@@ -22,6 +22,9 @@ in committed mode. Files:
   `siteRotation`, `buildSchedule`, `mergeTimeline`.
 - `src/app/screens/ProtocolGuideView.jsx` — the 6 sections (sub-components colocated).
 - `src/app/AlkiApp.jsx` — route + `onProtocolGuide` prop + committed-mode CTA.
+- Compound `displayWarning`s (e.g. Cardarine "CARCINOGENIC") surface as an
+  informational banner at the top of the guide. **No guardrails** — it never
+  blocks, hides, or disables the compound/guide (Alki advises, never gatekeeps).
 
 **Audit pass (2026-05-27):** systematically compared every derived record against
 its source. Fixed three derivation bugs — frequency precedence ("2x/week" /
