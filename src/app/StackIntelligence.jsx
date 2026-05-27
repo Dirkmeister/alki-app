@@ -721,9 +721,10 @@ function analyzeStack(stackIds, userProfile = {}, compoundCatalog = []) {
   // -------- SAFETY SCORE --------
   const sumRisk = (key) => compounds.reduce((sum, c) => sum + (c.risk[key] || 0), 0);
 
-  const suppression = clamp(100 - sumRisk("suppression") * 100, 0, 100);
-  const liver = clamp(100 - sumRisk("liver") * 100, 0, 100);
-  const cardio = clamp(100 - sumRisk("cardio") * 100, 0, 100);
+  // #66 — round at source so the score bars never render long FP tails (e.g. 84.99999).
+  const suppression = Math.round(clamp(100 - sumRisk("suppression") * 100, 0, 100));
+  const liver = Math.round(clamp(100 - sumRisk("liver") * 100, 0, 100));
+  const cardio = Math.round(clamp(100 - sumRisk("cardio") * 100, 0, 100));
 
   let interactionPenalty = redundancies.length * 8;
   contraindications.forEach((c) => {

@@ -1922,9 +1922,21 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     const bfRaw = Math.round((profile.bodyFat + bfChange) * 10) / 10;
     const projectedBodyFat = Math.max(Math.min(profile.bodyFat, bfEssential), bfRaw);
 
+    // #68 — projected bodyweight: hold lean mass constant and re-solve total
+    // weight at the projected body fat. Naturally zero-change for stacks that
+    // don't move fat (consistent with the #50 dead-zone), so recovery stacks
+    // show no weight delta. Surfaces the bodyweight the projection is based on.
+    const _lbm = profile.weight ? profile.weight * (1 - profile.bodyFat / 100) : null;
+    const projectedWeight = (_lbm != null && projectedBodyFat < 100)
+      ? Math.round(_lbm / (1 - projectedBodyFat / 100))
+      : (profile.weight ?? null);
+    const weightChange = profile.weight ? projectedWeight - profile.weight : 0;
+
     return {
       bfChange,
       projectedBodyFat,
+      projectedWeight,
+      weightChange,
       muscleChange,
       skinChange,
       recoveryChange,
@@ -2111,6 +2123,15 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               delta={projectedChanges.bfChange}
               unit="%"
               goodDirection="down"
+            />
+            <StatTile
+              label="Weight"
+              current={`${profile.weight} lbs`}
+              projected={`${projectedChanges.projectedWeight} lbs`}
+              delta={projectedChanges.weightChange}
+              unit=" lbs"
+              goodDirection="down"
+              note="Est. at projected body fat (lean mass held)"
             />
             <StatTile
               label="Lean Mass"
