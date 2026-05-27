@@ -49,7 +49,7 @@ const SITE_URL =
 // ─────────────────────────────────────────────────────────────
 // App version — bump on every commit so testers can confirm which deploy
 // they're viewing. Shown on the splash/enter screen (upper-left).
-const APP_VERSION = "0.1.94";
+const APP_VERSION = "0.1.95";
 // Auto build id from Vercel's git commit SHA (wired in next.config.mjs).
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
@@ -1874,11 +1874,26 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
   useEffect(() => { setTimeout(() => setAnimateIn(true), 100); }, []);
 
+  // #64 — entering/leaving the projection view is a view change; scroll to top
+  // so the before/after avatars are framed (matches screen-load behavior).
+  useEffect(() => { try { window.scrollTo(0, 0); } catch (_) {} }, [showTransform]);
+
   const toggleCompound = (id) => {
     setSelectedCompounds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
     setShowTransform(false);
+  };
+
+  // #70 — add/remove a compound WITHOUT leaving the current view. The projection
+  // and stack analysis are derived from selectedCompounds via memos, so they
+  // update in place. Used by the projection screen's Support Layer (e.g. adding
+  // Tadalafil) and contraindication banner, which previously called
+  // toggleCompound and got bounced back to the builder by its setShowTransform(false).
+  const toggleCompoundInPlace = (id) => {
+    setSelectedCompounds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   // #47 — memoize so unrelated re-renders (lock-in, auto-save, animateIn) don't
@@ -2304,12 +2319,14 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           })}
         </div>
 
-        {/* Stack Intelligence — full analysis */}
+        {/* Stack Intelligence — full analysis. #70 — add/remove happen in place
+            (no bounce back to the builder) so adding support like Tadalafil from
+            the Support Layer updates this projection live. */}
         <StackIntelligence
           stackIds={selectedCompounds}
           userProfile={profile}
-          onRemoveCompound={toggleCompound}
-          onAddCompound={toggleCompound}
+          onRemoveCompound={toggleCompoundInPlace}
+          onAddCompound={toggleCompoundInPlace}
           compoundCatalog={COMPOUNDS}
         />
 
@@ -3421,6 +3438,9 @@ export default function AlkiApp() {
   const [eidolons, setEidolons] = useState([]);
   const [activeEidolonId, setActiveEidolonId] = useState(null);
   const [onboardingStartStep, setOnboardingStartStep] = useState(null);
+  // #64 — lightweight nav stack for the dashboard's sub-screens. Drives both
+  // one-level Back and a persistent Home button once the user is 2+ deep.
+  const [navHistory, setNavHistory] = useState([]);
   const saveTimeout = useRef(null);
 
   // ── Load saved avatar (URL + headshot PNG) from localStorage on mount ──
@@ -3462,6 +3482,7 @@ export default function AlkiApp() {
           setSelectedCompounds([]);
           setShowTransform(false);
           setAvatarUrl(DEFAULT_AVATAR_URL);
+          setNavHistory([]);
           setScreen("splash");
         }
       }
@@ -3574,6 +3595,7 @@ export default function AlkiApp() {
     setShowTransform(false);
     setAvatarUrl(DEFAULT_AVATAR_URL);
     setActiveProtocol(null);
+    setNavHistory([]);
     setScreen("splash");
   };
 
@@ -3599,6 +3621,24 @@ export default function AlkiApp() {
         .then(({ data }) => { if (data) setProgressLogs(data); });
     }
   };
+
+  // #64 — every screen change returns to the top. Carrying the previous
+  // screen's scroll position was landing users mid-page ("screen loaded at
+  // bottom"). Applies to ALL screens for consistent load behavior.
+  useEffect(() => {
+    try { window.scrollTo(0, 0); } catch (_) {}
+  }, [screen]);
+
+  // #64 — sub-screen navigation. navTo pushes the current screen so Back
+  // returns one level (not always straight to home), and the persistent Home
+  // button (rendered below) appears once navHistory is 2+ deep.
+  const navTo = (next) => { setNavHistory((h) => [...h, screen]); setScreen(next); };
+  const navBack = () => {
+    const prev = navHistory.length ? navHistory[navHistory.length - 1] : "dashboard";
+    setNavHistory((h) => h.slice(0, -1));
+    setScreen(prev);
+  };
+  const goHome = () => { setNavHistory([]); setScreen("dashboard"); };
 
   const afterAgeGate = supabase ? "auth" : "onboarding";
 
@@ -3707,12 +3747,12 @@ export default function AlkiApp() {
           activeProtocol={activeProtocol}
           setActiveProtocol={setActiveProtocol}
           onBackToHome={null}
-          onQA={() => setScreen("qa")}
-          onTimeline={() => setScreen("timeline")}
-          onProtocolGuide={() => setScreen("protocol_guide")}
-          onModeler={() => setScreen("modeler")}
-          onProgress={() => setScreen("progress")}
-          onPhotos={() => setScreen("photos")}
+          onQA={() => navTo("qa")}
+          onTimeline={() => navTo("timeline")}
+          onProtocolGuide={() => navTo("protocol_guide")}
+          onModeler={() => navTo("modeler")}
+          onProgress={() => navTo("progress")}
+          onPhotos={() => navTo("photos")}
           cultivationState={cultivationState}
           progressLogs={progressLogs}
           avatarUrl={avatarUrl}
@@ -3731,7 +3771,7 @@ export default function AlkiApp() {
       )}
       {screen === "progress" && (
         <ProgressLog
-          onBack={() => setScreen("dashboard")}
+          onBack={navBack}
           userId={user?.id}
           eidolonId={activeEidolonId}
           profile={profile}
@@ -3748,7 +3788,7 @@ export default function AlkiApp() {
             eidolonName={activeName}
             onCapture={(dataUrl) => setPhotos(prev => ({ ...prev, [key]: [...(prev[key] || []), { id: "p_" + Date.now(), dataUrl, ts: Date.now() }] }))}
             onDelete={(id) => setPhotos(prev => ({ ...prev, [key]: (prev[key] || []).filter(p => p.id !== id) }))}
-            onBack={() => setScreen("dashboard")}
+            onBack={navBack}
           />
         );
       })()}
@@ -3756,23 +3796,23 @@ export default function AlkiApp() {
         // #18 — scope Q&A to the user's stack: committed → locked stack, else builder selection
         const qaIds = (activeProtocol?.compounds?.length ? activeProtocol.compounds : selectedCompounds) || [];
         const qaNames = qaIds.map(id => COMPOUNDS.find(c => c.id === id)?.name).filter(Boolean);
-        return <AlkiProtocolQA onBack={() => setScreen("dashboard")} contextCompounds={qaNames} />;
+        return <AlkiProtocolQA onBack={navBack} contextCompounds={qaNames} />;
       })()}
       {screen === "timeline" && (
         <CycleTimeline
           stack={selectedCompounds}
           compoundCatalog={COMPOUNDS}
           initialCycleLength={12}
-          onBack={() => setScreen("dashboard")}
+          onBack={navBack}
         />
       )}
       {screen === "protocol_guide" && (
         <ProtocolGuideView
           stackIds={(activeProtocol?.compounds?.length ? activeProtocol.compounds : selectedCompounds) || []}
           profile={profile}
-          onBack={() => setScreen("dashboard")}
-          onQA={() => setScreen("qa")}
-          onTimeline={() => setScreen("timeline")}
+          onBack={navBack}
+          onQA={() => navTo("qa")}
+          onTimeline={() => navTo("timeline")}
         />
       )}
       {screen === "modeler" && (
@@ -3780,8 +3820,29 @@ export default function AlkiApp() {
           profile={profile}
           selectedCompounds={selectedCompounds}
           compoundCatalog={COMPOUNDS}
-          onBack={() => setScreen("dashboard")}
+          onBack={navBack}
         />
+      )}
+
+      {/* #64 — persistent Home button, shown once the user is 2+ screens deep
+          (e.g. dashboard → protocol guide → timeline). Back steps one level;
+          this jumps straight home. Bottom-left to clear the feedback FAB. */}
+      {navHistory.length >= 2 && (
+        <button
+          onClick={goHome}
+          title="Back to home"
+          style={{
+            position: "fixed", left: 16, bottom: 24, zIndex: 901,
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "10px 16px", borderRadius: 100,
+            background: "rgba(20,20,20,0.92)", border: "1px solid rgba(26,232,122,0.3)",
+            color: "#1ae87a", fontSize: 13, fontWeight: 700, cursor: "pointer",
+            fontFamily: "'Syne', 'DM Sans', sans-serif",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+          }}
+        >
+          ⌂ Home
+        </button>
       )}
 
       {/* Dev/testing feedback button — visible on all screens past splash */}

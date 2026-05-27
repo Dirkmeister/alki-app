@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { generateStacks, detectPhase } from "../lib/stackGenerator";
 
 /**
@@ -45,6 +45,17 @@ export default function StackGenerator({ profile, compoundCatalog, onLoadStack, 
 
   const phase = useMemo(() => detectPhase(profile), [profile]);
   const phaseLabel = PHASE_LABELS[phase] || "Recomposition";
+
+  // Changing a goal re-detects the phase, which regenerates the stacks above.
+  // Re-surface them: if the panel was collapsed (e.g. after loading a stack),
+  // re-expand and drop any open card so the fresh ladder is visible. Skips the
+  // initial mount so we don't force-open when defaultExpanded is false.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) { didMountRef.current = true; return; }
+    setOpenStackId(null);
+    setExpanded(true);
+  }, [phase]);
 
   if (stacks.length === 0) {
     return null;
