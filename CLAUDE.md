@@ -186,7 +186,7 @@ A comprehensive mathematical/physiological reference document exists covering:
 - **Sprint 7:** Regression/decay simulation ("what happens if I stop?")
 
 ### Tier 1 Plans (Do First)
-- **Plan A:** Home screen redesign — avatar-first, eidolon name editing, stat pills. ALSO FIXES the new-eidolon crash bug (Dashboard missing setEidolons/setActiveEidolonId/setProfile props).
+- **Plan A:** Home screen redesign — avatar-first, eidolon name editing, stat pills. (The new-eidolon crash this plan originally bundled is now fixed independently — see Known Bugs.)
 - **Plan B:** Avatar clothing — shirtless/sports bra + shorts, muscle definition opacity-mapped to BF%.
 - **Plan C:** Practical protocol guide — supply list, reconstitution calculator, injection site diagram, weekly schedule.
 
@@ -196,7 +196,7 @@ A comprehensive mathematical/physiological reference document exists covering:
 
 ## Known Bugs
 
-- **CRITICAL:** Creating new eidolons crashes the app. Root cause: Dashboard component doesn't receive `setEidolons`, `setActiveEidolonId`, `setProfile` props from AlkiApp.jsx root. Fix is in Plan A Step 1.
+- **FIXED (2026-05-27):** Creating/switching eidolons crashed the app. Actual root cause: refactor #61 moved goal selection inline (driven by the `editing` flag) and removed the `showGoalsEditor` state, but left two dangling `setShowGoalsEditor(false)` calls in `switchToEidolon` and `createNewEidolon` in AlkiApp.jsx — calling a setter that no longer existed threw `ReferenceError: setShowGoalsEditor is not defined`. Fix: removed both dead lines (visibility is now governed by `setEditing(true)`, which both functions already call). NOTE: the earlier "Dashboard missing setEidolons/setActiveEidolonId/setProfile props" diagnosis was stale — those props are already wired (AlkiApp.jsx Dashboard render).
 - (Add new bugs here as they surface)
 
 ## Key Warnings

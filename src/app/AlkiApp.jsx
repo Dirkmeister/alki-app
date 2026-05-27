@@ -1697,7 +1697,6 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     }
     setShowTransform(false);
     setShowEidolonSwitcher(false);
-    setShowGoalsEditor(false);
     setEditingName(false);
   }, [flushCurrentEidolon]);
 
@@ -1712,7 +1711,6 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setSelectedCompounds([]);
     setEditing(true);
     setShowTransform(false);
-    setShowGoalsEditor(false);
     setShowEidolonSwitcher(false);
     // #20 — drop straight into naming the new eidolon
     setNameInput("");
