@@ -1996,6 +1996,16 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     return true;
   });
 
+  // #45 — the active filter can be "All", a goal ("goal:<id>"), or a category
+  // ("cat:<Category>"). Goals bridge the vocabulary the user picked at onboarding
+  // (e.g. "Muscle Gain") to compounds, since categories are mechanism classes.
+  const matchesActiveFilter = (r) => {
+    if (categoryFilter === "All") return true;
+    if (categoryFilter.startsWith("goal:")) return !!r.compound.suitability?.goals?.includes(categoryFilter.slice(5));
+    if (categoryFilter.startsWith("cat:")) return r.compound.category === categoryFilter.slice(4);
+    return r.compound.category === categoryFilter; // legacy bare-category value
+  };
+
   const recommendedIds = new Set(recommended.map(r => r.compound.id));
   const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
 
@@ -2882,24 +2892,35 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               </button>
 
               {/* Recommended compounds */}
-              {/* Category filter tabs */}
+              {/* Filter tabs — goals (the user's vocabulary) + categories (mechanism) (#45) */}
               {(() => {
                 const cats = [...new Set(recommended.map(r => r.compound.category))];
-                if (cats.length <= 1) return null;
+                const goalChips = (profile.goals || [])
+                  .map(gid => GOALS.find(g => g.id === gid))
+                  .filter(Boolean)
+                  .filter(g => recommended.some(r => r.compound.suitability?.goals?.includes(g.id)));
+                if (cats.length <= 1 && goalChips.length === 0) return null;
+                const chipStyle = (active) => ({
+                  padding: "6px 12px", borderRadius: 100, fontSize: 11, fontWeight: 600,
+                  background: active ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${active ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.08)"}`,
+                  color: active ? S.accent : "rgba(255,255,255,0.4)",
+                  cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                });
+                const pick = (val) => { setCategoryFilter(val); setShowAllRecommended(false); };
                 return (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-                    {["All", ...cats].map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => { setCategoryFilter(cat); setShowAllRecommended(false); }}
-                        style={{
-                          padding: "6px 12px", borderRadius: 100, fontSize: 11, fontWeight: 600,
-                          background: categoryFilter === cat ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
-                          border: `1px solid ${categoryFilter === cat ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.08)"}`,
-                          color: categoryFilter === cat ? S.accent : "rgba(255,255,255,0.4)",
-                          cursor: "pointer", fontFamily: "inherit",
-                        }}
-                      >
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+                    <button onClick={() => pick("All")} style={chipStyle(categoryFilter === "All")}>All</button>
+                    {goalChips.map(g => (
+                      <button key={`goal:${g.id}`} onClick={() => pick(`goal:${g.id}`)} style={chipStyle(categoryFilter === `goal:${g.id}`)}>
+                        {g.icon} {g.label}
+                      </button>
+                    ))}
+                    {goalChips.length > 0 && cats.length > 1 && (
+                      <span style={{ width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.12)", margin: "2px 4px" }} />
+                    )}
+                    {cats.length > 1 && cats.map(cat => (
+                      <button key={`cat:${cat}`} onClick={() => pick(`cat:${cat}`)} style={chipStyle(categoryFilter === `cat:${cat}`)}>
                         {cat}
                       </button>
                     ))}
@@ -2908,10 +2929,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               })()}
 
               <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
-                Matched to Your Profile — {recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length} compound{recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter).length !== 1 ? "s" : ""}
+                Matched to Your Profile — {recommended.filter(matchesActiveFilter).length} compound{recommended.filter(matchesActiveFilter).length !== 1 ? "s" : ""}
               </div>
               {(() => {
-                const filtered = recommended.filter(r => categoryFilter === "All" || r.compound.category === categoryFilter);
+                const filtered = recommended.filter(matchesActiveFilter);
                 const visible = showAllRecommended ? filtered : filtered.slice(0, 6);
                 const hasMore = filtered.length > 6 && !showAllRecommended;
                 return (
