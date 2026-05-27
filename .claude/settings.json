@@ -9,6 +9,8 @@
       "Write(docs/**)",
       "Edit(public/**)",
       "Write(public/**)",
+      "Edit(CLAUDE.md)",
+      "Write(CLAUDE.md)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
@@ -16,6 +18,7 @@
     ],
     "deny": [
       "Bash(rm -rf:*)",
+      "Bash(git push:*)",
       "Bash(git push --force:*)",
       "Edit(.env.local)",
       "Write(.env.local)",
