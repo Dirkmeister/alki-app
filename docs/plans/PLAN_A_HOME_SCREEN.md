@@ -25,11 +25,13 @@ When a user opens the app, they immediately see:
 
 Everything radiates from the avatar. The avatar IS the home screen.
 
-## Step 1: Fix the Eidolon Crash Bug (MUST DO FIRST)
+## Step 1: Fix the Eidolon Crash Bug — ✅ DONE (2026-05-27)
 
-**Root cause:** Dashboard component doesn't receive `setEidolons`, `setActiveEidolonId`, `setProfile` props from AlkiApp.jsx root — calling undefined functions when creating a new eidolon.
+**Actual root cause:** Refactor #61 moved goal selection inline (driven by the `editing` flag) and removed the `showGoalsEditor` state, but left two dangling `setShowGoalsEditor(false)` calls in `switchToEidolon` and `createNewEidolon` in AlkiApp.jsx. Calling a setter that no longer existed threw `ReferenceError: setShowGoalsEditor is not defined`, crashing the app on eidolon create/switch.
 
-**Fix:** Pass these props from AlkiApp.jsx through to Dashboard (and any child that needs eidolon management). Must be resolved before any other eidolon UI work.
+**Fix applied:** Removed both dead lines. Goals-editor visibility is now governed by `setEditing(true)`, which both functions already call, so no behavior was lost.
+
+**Note:** The original diagnosis below was stale — `setEidolons`, `setActiveEidolonId`, and `setProfile` are already passed to Dashboard from AlkiApp.jsx; that was not the cause. The remaining steps (home screen redesign) are independent and still open.
 
 ## Steps 2–8: Home Screen Redesign
 
@@ -51,7 +53,7 @@ Everything radiates from the avatar. The avatar IS the home screen.
 
 ## Testing Checklist
 
-- [ ] New eidolon creation no longer crashes
+- [x] New eidolon creation no longer crashes (fixed 2026-05-27; build passes)
 - [ ] Avatar renders large and centered on home screen
 - [ ] Eidolon name is displayed and editable (tap to edit)
 - [ ] Stat pills show correct biometric values
