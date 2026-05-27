@@ -1627,7 +1627,10 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose, on
 function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  // #51-57 — two-tier connected filter (goal -> type) + sort + clear.
+  const [goalFilter, setGoalFilter] = useState("all");   // "all" | goalId
+  const [catFilter, setCatFilter] = useState("all");     // "all" | category name
+  const [sortMode, setSortMode] = useState("match");     // match | name | risk | category
   const [showAllRecommended, setShowAllRecommended] = useState(false);
   const [editing, setEditing] = useState(!activeProtocol);
   const [showGoalsEditor, setShowGoalsEditor] = useState(false);
@@ -2012,12 +2015,39 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   // #45 — the active filter can be "All", a goal ("goal:<id>"), or a category
   // ("cat:<Category>"). Goals bridge the vocabulary the user picked at onboarding
   // (e.g. "Muscle Gain") to compounds, since categories are mechanism classes.
-  const matchesActiveFilter = (r) => {
-    if (categoryFilter === "All") return true;
-    if (categoryFilter.startsWith("goal:")) return !!r.compound.suitability?.goals?.includes(categoryFilter.slice(5));
-    if (categoryFilter.startsWith("cat:")) return r.compound.category === categoryFilter.slice(4);
-    return r.compound.category === categoryFilter; // legacy bare-category value
+  // #51 — connected filter: a goal narrows the set, then the Type row narrows
+  // further within that goal. Both apply to the matched list AND browse-all.
+  const passesFilters = (rec) => {
+    const c = rec.compound;
+    if (goalFilter !== "all" && !(c.suitability?.goals || []).includes(goalFilter)) return false;
+    if (catFilter !== "all" && c.category !== catFilter) return false;
+    return true;
   };
+
+  // #56 — sort. Base-8 compounds lack riskTier -> treat as "moderate".
+  const RISK_ORDER = { very_low: 0, low: 1, low_mod: 2, moderate: 3, mod_high: 4, high: 5, unknown: 3 };
+  const sortRecs = (arr) => {
+    const a = [...arr];
+    if (sortMode === "name") a.sort((x, y) => x.compound.name.localeCompare(y.compound.name));
+    else if (sortMode === "risk") a.sort((x, y) => (RISK_ORDER[x.compound.riskTier] ?? 3) - (RISK_ORDER[y.compound.riskTier] ?? 3));
+    else if (sortMode === "category") a.sort((x, y) => x.compound.category.localeCompare(y.compound.category) || (y.score - x.score));
+    else a.sort((x, y) => y.score - x.score); // "match"
+    return a;
+  };
+
+  // #51/#52 — Type options are the categories present among ALL compounds (matched
+  // + browse-all) that satisfy the current goal, so e.g. picking Muscle Gain
+  // surfaces SARM even when SARMs are gated out of the matched list.
+  const filterAndSort = (arr) => sortRecs(arr.filter(passesFilters));
+  const goalScopedCats = () => {
+    const pool = [...recommended, ...otherCompounds].filter(
+      (rec) => goalFilter === "all" || (rec.compound.suitability?.goals || []).includes(goalFilter)
+    );
+    return [...new Set(pool.map((rec) => rec.compound.category))].sort();
+  };
+  const filtersActive = goalFilter !== "all" || catFilter !== "all";
+  const setGoal = (g) => { setGoalFilter(g); setCatFilter("all"); setShowAllRecommended(false); };
+  const clearSelection = () => { setSelectedCompounds([]); setGoalFilter("all"); setCatFilter("all"); };
 
   const recommendedIds = new Set(recommended.map(r => r.compound.id));
   const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
@@ -2905,108 +2935,110 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 ⚡ Recommend a stack for me instead
               </button>
 
-              {/* Recommended compounds */}
-              {/* Filter tabs — goals (the user's vocabulary) + categories (mechanism) (#45) */}
+              {/* Compounds — connected filter (goal -> type) + sort (#51-57) */}
               {(() => {
-                const cats = [...new Set(recommended.map(r => r.compound.category))];
-                const goalChips = (profile.goals || [])
-                  .map(gid => GOALS.find(g => g.id === gid))
-                  .filter(Boolean)
-                  .filter(g => recommended.some(r => r.compound.suitability?.goals?.includes(g.id)));
-                if (cats.length <= 1 && goalChips.length === 0) return null;
-                const chipStyle = (active) => ({
+                const chip = (active) => ({
                   padding: "6px 12px", borderRadius: 100, fontSize: 11, fontWeight: 600,
                   background: active ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
                   border: `1px solid ${active ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.08)"}`,
-                  color: active ? S.accent : "rgba(255,255,255,0.4)",
+                  color: active ? S.accent : "rgba(255,255,255,0.5)",
                   cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
                 });
-                const pick = (val) => { setCategoryFilter(val); setShowAllRecommended(false); };
+                const rowLabel = { fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", minWidth: 38 };
+                const goalChips = (profile.goals || []).map(gid => GOALS.find(g => g.id === gid)).filter(Boolean);
+                const typeCats = goalScopedCats();
+                const SORTS = [["match", "Best match"], ["name", "Name"], ["risk", "Risk"], ["category", "Category"]];
                 return (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
-                    <button onClick={() => pick("All")} style={chipStyle(categoryFilter === "All")}>All</button>
-                    {goalChips.map(g => (
-                      <button key={`goal:${g.id}`} onClick={() => pick(`goal:${g.id}`)} style={chipStyle(categoryFilter === `goal:${g.id}`)}>
-                        {g.icon} {g.label}
-                      </button>
-                    ))}
-                    {goalChips.length > 0 && cats.length > 1 && (
-                      <span style={{ width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.12)", margin: "2px 4px" }} />
+                  <div style={{ marginBottom: 16 }}>
+                    {goalChips.length > 0 && (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+                        <span style={rowLabel}>Goal</span>
+                        <button onClick={() => setGoal("all")} style={chip(goalFilter === "all")}>All</button>
+                        {goalChips.map(g => (
+                          <button key={g.id} onClick={() => setGoal(g.id)} style={chip(goalFilter === g.id)}>{g.icon} {g.label}</button>
+                        ))}
+                      </div>
                     )}
-                    {cats.length > 1 && cats.map(cat => (
-                      <button key={`cat:${cat}`} onClick={() => pick(`cat:${cat}`)} style={chipStyle(categoryFilter === `cat:${cat}`)}>
-                        {cat}
-                      </button>
-                    ))}
+                    {typeCats.length > 1 && (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+                        <span style={rowLabel}>Type</span>
+                        <button onClick={() => { setCatFilter("all"); setShowAllRecommended(false); }} style={chip(catFilter === "all")}>All</button>
+                        {typeCats.map(cat => (
+                          <button key={cat} onClick={() => { setCatFilter(cat); setShowAllRecommended(false); }} style={chip(catFilter === cat)}>{cat}</button>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <span style={rowLabel}>Sort</span>
+                      {SORTS.map(([id, lbl]) => (
+                        <button key={id} onClick={() => setSortMode(id)} style={chip(sortMode === id)}>{lbl}</button>
+                      ))}
+                      {selectedCompounds.length > 0 && (
+                        <button onClick={clearSelection} style={{ ...chip(false), marginLeft: "auto", color: "#ef6b6b", borderColor: "rgba(239,107,107,0.3)" }}>
+                          Clear ({selectedCompounds.length})
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
 
-              <div style={{ ...S.label, marginBottom: 12, marginTop: 8 }}>
-                Matched to Your Profile — {recommended.filter(matchesActiveFilter).length} compound{recommended.filter(matchesActiveFilter).length !== 1 ? "s" : ""}
-              </div>
+              {/* Matched — filtered + sorted */}
               {(() => {
-                const filtered = recommended.filter(matchesActiveFilter);
-                const visible = showAllRecommended ? filtered : filtered.slice(0, 6);
-                const hasMore = filtered.length > 6 && !showAllRecommended;
+                const all = filterAndSort(recommended);
+                const visible = showAllRecommended ? all : all.slice(0, 6);
+                const hasMore = all.length > 6 && !showAllRecommended;
                 return (
                   <>
-                    {filtered.length === 0 && (
+                    <div style={{ ...S.label, marginBottom: 12, marginTop: 4 }}>
+                      Matched to Your Profile — {all.length} compound{all.length !== 1 ? "s" : ""}
+                    </div>
+                    {all.length === 0 && (
                       <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6 }}>
-                        No compounds match your current profile and goals. Try adjusting your goals, or browse the full library below.
+                        No matched compounds for this filter.{otherCompounds.some(passesFilters) ? " See Browse all below." : " Try a different goal or type."}
                       </div>
                     )}
                     {visible.map(rec => (
-                      <CompoundCard
-                        key={rec.compound.id}
-                        rec={rec}
-                        isSelected={selectedCompounds.includes(rec.compound.id)}
-                        onToggle={() => toggleCompound(rec.compound.id)}
-                      />
+                      <CompoundCard key={rec.compound.id} rec={rec} isSelected={selectedCompounds.includes(rec.compound.id)} onToggle={() => toggleCompound(rec.compound.id)} />
                     ))}
                     {hasMore && (
-                      <button
-                        onClick={() => setShowAllRecommended(true)}
-                        style={{ ...S.btnOutline, marginTop: 8, marginBottom: 4, fontSize: 12, padding: "10px 16px" }}
-                      >
-                        Show {filtered.length - 6} more matched compounds
+                      <button onClick={() => setShowAllRecommended(true)} style={{ ...S.btnOutline, marginTop: 8, marginBottom: 4, fontSize: 12, padding: "10px 16px" }}>
+                        Show {all.length - 6} more matched compounds
                       </button>
                     )}
                   </>
                 );
               })()}
 
-              {/* Browse all — collapsible */}
-              {otherCompounds.length > 0 && (
-                <>
-                  <button
-                    onClick={() => setShowOtherCompounds(v => !v)}
-                    style={{
-                      ...S.btnOutline, marginTop: 20, marginBottom: 12,
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "13px 16px", fontSize: 13
-                    }}
-                  >
-                    <span>{showOtherCompounds ? "Hide" : "Browse"} all compounds ({otherCompounds.length} more)</span>
-                    <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: showOtherCompounds ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
-                  </button>
-                  {showOtherCompounds && (
-                    <>
-                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>
-                        These compounds fall outside your goals, body fat range, or experience tier. Some are educational reference only — read the full profile before considering.
-                      </p>
-                      {otherCompounds.map(rec => (
-                        <CompoundCard
-                          key={rec.compound.id}
-                          rec={rec}
-                          isSelected={selectedCompounds.includes(rec.compound.id)}
-                          onToggle={() => toggleCompound(rec.compound.id)}
-                        />
-                      ))}
-                    </>
-                  )}
-                </>
-              )}
+              {/* Browse all — same filter + sort; auto-opens when a filter is active (#54) */}
+              {otherCompounds.length > 0 && (() => {
+                const all = filterAndSort(otherCompounds);
+                const open = showOtherCompounds || filtersActive;
+                return (
+                  <>
+                    <button
+                      onClick={() => setShowOtherCompounds(v => !v)}
+                      style={{ ...S.btnOutline, marginTop: 20, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", fontSize: 13 }}
+                    >
+                      <span>{open ? "Hide" : "Browse"} all compounds ({filtersActive ? `${all.length} matching` : `${otherCompounds.length} more`})</span>
+                      <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                    </button>
+                    {open && (
+                      <>
+                        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>
+                          These compounds fall outside your goals, body fat range, or experience tier. Some are educational reference only — read the full profile before considering.
+                        </p>
+                        {all.length === 0 && (
+                          <div style={{ ...S.card, color: "rgba(255,255,255,0.45)", fontSize: 13 }}>None match the current filter.</div>
+                        )}
+                        {all.map(rec => (
+                          <CompoundCard key={rec.compound.id} rec={rec} isSelected={selectedCompounds.includes(rec.compound.id)} onToggle={() => toggleCompound(rec.compound.id)} />
+                        ))}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
             </>
           )}
 
