@@ -224,4 +224,4 @@ A comprehensive mathematical/physiological reference document exists covering:
 - `docs/plans/PLAN_D_COMPOUND_REVIEW.md` — Compound classification audit
 - `docs/plans/PLAN_E_PHOTO_CAPTURE.md` — Progress photo UI scaffolding
 - `ALKI_BUG_THREAD_SEED.md` — Bug triage session template
-- Eidolon Engine spec lives in Claude.ai project knowledge (search "Eidolon Engine" or "mathematical physiological reference")
+- Eidolon Engine spec: `docs/EIDOLON_ENGINE_SPEC.md` — the full mathematical/physiological reference for the simulation engine
