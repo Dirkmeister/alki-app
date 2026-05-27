@@ -1633,7 +1633,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [sortMode, setSortMode] = useState("match");     // match | name | risk | category
   const [showAllRecommended, setShowAllRecommended] = useState(false);
   const [editing, setEditing] = useState(!activeProtocol);
-  const [showGoalsEditor, setShowGoalsEditor] = useState(false);
+  const [showManageMenu, setShowManageMenu] = useState(false); // #62 — committed-home Manage dropdown
   const [showEidolonSwitcher, setShowEidolonSwitcher] = useState(false);
   const [showAvatarDebug, setShowAvatarDebug] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -2261,10 +2261,35 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               Discard Changes
             </button>
           )}
-          {editing && (
-            <button onClick={() => setShowGoalsEditor(v => !v)} style={{ background: "none", border: "none", color: showGoalsEditor ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              Goals
-            </button>
+          {/* #62 — committed-home eidolon management lives here now (was the bottom action grid) */}
+          {!editing && activeProtocol && (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setShowManageMenu(v => !v)} style={{ background: "none", border: "none", color: showManageMenu ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Manage ▾
+              </button>
+              {showManageMenu && (
+                <>
+                  <div onClick={() => setShowManageMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+                  <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 91, background: "#141414", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: 6, minWidth: 168, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                    {[
+                      ["Modify protocol", () => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }],
+                      ["Switch eidolon", () => setShowEidolonSwitcher(true)],
+                      ["+ New eidolon", createNewEidolon],
+                    ].map(([mLabel, fn]) => (
+                      <button
+                        key={mLabel}
+                        onClick={() => { fn(); setShowManageMenu(false); }}
+                        style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", padding: "9px 12px", borderRadius: 6, whiteSpace: "nowrap" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                      >
+                        {mLabel}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
           <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Modeler
@@ -2350,26 +2375,31 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       )}
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
-      {editing && showGoalsEditor && (
+      {/* #61 — goal selection is inline while building/modifying (no longer hidden
+          behind a nav toggle); selected goals sort to the front, and the whole card
+          disappears once the protocol is locked in (committed mode). */}
+      {editing && (
         <div style={{ ...S.card, borderColor: 'rgba(26,232,122,0.2)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ ...S.label, marginBottom: 0 }}>Goals for {activeEidolon?.name || 'Eidolon 1'}</div>
-            <button onClick={() => setShowGoalsEditor(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
+          <div style={{ ...S.label, marginBottom: 12 }}>
+            Goals for {activeEidolon?.name || 'Eidolon 1'}{' '}
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>· tap to choose</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
-            {GOALS.map(g => {
-              const active = (profile.goals || []).includes(g.id);
-              return (
-                <button key={g.id} onClick={() => handleGoalToggle(g.id)} style={{
-                  ...S.tag,
-                  background: active ? S.accentDim : 'rgba(255,255,255,0.04)',
-                  border: `1.5px solid ${active ? S.accent : 'rgba(255,255,255,0.1)'}`,
-                  color: active ? '#fff' : 'rgba(255,255,255,0.5)'
-                }}>
-                  {g.icon} {g.label}
-                </button>
-              );
-            })}
+            {[...GOALS]
+              .sort((a, b) => (((profile.goals || []).includes(a.id) ? 0 : 1) - ((profile.goals || []).includes(b.id) ? 0 : 1)))
+              .map(g => {
+                const active = (profile.goals || []).includes(g.id);
+                return (
+                  <button key={g.id} onClick={() => handleGoalToggle(g.id)} style={{
+                    ...S.tag,
+                    background: active ? S.accentDim : 'rgba(255,255,255,0.04)',
+                    border: `1.5px solid ${active ? S.accent : 'rgba(255,255,255,0.1)'}`,
+                    color: active ? '#fff' : 'rgba(255,255,255,0.5)'
+                  }}>
+                    {g.icon} {g.label}
+                  </button>
+                );
+              })}
           </div>
         </div>
       )}
@@ -2751,54 +2781,30 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               </div>
             ) : (
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-                No goals set. Tap <span style={{ color: S.accent, fontWeight: 600 }}>Modify</span> to change goals — they lock while a protocol is active.
+                No goals set. Tap <span style={{ color: S.accent, fontWeight: 600 }}>Manage ▾ → Modify</span> to change goals — they lock while a protocol is active.
               </div>
             )}
           </div>
 
-          {/* 7. Action grid — top row 2-col (Projection + Timeline), bottom row 3-col (Modify / Switch / New) */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8, marginBottom: 10 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <button
-                onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-                disabled={stackAnalysis.isBlocked}
-                style={{
-                  ...S.btnOutline,
-                  ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {})
-                }}
-              >
-                View Projection
-              </button>
-              <button
-                onClick={onTimeline}
-                style={S.btnOutline}
-              >
-                Protocol Timeline
-              </button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              <button
-                onClick={() => {
-                  setSelectedCompounds(activeProtocol.compounds || []);
-                  setEditing(true);
-                }}
-                style={S.btnOutline}
-              >
-                Modify
-              </button>
-              <button
-                onClick={() => setShowEidolonSwitcher(true)}
-                style={S.btnOutline}
-              >
-                Switch
-              </button>
-              <button
-                onClick={createNewEidolon}
-                style={S.btnOutline}
-              >
-                New
-              </button>
-            </div>
+          {/* 7. Primary actions — Projection + Timeline. Eidolon management
+              (Modify / Switch / New) now lives in the "Manage ▾" nav dropdown (#62). */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8, marginBottom: 10 }}>
+            <button
+              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+              disabled={stackAnalysis.isBlocked}
+              style={{
+                ...S.btnOutline,
+                ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {})
+              }}
+            >
+              View Projection
+            </button>
+            <button
+              onClick={onTimeline}
+              style={S.btnOutline}
+            >
+              Protocol Timeline
+            </button>
           </div>
         </>
       )}
