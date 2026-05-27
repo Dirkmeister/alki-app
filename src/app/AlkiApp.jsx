@@ -49,7 +49,7 @@ const SITE_URL =
 // ─────────────────────────────────────────────────────────────
 // App version — bump on every commit so testers can confirm which deploy
 // they're viewing. Shown on the splash/enter screen (upper-left).
-const APP_VERSION = "0.1.96";
+const APP_VERSION = "0.1.97";
 // Auto build id from Vercel's git commit SHA (wired in next.config.mjs).
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
@@ -3848,6 +3848,15 @@ export default function AlkiApp() {
           stack={selectedCompounds}
           compoundCatalog={COMPOUNDS}
           initialCycleLength={12}
+          // #71 — locked when the shown stack is the committed protocol (not a draft):
+          // cycle length is then read-only. Building/modifying → editable suggestion.
+          locked={(() => {
+            const ap = activeProtocol;
+            if (!ap?.lockedAt) return false;
+            const a = [...selectedCompounds].sort().join(",");
+            const b = [...(ap.compounds || [])].sort().join(",");
+            return a === b;
+          })()}
           onBack={navBack}
         />
       )}

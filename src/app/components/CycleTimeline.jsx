@@ -485,6 +485,26 @@ function buildTimeline(rawStack, cycleLength, compoundCatalog) {
   return { totalWeeks, phases, weeks, bloodwork, pct, suppressionLevel, lanes };
 }
 
+// #71 — calculate a protocol's natural cycle length from its compounds: the
+// longest standard cycle among them (compounds with no finite cycle — as-needed
+// or indefinite — don't drive it). PCT is auto-appended downstream. Used to seed
+// the (editable) length on build-my-own and to fix it on a locked protocol.
+function suggestedCycleLength(rawStack, compoundCatalog, { min = 4, max = 24, fallback = 12 } = {}) {
+  const stack = normalizeStack(rawStack);
+  let longest = 0;
+  for (const item of stack) {
+    let p = CYCLE_PROFILES[item.id];
+    if (!p && compoundCatalog) {
+      const c = compoundCatalog.find((x) => x.id === item.id);
+      if (c) p = generateFallbackProfile(c);
+    }
+    if (!p || !p.standardCycleWeeks) continue; // 0 / undefined → as-needed/indefinite
+    if (p.standardCycleWeeks > longest) longest = p.standardCycleWeeks;
+  }
+  const base = longest > 0 ? longest : fallback;
+  return Math.max(min, Math.min(max, base));
+}
+
 // ============================================================
 // ICONS
 // ============================================================
@@ -1190,12 +1210,21 @@ function SectionLabel({ children, style = {} }) {
 export default function CycleTimeline({
   stack = [],
   compoundCatalog = [],
-  initialCycleLength = 8,
+  initialCycleLength = 12,
   minCycleLength = 4,
   maxCycleLength = 24,
+  locked = false,          // #71 — locked protocol: cycle length is fixed, not editable
   onBack,
 }) {
-  const [cycleLength, setCycleLength] = useState(initialCycleLength);
+  // #71 — the cycle length is calculated from the compounds. On a locked protocol
+  // it's read-only; while building your own you can override the suggestion.
+  const suggested = useMemo(
+    () => suggestedCycleLength(stack, compoundCatalog, { min: minCycleLength, max: maxCycleLength, fallback: initialCycleLength }),
+    [stack, compoundCatalog, minCycleLength, maxCycleLength, initialCycleLength]
+  );
+  const [override, setOverride] = useState(null); // null = follow the suggestion
+  const cycleLength = locked ? suggested : (override ?? suggested);
+  const setCycleLength = (n) => setOverride(Math.max(minCycleLength, Math.min(maxCycleLength, n)));
   const [selectedWeek, setSelectedWeek] = useState(1);
 
   const timeline = useMemo(
@@ -1265,7 +1294,8 @@ export default function CycleTimeline({
     <div style={containerStyle}>
       <Header onBack={onBack} />
 
-      {/* Cycle length adjuster */}
+      {/* Cycle length — #71. Locked protocol: read-only, calculated from compounds.
+          Build-my-own: editable stepper seeded with the suggestion. */}
       <div style={{
         marginTop: 20,
         marginBottom: 24,
@@ -1287,7 +1317,7 @@ export default function CycleTimeline({
             color: TOKENS.textTertiary,
             marginBottom: 2,
           }}>
-            Cycle length
+            Cycle length{locked ? " · locked" : ""}
           </div>
           <div style={{
             fontSize: 16,
@@ -1297,17 +1327,26 @@ export default function CycleTimeline({
           }}>
             {cycleLength} weeks
           </div>
+          <div style={{ fontSize: 11, color: TOKENS.textTertiary, marginTop: 3, lineHeight: 1.4 }}>
+            {locked
+              ? "Set by your locked protocol — calculated from its compounds + PCT."
+              : (override != null && override !== suggested
+                  ? <>Suggested from your compounds: {suggested} wk. <button onClick={() => setOverride(null)} style={{ background: "none", border: "none", color: TOKENS.accent, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: FONT_STACK, padding: 0 }}>↺ reset</button></>
+                  : `Suggested from your compounds. Adjust to explore.`)}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <StepBtn
-            onClick={() => setCycleLength(Math.max(minCycleLength, cycleLength - 1))}
-            disabled={cycleLength <= minCycleLength}
-          >−</StepBtn>
-          <StepBtn
-            onClick={() => setCycleLength(Math.min(maxCycleLength, cycleLength + 1))}
-            disabled={cycleLength >= maxCycleLength}
-          >+</StepBtn>
-        </div>
+        {!locked && (
+          <div style={{ display: "flex", gap: 6 }}>
+            <StepBtn
+              onClick={() => setCycleLength(Math.max(minCycleLength, cycleLength - 1))}
+              disabled={cycleLength <= minCycleLength}
+            >−</StepBtn>
+            <StepBtn
+              onClick={() => setCycleLength(Math.min(maxCycleLength, cycleLength + 1))}
+              disabled={cycleLength >= maxCycleLength}
+            >+</StepBtn>
+          </div>
+        )}
       </div>
 
       <SectionLabel>Protocol phases</SectionLabel>

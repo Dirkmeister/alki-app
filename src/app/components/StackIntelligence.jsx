@@ -520,11 +520,14 @@ const SUPPORT_DEFS = {
   },
 };
 
-// #39 — support items that correspond to an actual catalog compound the user can
-// add to their stack. Lifestyle/monitoring/protocol support (protein, bloodwork,
-// PCT) stays as guidance. Extend this as TUDCA/NAC/etc. enter the catalog.
-const SUPPORT_COMPOUND_MAP = {
-  tadalafil_daily: "tadalafil",
+// #39/#71 — support items that map to actual catalog compounds the user can add to
+// their stack. Values are option LISTS: most are a single compound, but PCT offers a
+// choice of SERMs (Tamoxifen / Enclomiphene) — one or both per suppression level.
+// Lifestyle/monitoring support (protein, bloodwork, TUDCA/NAC not yet in catalog)
+// stays as guidance.
+const SUPPORT_COMPOUND_OPTIONS = {
+  tadalafil_daily: ["tadalafil"],
+  pct_standard: ["tamoxifen", "enclomiphene"],
 };
 
 // ============================================================
@@ -895,6 +898,14 @@ export default function StackIntelligence({ stackIds = [], userProfile = {}, onR
     return null;
   }
 
+  // #71 — PCT SERM recommendation: both Tamoxifen + Enclomiphene for a strongly- or
+  // dual-suppressive cycle; either one for a mild cycle. Mirrors generatePCT() in
+  // the stack generator (strong-SARM list + dual-suppressive detection).
+  const STRONG_SARM_IDS = ["yk11", "rad140", "lgd4033", "lgd3303", "rad150", "s23"];
+  const pctRecommendBoth =
+    analysis.compounds.some((c) => STRONG_SARM_IDS.includes(c.id)) ||
+    analysis.compounds.filter((c) => c.category === "SARM" && (c.risk?.suppression || 0) >= 0.35).length > 1;
+
   // Compact mode: render ONLY the critical contraindication banner.
   // Used on the Dashboard so the selection flow stays clean.
   // Full analysis lives on the Transform screen.
@@ -943,7 +954,13 @@ export default function StackIntelligence({ stackIds = [], userProfile = {}, onR
       )}
 
       {analysis.supportRequired.length > 0 && (
-        <SupportLayer supportRequired={analysis.supportRequired} selectedIds={stackIds} onAddCompound={onAddCompound} />
+        <SupportLayer
+          supportRequired={analysis.supportRequired}
+          selectedIds={stackIds}
+          onAddCompound={onAddCompound}
+          compoundCatalog={compoundCatalog}
+          pctRecommendBoth={pctRecommendBoth}
+        />
       )}
 
       <DesignNotes compounds={analysis.compounds} />
@@ -1195,12 +1212,15 @@ function InteractionsSection({ redundancies, synergies }) {
   );
 }
 
-function SupportLayer({ supportRequired, selectedIds = [], onAddCompound }) {
+function SupportLayer({ supportRequired, selectedIds = [], onAddCompound, compoundCatalog = [], pctRecommendBoth = false }) {
   const grouped = supportRequired.reduce((acc, s) => {
     if (!acc[s.category]) acc[s.category] = [];
     acc[s.category].push(s);
     return acc;
   }, {});
+
+  const nameOf = (id) =>
+    (compoundCatalog.find((c) => c.id === id) || COMPOUND_INTEL[id] || {}).name || id;
 
   return (
     <div style={styles.section}>
@@ -1235,25 +1255,50 @@ function SupportLayer({ supportRequired, selectedIds = [], onAddCompound }) {
               <div style={styles.supportCardDetail}>{item.detail}</div>
               <div style={styles.supportCardTrigger}>Triggered by {item.triggeredBy}</div>
               {(() => {
-                const addId = SUPPORT_COMPOUND_MAP[item.id];
-                if (!addId || !onAddCompound) return null;
-                if (selectedIds.includes(addId)) {
-                  return <div style={{ fontSize: 11, fontWeight: 600, color: ACCENT, marginTop: 8 }}>✓ In your stack</div>;
-                }
+                const opts = SUPPORT_COMPOUND_OPTIONS[item.id];
+                if (!opts || !onAddCompound) return null;
                 const req = item.urgency === "required";
+                // #71 — PCT offers a choice: one SERM for mild cycles, both for
+                // strongly/dual-suppressive ones. Other support items are single.
+                const isPCT = item.id === "pct_standard";
+                const recLabel = isPCT
+                  ? (pctRecommendBoth
+                      ? "Recommended for this stack: add BOTH (strong/dual suppression)"
+                      : "Add one — Tamoxifen or Enclomiphene both work for a mild cycle")
+                  : null;
                 return (
-                  <button
-                    onClick={() => onAddCompound(addId)}
-                    style={{
-                      marginTop: 8, padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      cursor: "pointer", fontFamily: "inherit",
-                      background: req ? ACCENT : "transparent",
-                      color: req ? "#06281b" : ACCENT,
-                      border: `1px solid ${req ? ACCENT : ACCENT + "66"}`,
-                    }}
-                  >
-                    + Add to stack{req ? " · required" : ""}
-                  </button>
+                  <div style={{ marginTop: 8 }}>
+                    {recLabel && (
+                      <div style={{ fontSize: 11, color: TEXT_DIM, marginBottom: 6, lineHeight: 1.4 }}>{recLabel}</div>
+                    )}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {opts.map((id) => {
+                        const inStack = selectedIds.includes(id);
+                        if (inStack) {
+                          return (
+                            <span key={id} style={{ fontSize: 11, fontWeight: 600, color: ACCENT, padding: "7px 0" }}>
+                              ✓ {nameOf(id)} in stack
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => onAddCompound(id)}
+                            style={{
+                              padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                              cursor: "pointer", fontFamily: "inherit",
+                              background: req ? ACCENT : "transparent",
+                              color: req ? "#06281b" : ACCENT,
+                              border: `1px solid ${req ? ACCENT : ACCENT + "66"}`,
+                            }}
+                          >
+                            + {nameOf(id)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })()}
             </div>
