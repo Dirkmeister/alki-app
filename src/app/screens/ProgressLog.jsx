@@ -19,12 +19,17 @@ const S = {
   disclaimer: { fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, textAlign: "center", padding: "16px 0" }
 };
 
-function ScoreInput({ label, value, onChange, icon }) {
+function ScoreInput({ label, value, onChange, icon, hint }) {
   return (
     <div>
-      <div style={{ ...S.label, fontSize: 10, marginBottom: 6 }}>
+      <div style={{ ...S.label, fontSize: 10, marginBottom: hint ? 2 : 6 }}>
         {icon} {label}
       </div>
+      {hint && (
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 8, lineHeight: 1.4 }}>
+          {hint}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 4 }}>
         {[1,2,3,4,5,6,7,8,9,10].map(n => (
           <button
@@ -269,10 +274,15 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
             </div>
           </div>
 
+          {/* #36 — these three are subjective self-ratings; define them here since
+              this is the only place in the app they appear. */}
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 12, lineHeight: 1.5 }}>
+            Subjective check-in — rate each from 1 (poor) to 10 (great). These track how you <em>feel</em> alongside the hard numbers above.
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
-            <ScoreInput label="Wellbeing" value={wellbeing} onChange={setWellbeing} icon="🧠" />
-            <ScoreInput label="Energy" value={energy} onChange={setEnergy} icon="⚡" />
-            <ScoreInput label="Sleep Quality" value={sleepQuality} onChange={setSleepQuality} icon="🌙" />
+            <ScoreInput label="Wellbeing" value={wellbeing} onChange={setWellbeing} icon="🧠" hint="Overall mood and how good you feel day-to-day." />
+            <ScoreInput label="Energy" value={energy} onChange={setEnergy} icon="⚡" hint="Daytime energy and drive — sustained, not caffeine spikes." />
+            <ScoreInput label="Sleep Quality" value={sleepQuality} onChange={setSleepQuality} icon="🌙" hint="How rested you feel, not just hours slept." />
           </div>
 
           <div style={{ marginBottom: 16 }}>

@@ -558,6 +558,9 @@ function deriveIntelFromCatalog(c) {
     contraindications: [],
     supportTriggers: [],
     risk: { suppression, liver: tier.liver, cardio: tier.cardio, dataQuality: "limited_human" },
+    // #67 — give catalog-fallback compounds (e.g. SR-9009) a real "Role in Stack"
+    // line instead of a blank, using their mechanism/tagline from the catalog.
+    designNote: c.mechanism || c.tagline || "Part of your custom stack — open its full profile for mechanism, dosing, and role.",
     _derived: true,
   };
 }

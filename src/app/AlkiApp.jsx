@@ -49,7 +49,7 @@ const SITE_URL =
 // ─────────────────────────────────────────────────────────────
 // App version — bump on every commit so testers can confirm which deploy
 // they're viewing. Shown on the splash/enter screen (upper-left).
-const APP_VERSION = "0.1.95";
+const APP_VERSION = "0.1.96";
 // Auto build id from Vercel's git commit SHA (wired in next.config.mjs).
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
@@ -1154,12 +1154,15 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
   }));
 
   const bfNum = parseFloat(data.bodyFat);
+  // #31 — informational only. Describe what the range *means* physiologically;
+  // don't prescribe a goal or protocol. The recommendation engine still ranks
+  // compounds by body fat — this copy is here to teach, not to steer.
   const bfFeedback = !isNaN(bfNum) && bfNum > 0 ? (
-    bfNum < 8 ? { text: "Competition-level lean. All compounds available for research. Recovery and GH peptides are most commonly studied at this range.", color: "#1ae87a" } :
-    bfNum < 15 ? { text: "Athletic range. Full compound spectrum available for research. GH and recovery peptides are frequently studied here; GLP-1 research indicates lean mass risk at this level.", color: "#1ae87a" } :
-    bfNum < 22 ? { text: "Healthy range. Full compound spectrum available. Research literature supports body recomposition protocols at this body fat level.", color: "#1ae87a" } :
-    bfNum < 30 ? { text: "Research literature indicates GLP-1 compounds show strongest outcomes at this range. Fat loss protocols will be prioritized in your research profile.", color: "#1ae87a" } :
-    { text: "Research literature documents strongest GLP-1 clinical results at this body fat percentage. Fat loss protocols will lead your research profile.", color: "#1ae87a" }
+    bfNum < 8 ? { text: "Competition-level lean — at or below the essential-fat margin for most men. Very lean ranges are where much GH-axis and recovery research is focused.", color: "#1ae87a" } :
+    bfNum < 15 ? { text: "Athletic range. Lean and within healthy limits. For context, GLP-1 research notes elevated lean-mass-loss risk the leaner you are.", color: "#1ae87a" } :
+    bfNum < 22 ? { text: "Healthy range — typical for an active adult.", color: "#1ae87a" } :
+    bfNum < 30 ? { text: "Above-average body fat — the range most published GLP-1 weight-loss trials were conducted in.", color: "#1ae87a" } :
+    { text: "High body fat — where the strongest documented GLP-1 weight-loss results come from in the clinical literature.", color: "#1ae87a" }
   ) : null;
 
   const steps = [
@@ -1273,7 +1276,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
                 borderRadius: "0 0 10px 10px", padding: "16px 14px 14px"
               }}>
                 <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, margin: "0 0 14px", lineHeight: 1.5 }}>
-                  Optional — from an InBody machine, DEXA scan, or smart scale. Each field you fill in sharpens your recommendations.
+                  Optional — most people skip this, and that's fine. If you have a DEXA scan, InBody, or smart-scale readout handy, enter whatever you can: each value sharpens your projections and recommendations.
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {advFields.map(({ key, label, unit, placeholder, hint }) => (
@@ -1747,6 +1750,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   // #51-57 — two-tier connected filter (goal -> type) + sort + clear.
   const [goalFilter, setGoalFilter] = useState("all");   // "all" | goalId
   const [catFilter, setCatFilter] = useState("all");     // "all" | category name
+  const [searchQuery, setSearchQuery] = useState("");    // #46 — free-text compound search
   const [sortMode, setSortMode] = useState("match");     // match | name | risk | category
   const [showAllRecommended, setShowAllRecommended] = useState(false);
   const [editing, setEditing] = useState(!activeProtocol);
@@ -1868,7 +1872,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   }, [profile]);
   const stackAnalysis = useMemo(() => {
     if (selectedCompounds.length === 0) return { isBlocked: false, compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null };
-    try { return analyzeStack(selectedCompounds, profile); }
+    // #67 — pass the catalog so derived (catalog-fallback) compounds are counted.
+    // Without it this score dropped non-COMPOUND_INTEL compounds and read higher
+    // than the StackIntelligence card (which gets the catalog) — visible once the
+    // score was echoed in the CTA bar. Now both use the same basis.
+    try { return analyzeStack(selectedCompounds, profile, COMPOUNDS); }
     catch (e) { console.error('analyzeStack error:', e); return { isBlocked: false, compounds: [], contraindications: [], synergies: [], redundancies: [], supportRequired: [], safetyScore: { overall: 100 }, summary: null }; }
   }, [selectedCompounds, profile]);
 
@@ -2163,6 +2171,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     const c = rec.compound;
     if (goalFilter !== "all" && !(c.suitability?.goals || []).includes(goalFilter)) return false;
     if (catFilter !== "all" && c.category !== catFilter) return false;
+    // #46 — free-text search across name, tagline, and category.
+    const q = searchQuery.trim().toLowerCase();
+    if (q && !`${c.name} ${c.tagline || ""} ${c.category || ""}`.toLowerCase().includes(q)) return false;
     return true;
   };
 
@@ -2187,9 +2198,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     );
     return [...new Set(pool.map((rec) => rec.compound.category))].sort();
   };
-  const filtersActive = goalFilter !== "all" || catFilter !== "all";
+  const filtersActive = goalFilter !== "all" || catFilter !== "all" || searchQuery.trim() !== "";
   const setGoal = (g) => { setGoalFilter(g); setCatFilter("all"); setShowAllRecommended(false); };
-  const clearSelection = () => { setSelectedCompounds([]); setGoalFilter("all"); setCatFilter("all"); };
+  const clearSelection = () => { setSelectedCompounds([]); setGoalFilter("all"); setCatFilter("all"); setSearchQuery(""); };
 
   const recommendedIds = new Set(recommended.map(r => r.compound.id));
   const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
@@ -2857,6 +2868,28 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 const SORTS = [["match", "Best match"], ["name", "Name"], ["risk", "Risk"], ["category", "Category"]];
                 return (
                   <div style={{ marginBottom: 16 }}>
+                    {/* #46 — free-text search; applies to matched + browse-all via passesFilters */}
+                    <div style={{ position: "relative", marginBottom: 10 }}>
+                      <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "rgba(255,255,255,0.3)", pointerEvents: "none" }}>🔍</span>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setShowAllRecommended(false); }}
+                        placeholder="Search compounds by name…"
+                        style={{
+                          width: "100%", boxSizing: "border-box", padding: "10px 34px 10px 34px",
+                          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: 100, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit",
+                        }}
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          aria-label="Clear search"
+                          style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%", width: 20, height: 20, color: "rgba(255,255,255,0.6)", fontSize: 13, lineHeight: 1, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                        >×</button>
+                      )}
+                    </div>
                     {goalChips.length > 0 && (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
                         <span style={rowLabel}>Goal</span>
@@ -2997,6 +3030,18 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 padding: "12px 20px 20px", zIndex: 100,
                 background: "linear-gradient(to top, #0a0a0a 85%, transparent)",
               }}>
+                {/* #67 — echo the live Stack Safety score in the always-visible CTA
+                    bar so its change is seen without scrolling back up to the analysis. */}
+                {(() => {
+                  const sc = stackAnalysis.safetyScore?.overall ?? 100;
+                  const col = sc >= 85 ? "#22d68a" : sc >= 65 ? "#a3e635" : sc >= 45 ? "#f59e0b" : "#ef4444";
+                  return (
+                    <div style={{ maxWidth: 480, margin: "0 auto 8px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      <span style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: 10, fontWeight: 700 }}>Stack Safety</span>
+                      <span style={{ color: col, fontSize: 12, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stackAnalysis.summary?.risk || "—"} · {sc}/100</span>
+                    </div>
+                  );
+                })()}
                 <button
                   onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
                   disabled={stackAnalysis.isBlocked}
