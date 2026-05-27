@@ -64,20 +64,17 @@ alki-app/
 │   ├── layout.js              ← Root layout, meta tags, font loading
 │   ├── globals.css            ← Base styles, CSS reset
 │   │
-│   ├── screens/               ← Full-page views
-│   │   ├── SplashScreen.jsx
-│   │   ├── AgeGate.jsx
-│   │   ├── Onboarding.jsx
+│   ├── screens/               ← Standalone full-page views
 │   │   ├── ProgressLog.jsx
-│   │   └── AlkiProtocolQA.jsx ← Protocol Q&A page (per-compound + general FAQs)
-│   │   (NOTE: the main Dashboard + the SVG BodyAvatar are defined INLINE in
-│   │    AlkiApp.jsx, not here. Stale standalone Home.jsx / Dash.jsx / components
-│   │    /BodyAvatar.jsx were deleted 2026-05-27. Several remaining screens/ files
-│   │    may also be unused inline-duplicates — audit pending.)
+│   │   ├── AlkiProtocolQA.jsx ← Protocol Q&A reference (per-compound + general FAQs)
+│   │   └── ProtocolGuideView.jsx ← Plan C: personalized protocol guide (6 sections)
+│   │   (NOTE: Splash, AgeGate, Onboarding, Dashboard + the SVG BodyAvatar are
+│   │    defined INLINE in AlkiApp.jsx — NOT here. The stale standalone copies of
+│   │    those, plus CompoundCard / theme.js / goals.js / avatar.js / Home / Dash,
+│   │    were deleted in the 2026-05-27 dead-code sweep.)
 │   │
-│   ├── components/            ← Shared UI components
-│   │   ├── CompoundCard.jsx   ← Compound detail cards
-│   │   ├── StackIntelligence.jsx ← Stack analysis view
+│   ├── components/            ← Shared UI components (CompoundCard is inline in AlkiApp)
+│   │   ├── StackIntelligence.jsx ← Stack analysis (analyzeStack, getStackSuggestions, synergy data)
 │   │   ├── StackGenerator.jsx ← Stack builder UI
 │   │   ├── CycleTimeline.jsx  ← Protocol timeline visualization
 │   │   ├── PeptideModeler.jsx ← Compound modeling view
@@ -92,25 +89,22 @@ alki-app/
 │   │   └── avaturnConfig.js   ← Avaturn SDK config (disabled)
 │   │
 │   ├── admin/                 ← Internal tools (not user-facing)
-│   │   └── AlkiTriage.jsx     ← Bug triage board
+│   │   └── AlkiTriage.jsx     ← Bug triage board (BUILT but NOT wired to any route)
 │   │
-│   ├── data/                  ← Static data (no render imports allowed)
-│   │   ├── compounds.js       ← 8-compound core database
-│   │   ├── compounds-expanded.js ← Extended compound data
-│   │   └── goals.js           ← Goal definitions for onboarding
+│   ├── data/                  ← Static data (no render imports allowed; GOALS is inline in AlkiApp)
+│   │   ├── compounds.js       ← 8-compound core DB (also spreads in the expanded set)
+│   │   ├── compounds-expanded.js ← Extended 63-compound data
+│   │   └── protocolProtocols.js ← Plan C: per-compound protocol data (all 71; needs_review flags)
 │   │
 │   ├── lib/                   ← Pure logic (no render imports allowed)
-│   │   ├── peptideEngine.js   ← Recommendation engine (deterministic, rule-based)
-│   │   ├── recommendations.js ← Recommendation helpers
+│   │   ├── peptideEngine.js   ← Morph/effect helpers (NOTE: the LIVE recommendation
+│   │   │                         engine is the INLINE getRecommendations in AlkiApp.jsx)
 │   │   ├── stackGenerator.js  ← Stack generation logic
 │   │   ├── morphTargets.js    ← Canonical 13-key morph system + baseline driver
 │   │   ├── compoundMorphVectors.js ← Per-compound effect vectors (core IP)
-│   │   ├── avatar.js          ← Avatar parameter resolution
+│   │   ├── protocolGuide.js   ← Plan C: supply/reconstitution/schedule/timeline helpers
 │   │   ├── cultivation.js     ← Cultivation system (progressing/stagnant/regressing)
 │   │   └── supabase.js        ← Supabase client initialization
-│   │
-│   ├── styles/
-│   │   └── theme.js           ← Design tokens
 │   │
 │   └── error.jsx              ← Error boundary
 │
