@@ -229,6 +229,19 @@ function deriveBloodwork(category) {
   return { required: false, panel: ["CMP", "CBC"], note: "No routine hormone panel required for this class." };
 }
 
+// Surface the per-day cadence + titration hint that live in the dosing string but
+// get flattened to "daily" by deriveFrequency (audit finding 2026-05-27). Faithful
+// to source — e.g. "200 mcg, 1–3x daily" -> { perDay: "1–3×/day" }; "titrate up" -> titrate:true.
+function deriveCadence(dosing = "") {
+  const d = dosing.toLowerCase();
+  let perDay = null, m;
+  if ((m = d.match(/(\d+(?:\s*[–-]\s*\d+)?)\s*x\s*daily/))) perDay = m[1].replace(/\s*-\s*/, "–") + "×/day";
+  else if ((m = d.match(/split into\s*(\d+(?:\s*[–-]\s*\d+)?)/))) perDay = m[1].replace(/\s*-\s*/, "–") + " doses/day";
+  else if (/split\s*am\/pm|split/.test(d)) perDay = "split AM/PM";
+  const titrate = /titrat|pyramid|escalat|\bloading\b|ramp/.test(d);
+  return { perDay, titrate };
+}
+
 function deriveRecord(c) {
   const routeType = deriveRouteType(c.route);
   const dose = parseDose(c.dosing);
@@ -245,6 +258,7 @@ function deriveRecord(c) {
     dose,
     frequency: deriveFrequency(c.dosing, c.cycle),
     timing: deriveTiming(c),
+    cadence: deriveCadence(c.dosing),
     reconstitution: injectable && perDoseMcg
       ? { vialSizes: [5, 10], defaultVialMg: 5, defaultBacWaterMl: 2, perDoseMcg }
       : null,

@@ -222,9 +222,11 @@ function ScheduleGroup({ title, entries }) {
             </div>
             <div style={{ fontSize: 12, color: T.text3, marginTop: 3 }}>
               {e.frequencyLabel}
+              {e.cadence?.perDay ? ` · ${e.cadence.perDay}` : ""}
               {e.cycle?.onWeeks
                 ? ` · ${e.cycle.onWeeks}wk${e.cycle.offWeeks ? ` on / ${e.cycle.offWeeks}wk off` : " cycle"}`
                 : (e.cycle?.raw ? ` · ${e.cycle.raw}` : "")}
+              {e.cadence?.titrate ? " · titrate per protocol (starting dose shown)" : ""}
             </div>
             {e.titration && (
               <div style={{ fontSize: 11, color: T.faint, marginTop: 6, lineHeight: 1.5 }}>

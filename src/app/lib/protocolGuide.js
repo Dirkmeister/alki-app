@@ -114,6 +114,7 @@ export function buildSchedule(stackIds) {
       frequencyLabel: FREQUENCY_LABELS[p.frequency] || p.frequency,
       days: p.days,
       cycle: p.cycle,
+      cadence: p.cadence || null,
       titration: p.titration || null,
       routeType: p.routeType,
     };
