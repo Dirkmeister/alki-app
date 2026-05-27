@@ -855,13 +855,15 @@ const S = {
   accentDim: "rgba(26,232,122,0.12)",
   accentBorder: "rgba(26,232,122,0.22)",
   card: {
-    background: "rgba(255,255,255,0.035)",
+    // #48 — backdrop-filter:blur was on EVERY card. With dozens of cards (up to
+    // ~71 in "see all"), any repaint (scroll, a keystroke's cursor blink) forced
+    // the compositor to re-blur each layer -> 7-17fps with ZERO JS blocking time.
+    // Over the flat #0a0a0a bg the blur was visually negligible; removed it.
+    background: "rgba(255,255,255,0.05)",
     border: "1px solid rgba(255,255,255,0.07)",
     borderRadius: 16,
     padding: 22,
     marginBottom: 14,
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
     transition: "border-color 0.25s ease, background 0.25s ease"
   },
   input: {
