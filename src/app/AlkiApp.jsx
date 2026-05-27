@@ -15,6 +15,7 @@ import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
 import { getStackVectors } from "./lib/compoundMorphVectors";
 import FeedbackFAB from "./FeedbackFAB";
+import PerfHUD from "./PerfHUD";
 
 // ─────────────────────────────────────────────────────────────
 // Default 3D parametric body. This is the always-on avatar. "Reset"
@@ -3788,6 +3789,9 @@ export default function AlkiApp() {
       {screen !== "loading" && (
         <FeedbackFAB currentScreen={screen} userEmail={user?.email || null} />
       )}
+
+      {/* Dev-only perf HUD — opt-in via ?perf=1 or localStorage alkiPerf=1 */}
+      <PerfHUD />
     </div>
   );
 }
