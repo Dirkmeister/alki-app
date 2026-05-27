@@ -11,6 +11,7 @@ import { AVATURN_ENABLED } from "./avatar/avaturnConfig";
 import PeptideModeler from "./components/PeptideModeler";
 import ProgressLog from "./screens/ProgressLog";
 import ProtocolGuideView from "./screens/ProtocolGuideView";
+import ProgressPhotos from "./screens/ProgressPhotos";
 import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
@@ -1740,7 +1741,7 @@ function EidolonHero({
   );
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   // #51-57 — two-tier connected filter (goal -> type) + sort + clear.
@@ -2675,6 +2676,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               Protocol Timeline
             </button>
           </div>
+          {/* Plan E — progress photos entry */}
+          <button onClick={onPhotos} style={{ ...S.btnOutline, marginBottom: 10 }}>
+            📷 Progress Photos
+          </button>
         </>
       )}
 
@@ -3409,6 +3414,9 @@ export default function AlkiApp() {
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
   const [progressLogs, setProgressLogs] = useState([]);
   const [doseLog, setDoseLog] = useState({}); // #16 — { [eidolonId]: { [YYYY-MM-DD]: { taken:[ids], done:bool } } }
+  // Plan E — progress photos, in-memory ONLY (deliberately not in saveProfile/auto-save;
+  // Supabase Storage is a future task). { [eidolonId]: [{ id, dataUrl, ts }] }
+  const [photos, setPhotos] = useState({});
   const [activeProtocol, setActiveProtocol] = useState(null);
   const [eidolons, setEidolons] = useState([]);
   const [activeEidolonId, setActiveEidolonId] = useState(null);
@@ -3704,6 +3712,7 @@ export default function AlkiApp() {
           onProtocolGuide={() => setScreen("protocol_guide")}
           onModeler={() => setScreen("modeler")}
           onProgress={() => setScreen("progress")}
+          onPhotos={() => setScreen("photos")}
           cultivationState={cultivationState}
           progressLogs={progressLogs}
           avatarUrl={avatarUrl}
@@ -3730,6 +3739,19 @@ export default function AlkiApp() {
           onLogsChanged={setProgressLogs}
         />
       )}
+      {screen === "photos" && (() => {
+        const key = activeEidolonId || "solo";
+        const activeName = (eidolons.find(e => e.id === activeEidolonId) || eidolons[0])?.name || "Your Eidolon";
+        return (
+          <ProgressPhotos
+            photos={photos[key] || []}
+            eidolonName={activeName}
+            onCapture={(dataUrl) => setPhotos(prev => ({ ...prev, [key]: [...(prev[key] || []), { id: "p_" + Date.now(), dataUrl, ts: Date.now() }] }))}
+            onDelete={(id) => setPhotos(prev => ({ ...prev, [key]: (prev[key] || []).filter(p => p.id !== id) }))}
+            onBack={() => setScreen("dashboard")}
+          />
+        );
+      })()}
       {screen === "qa" && (() => {
         // #18 — scope Q&A to the user's stack: committed → locked stack, else builder selection
         const qaIds = (activeProtocol?.compounds?.length ? activeProtocol.compounds : selectedCompounds) || [];

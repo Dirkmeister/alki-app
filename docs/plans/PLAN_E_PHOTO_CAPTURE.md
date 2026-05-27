@@ -3,9 +3,24 @@
 **Priority: Tier 2 — Do After A/B/C**
 **Depends on: Plan A (home screen where progress photos are accessed)**
 **Important: UI scaffolding only. No Supabase storage. No CV-based avatar generation (that's Phase 2).**
-**Status: Not started**
+**Status: BUILT (2026-05-27) — in-memory scaffolding; persistence deferred.**
 
 > Reconstructed from May 17, 2026 session.
+
+## Implementation notes (2026-05-27)
+
+- `src/app/screens/ProgressPhotos.jsx` — native `<input type="file" accept="image/*"
+  capture="environment">` (camera on mobile, picker on desktop), date-sorted gallery
+  grid, full-size viewer modal with delete, empty state, prominent "not saved between
+  sessions" notice.
+- `AlkiApp.jsx` — `photos` state keyed by eidolon id, **deliberately NOT in
+  saveProfile/auto-save** (in-memory only, lost on refresh — per the plan). Entry is a
+  "📷 Progress Photos" button in the committed-home actions; route `screen === "photos"`.
+- **Deferred (as scoped):** Supabase Storage persistence, cultivation check-in
+  coupling (photos are self-contained; they don't touch the streak logic), before/after
+  comparison slider, CV/avatar generation.
+- Verified (Playwright): upload → photo appears in gallery → full-size viewer; session
+  notice + empty state present; build passes; 0 console errors.
 
 ---
 
@@ -57,11 +72,11 @@ Add two photo features:
 
 ## Testing Checklist
 
-- [ ] Camera opens on mobile (Austin's phone)
-- [ ] File picker works as fallback on desktop
-- [ ] Captured photo appears in gallery immediately
-- [ ] Gallery shows photos sorted by date
-- [ ] Tap to view full-size works
-- [ ] Photos associated with correct eidolon
-- [ ] Clear "photos are not saved between sessions" notice visible
-- [ ] Mobile responsive
+- [~] Camera opens on mobile (`capture="environment"` set — pending Austin's device check)
+- [x] File picker works as fallback on desktop (verified via upload)
+- [x] Captured photo appears in gallery immediately
+- [x] Gallery shows photos sorted by date (newest first)
+- [x] Tap to view full-size works
+- [x] Photos associated with correct eidolon (state keyed by eidolon id)
+- [x] Clear "photos are not saved between sessions" notice visible
+- [~] Mobile responsive (built at 414px; pending Austin's device check)
