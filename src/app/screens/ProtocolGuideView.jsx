@@ -222,7 +222,9 @@ function ScheduleGroup({ title, entries }) {
             </div>
             <div style={{ fontSize: 12, color: T.text3, marginTop: 3 }}>
               {e.frequencyLabel}
-              {e.cycle?.onWeeks ? ` · ${e.cycle.onWeeks}wk${e.cycle.offWeeks ? ` on / ${e.cycle.offWeeks}wk off` : ""}` : ""}
+              {e.cycle?.onWeeks
+                ? ` · ${e.cycle.onWeeks}wk${e.cycle.offWeeks ? ` on / ${e.cycle.offWeeks}wk off` : " cycle"}`
+                : (e.cycle?.raw ? ` · ${e.cycle.raw}` : "")}
             </div>
             {e.titration && (
               <div style={{ fontSize: 11, color: T.faint, marginTop: 6, lineHeight: 1.5 }}>

@@ -158,18 +158,24 @@ const AUTHORED = {
 
 function deriveRouteType(route = "") {
   const r = route.toLowerCase();
-  if (/topical|cream|serum/.test(r)) return "topical";
   if (/intranasal|nasal|spray/.test(r)) return "nasal";
   if (/sublingual/.test(r)) return "oral";
-  if (/oral|capsule|tablet/.test(r)) return "oral";
+  if (/oral|capsule|tablet/.test(r)) return "oral"; // "Oral or topical" → oral (primary route)
+  if (/topical|cream|serum/.test(r)) return "topical";
   return "injectable"; // SubQ / IM default
 }
 
+// Precedence matters: "Nx daily" is daily cadence; "Nx weekly" / "Nx/week" /
+// EOD is multi-weekly; bare "weekly" / "/week" is once-weekly. Checking daily
+// and multi-weekly BEFORE bare-weekly avoids "2x/week" or "3x weekly" being
+// mis-read as once-weekly, and "2–3x daily" as multi-weekly.
 function deriveFrequency(dosing = "", cycle = "") {
   const d = `${dosing} ${cycle}`.toLowerCase();
   if (/as.?needed|prn|per use/.test(d)) return "as-needed";
-  if (/once.?week|1x.?week|weekly|\/week/.test(d)) return "weekly";
-  if (/2x.?week|twice.?week|3x.?week|3x.?weekly|2–3x|every other day|eod/.test(d)) return "2x-week";
+  if (/x\s*daily|x\/day|times?\s*(?:a|per)\s*day|\bbid\b|\btid\b/.test(d)) return "daily"; // "1–3x daily", "2x daily"
+  if (/\/day|per day|every day|\bdaily\b/.test(d)) return "daily";
+  if (/\dx\s*(?:weekly|\/week|per week|a week)|twice.?week|every other day|\beod\b/.test(d)) return "2x-week"; // "3x weekly", "2x/week"
+  if (/once.?(?:weekly|a week|per week)|1x.?week|weekly|\/week/.test(d)) return "weekly";
   if (/5.?on|weekday/.test(d)) return "5-on-2-off";
   return "daily";
 }
@@ -195,13 +201,19 @@ function toMcg({ amount, unit }) {
   return null; // iu / unknown → not reconstitutable by mass
 }
 
+// Never fabricate a cycle length. If the source has no parseable week count we
+// return onWeeks: null and carry the raw string so the UI shows the real cadence
+// ("pulsed", "throughout cycle", "ongoing", etc.) instead of a made-up "8 weeks".
 function parseCycle(cycle = "") {
+  const raw = (cycle || "").trim();
   const on = cycle.match(/(\d+)\s*(?:–|-|to)?\s*(\d+)?\s*weeks?\s*on/i) || cycle.match(/(\d+)\s*(?:–|-|to)\s*(\d+)\s*week/i) || cycle.match(/(\d+)\s*week/i);
   const off = cycle.match(/(\d+)\s*weeks?\s*off/i);
-  let onWeeks = 8;
-  if (on) onWeeks = parseInt(on[2] || on[1]) || 8;
-  if (/ongoing|indefinite|sustainable|long.?term|6\+/i.test(cycle)) onWeeks = 12;
-  return { onWeeks, offWeeks: off ? parseInt(off[1]) : 0, standardCycleWeeks: onWeeks };
+  const dayCycle = cycle.match(/(\d+)\s*(?:–|-|to)?\s*(\d+)?\s*day/i);
+  let onWeeks = null;
+  if (on) onWeeks = parseInt(on[2] || on[1]) || null;
+  else if (/ongoing|indefinite|sustainable|long.?term|throughout|6\+/i.test(cycle)) onWeeks = null; // continuous — no fixed length
+  else if (dayCycle) onWeeks = Math.max(1, Math.round(parseInt(dayCycle[2] || dayCycle[1]) / 7)); // "10–20 day cycles" → ~weeks
+  return { onWeeks, offWeeks: off ? parseInt(off[1]) : 0, raw };
 }
 
 function deriveBloodwork(category) {

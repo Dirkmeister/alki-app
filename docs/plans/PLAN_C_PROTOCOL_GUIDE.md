@@ -23,6 +23,15 @@ in committed mode. Files:
 - `src/app/screens/ProtocolGuideView.jsx` — the 6 sections (sub-components colocated).
 - `src/app/AlkiApp.jsx` — route + `onProtocolGuide` prop + committed-mode CTA.
 
+**Audit pass (2026-05-27):** systematically compared every derived record against
+its source. Fixed three derivation bugs — frequency precedence ("2x/week" /
+"3x weekly" mis-read as once-weekly; "2–3x daily" mis-read as 2x-week), route
+("Oral or topical" → oral), and `parseCycle` no longer fabricates "8 weeks" when
+the source has no fixed length (shows the real cadence text instead). No "error"
+flags remain; the ~29 `needs_review` items left are genuine domain calls (per-vial
+reconstitution sizes, week-by-week expectations, experimental compounds with no
+published dose) for owner verification.
+
 **Deviation from the approved plan (lower risk):** rather than extracting a
 `cycleEngine.js` and modifying the working `CycleTimeline`, the guide's Weekly
 Schedule is built directly from the authored data (`buildSchedule`) and the guide
