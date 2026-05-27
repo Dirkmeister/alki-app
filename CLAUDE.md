@@ -205,7 +205,7 @@ A comprehensive mathematical/physiological reference document exists covering:
 - **18+ age gate is non-negotiable.** Never remove or weaken it.
 - **Disclaimer architecture is non-negotiable.** Every critical surface needs the research/educational disclaimer.
 - **Alki is an information platform.** Never add language that diagnoses, prescribes, treats, or sells.
-- **GLP-1s are blocked for lean users** (below ~12% BF). Contraindication logic must stay active.
+- **GLP-1s are de-prioritized for lean users, NOT hard-blocked.** Alki advises, it doesn't gatekeep (confirmed 2026-05-27). Below the BF thresholds (code uses **15% / 22%**, not the "12%" this line previously claimed), GLP-1s are filtered out of the *recommended* list (AlkiApp.jsx `getRecommendations` + the recommended-list filter) and a contraindication advisory is shown, but the compound stays selectable via "Browse all" and the stack can still be locked. `StackIntelligence.analyzeStack` hardcodes `isBlocked = false` ("contraindications inform; they never block"). Keep this advisory logic active — do not add a hard block without an explicit product decision to reverse the advise-don't-gatekeep philosophy.
 - **.env.local contains secrets.** Never commit it. The .gitignore already excludes `.env*.local`.
 
 ## Supabase Project

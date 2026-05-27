@@ -621,7 +621,7 @@ export const EXPANDED_COMPOUNDS = [
   {
     id: "melanotan2",
     name: "Melanotan II",
-    category: "Performance",
+    category: "Cosmetic",
     tagline: "Tan + Libido + Appetite",
     mechanism: "Non-selective melanocortin agonist driving melanin production for tanning, activating central libido pathways, and suppressing appetite. The most multi-functional melanocortin peptide.",
     keyBenefits: ["Multi-functional — tan, libido, appetite", "Tan effects last weeks beyond cessation", "Libido enhancement well-reported", "Useful adjunct in fat loss phases"],

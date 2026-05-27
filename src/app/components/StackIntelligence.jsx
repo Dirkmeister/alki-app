@@ -1775,4 +1775,38 @@ const styles = {
   },
 };
 
-export { analyzeStack, COMPOUND_INTEL, AXES, SUPPORT_DEFS };
+// Proactive stack-aware suggestions (Plan D): given the current selection,
+// surface synergistic compounds NOT yet in the stack, ranked by how many of the
+// selected compounds they pair with. Advisory only — the user adds them by hand;
+// nothing is auto-added, and antagonist/redundancy warnings are handled by
+// analyzeStack once a compound is in the stack.
+function getStackSuggestions(selectedIds = [], catalog = []) {
+  const selected = new Set(selectedIds);
+  const catalogIds = new Set(catalog.map((c) => c.id));
+  const scores = {};
+  for (const id of selectedIds) {
+    const intel = COMPOUND_INTEL[id];
+    if (!intel) continue;
+    for (const synId of intel.synergies || []) {
+      if (selected.has(synId) || !catalogIds.has(synId)) continue;
+      if (!scores[synId]) scores[synId] = { count: 0, partners: [] };
+      scores[synId].count++;
+      scores[synId].partners.push(intel.name || id);
+    }
+  }
+  return Object.entries(scores)
+    .map(([id, s]) => {
+      const c = catalog.find((x) => x.id === id);
+      return {
+        id,
+        name: c?.name || COMPOUND_INTEL[id]?.name || id,
+        category: c?.category || COMPOUND_INTEL[id]?.category || "",
+        partners: s.partners,
+        count: s.count,
+      };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4);
+}
+
+export { analyzeStack, COMPOUND_INTEL, AXES, SUPPORT_DEFS, getStackSuggestions };

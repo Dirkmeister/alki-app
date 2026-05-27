@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import StackIntelligence, { analyzeStack } from "./components/StackIntelligence";
+import StackIntelligence, { analyzeStack, getStackSuggestions } from "./components/StackIntelligence";
 import StackGenerator from "./components/StackGenerator";
 import AlkiProtocolQA from "./screens/AlkiProtocolQA";
 import CycleTimeline from "./components/CycleTimeline";
@@ -242,7 +242,8 @@ const CAT_COLORS = {
   "Cycle Support": "#10b981",
   "Hair Support": "#14b8a6",
   Metabolic: "#eab308",
-  Hormonal: "#f43f5e"
+  Hormonal: "#f43f5e",
+  Cosmetic: "#f783ac"
 };
 
 const GOALS = [
@@ -2862,6 +2863,44 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                           Clear ({selectedCompounds.length})
                         </button>
                       )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Stack-aware suggestions (#D) — synergistic partners for the
+                  current selection. Advisory: tap + to add; nothing auto-added. */}
+              {selectedCompounds.length > 0 && (() => {
+                const suggestions = getStackSuggestions(selectedCompounds, COMPOUNDS)
+                  .filter(s => !selectedCompounds.includes(s.id));
+                if (suggestions.length === 0) return null;
+                return (
+                  <div style={{ ...S.card, borderColor: S.accentBorder, background: S.accentDim, marginTop: 4 }}>
+                    <div style={{ ...S.label, marginBottom: 4 }}>Pairs well with your selection</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>
+                      Synergistic with what you've picked — tap to add.
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {suggestions.map(s => (
+                        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <button
+                            onClick={() => toggleCompound(s.id)}
+                            aria-label={`Add ${s.name}`}
+                            style={{
+                              width: 30, height: 30, flexShrink: 0, borderRadius: 9,
+                              border: `2px solid ${S.accent}`, background: "transparent",
+                              color: S.accent, fontSize: 17, cursor: "pointer", lineHeight: 1,
+                              display: "flex", alignItems: "center", justifyContent: "center"
+                            }}
+                          >+</button>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{s.name}</div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.4 }}>
+                              Synergistic with {s.partners.join(", ")}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
