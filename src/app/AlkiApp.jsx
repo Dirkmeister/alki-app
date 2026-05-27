@@ -451,6 +451,16 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
     }
   }
 
+  // #50 — only morph the BODY when the stack moves fat or muscle perceptibly.
+  // Recovery/support compounds (BPC-157, TB-500, SERMs) carry tiny incidental
+  // bf/muscle values that MORPH_GAIN would otherwise exaggerate into a fake
+  // before/after. Snap sub-threshold deltas to zero so a healing/support stack
+  // shows an identical physique; real fat-loss/muscle-gain stacks still morph.
+  const FAT_DEADZONE = 0.03;    // ~1% body fat in the normalized (÷34) space
+  const MUSCLE_DEADZONE = 0.015; // ~0.9 muscle units (÷60) — lets real builders (MK-677) morph, keeps recovery (BPC/TB) flat
+  if (Math.abs(fatMod) < FAT_DEADZONE) fatMod = 0;
+  if (Math.abs(muscleMod) < MUSCLE_DEADZONE) muscleMod = 0;
+
   // Rich morph state for the parametric 3D body model
   let morphStates = { current: null, projected: null };
   try {

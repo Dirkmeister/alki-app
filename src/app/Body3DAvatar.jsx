@@ -247,7 +247,7 @@ export default function Body3DAvatar({
   glow = false,
   size = "large",       // "small" | "large"
   interactive = true,
-  autoRotate = true,
+  autoRotate = false, // #50 — static by default; drag to rotate (auto-spin stuttered under demand frameloop)
   debugPanel = false,   // TEMP: show live morph-weight sliders for calibration
 }) {
   const isSmall = size === "small";
