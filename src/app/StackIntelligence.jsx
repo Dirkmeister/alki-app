@@ -520,6 +520,13 @@ const SUPPORT_DEFS = {
   },
 };
 
+// #39 — support items that correspond to an actual catalog compound the user can
+// add to their stack. Lifestyle/monitoring/protocol support (protein, bloodwork,
+// PCT) stays as guidance. Extend this as TUDCA/NAC/etc. enter the catalog.
+const SUPPORT_COMPOUND_MAP = {
+  tadalafil_daily: "tadalafil",
+};
+
 // ============================================================
 // STACK ANALYZER — pure function, deterministic
 // ============================================================
@@ -867,7 +874,7 @@ function scoreColor(score) {
   return RED;
 }
 
-export default function StackIntelligence({ stackIds = [], userProfile = {}, onRemoveCompound, mode = "full", compoundCatalog = [] }) {
+export default function StackIntelligence({ stackIds = [], userProfile = {}, onRemoveCompound, onAddCompound, mode = "full", compoundCatalog = [] }) {
   const analysis = useMemo(
     () => analyzeStack(stackIds, userProfile, compoundCatalog),
     [stackIds, userProfile, compoundCatalog]
@@ -925,7 +932,7 @@ export default function StackIntelligence({ stackIds = [], userProfile = {}, onR
       )}
 
       {analysis.supportRequired.length > 0 && (
-        <SupportLayer supportRequired={analysis.supportRequired} />
+        <SupportLayer supportRequired={analysis.supportRequired} selectedIds={stackIds} onAddCompound={onAddCompound} />
       )}
 
       <DesignNotes compounds={analysis.compounds} />
@@ -1177,7 +1184,7 @@ function InteractionsSection({ redundancies, synergies }) {
   );
 }
 
-function SupportLayer({ supportRequired }) {
+function SupportLayer({ supportRequired, selectedIds = [], onAddCompound }) {
   const grouped = supportRequired.reduce((acc, s) => {
     if (!acc[s.category]) acc[s.category] = [];
     acc[s.category].push(s);
@@ -1216,6 +1223,28 @@ function SupportLayer({ supportRequired }) {
               </div>
               <div style={styles.supportCardDetail}>{item.detail}</div>
               <div style={styles.supportCardTrigger}>Triggered by {item.triggeredBy}</div>
+              {(() => {
+                const addId = SUPPORT_COMPOUND_MAP[item.id];
+                if (!addId || !onAddCompound) return null;
+                if (selectedIds.includes(addId)) {
+                  return <div style={{ fontSize: 11, fontWeight: 600, color: ACCENT, marginTop: 8 }}>✓ In your stack</div>;
+                }
+                const req = item.urgency === "required";
+                return (
+                  <button
+                    onClick={() => onAddCompound(addId)}
+                    style={{
+                      marginTop: 8, padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", fontFamily: "inherit",
+                      background: req ? ACCENT : "transparent",
+                      color: req ? "#06281b" : ACCENT,
+                      border: `1px solid ${req ? ACCENT : ACCENT + "66"}`,
+                    }}
+                  >
+                    + Add to stack{req ? " · required" : ""}
+                  </button>
+                );
+              })()}
             </div>
           ))}
         </div>

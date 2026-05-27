@@ -2130,6 +2130,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           stackIds={selectedCompounds}
           userProfile={profile}
           onRemoveCompound={toggleCompound}
+          onAddCompound={toggleCompound}
           compoundCatalog={COMPOUNDS}
         />
 
