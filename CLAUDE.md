@@ -68,13 +68,14 @@ alki-app/
 │   │   ├── SplashScreen.jsx
 │   │   ├── AgeGate.jsx
 │   │   ├── Onboarding.jsx
-│   │   ├── Home.jsx
-│   │   ├── Dashboard.jsx      ← Main post-onboarding hub (builder + committed modes)
 │   │   ├── ProgressLog.jsx
 │   │   └── AlkiProtocolQA.jsx ← Protocol Q&A page (per-compound + general FAQs)
+│   │   (NOTE: the main Dashboard + the SVG BodyAvatar are defined INLINE in
+│   │    AlkiApp.jsx, not here. Stale standalone Home.jsx / Dash.jsx / components
+│   │    /BodyAvatar.jsx were deleted 2026-05-27. Several remaining screens/ files
+│   │    may also be unused inline-duplicates — audit pending.)
 │   │
 │   ├── components/            ← Shared UI components
-│   │   ├── BodyAvatar.jsx     ← SVG parametric body avatar (2D, free tier)
 │   │   ├── CompoundCard.jsx   ← Compound detail cards
 │   │   ├── StackIntelligence.jsx ← Stack analysis view
 │   │   ├── StackGenerator.jsx ← Stack builder UI

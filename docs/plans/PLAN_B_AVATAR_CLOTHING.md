@@ -2,11 +2,32 @@
 
 **Priority: Tier 1 — Do With Plan A**
 **Depends on: Nothing (can be done in parallel with Plan A)**
-**Status: Not started**
+**Status: Core DONE (in inline SVG avatar) · two gaps + direction DEFERRED (decide later, 2026-05-27)**
 
 > Reconstructed from May 17, 2026 session.
 
 ---
+
+## Status reconciliation (2026-05-27)
+
+The plan's core goal is already implemented in the **inline `BodyAvatar` inside
+`AlkiApp.jsx`** (NOT `components/BodyAvatar.jsx`, which was a stale pre-Plan-B
+copy — deleted 2026-05-27 along with the unused `screens/Home.jsx` and
+`screens/Dashboard.jsx` that imported it):
+
+- ✅ Athletic wear — shirtless male / sports-bra female + dark shorts (`#1a1a1a` / `#2a2a2a`)
+- ✅ BF%→definition opacity mapping — exactly `(20 - bf) / 12`, per spec
+- ✅ `<150px` line-hiding; shorts/bra scale with waist/chest; all definition lines
+
+**Two checklist items remain unbuilt:** vascularity on arms/legs, and Melanotan II
+skin-tone shift (the SVG ignores the `skin` param).
+
+**Key caveat / open decision:** the SVG `BodyAvatar` is only the *fallback*.
+`avatarUrl` defaults to the GLB (`AlkiApp.jsx`), so users see the **3D
+`Body3DAvatar`** by default — which this plan explicitly says NOT to touch. So the
+remaining SVG work is low-visibility, while the high-impact work (clothing/definition
+on the 3D avatar) is out of this plan's original scope. **Direction deferred** —
+revisit when prioritizing avatar polish vs. other plans.
 
 ## The Problem
 
@@ -52,15 +73,16 @@ const definitionOpacity = Math.max(0, Math.min(1, (20 - bodyFatPercent) / 12));
 
 ## Testing Checklist
 
-- [ ] Male avatar: shirtless, wearing dark shorts, torso fully visible
-- [ ] Female avatar: sports bra + shorts, midriff and arms visible
-- [ ] Low BF% (~10%): muscle definition lines clearly visible (abs, pecs, obliques, delts)
-- [ ] High BF% (~25%): definition lines invisible, body shape shows fat distribution
-- [ ] Shorts width scales with waist parameter
-- [ ] Sports bra scales with chest parameter
-- [ ] Projected "after" avatar matches clothing style
-- [ ] Vascularity effect vector visible on exposed arms/legs
-- [ ] Skin tone shift (Melanotan II) visible across body
-- [ ] Avatar correct at large size (~300px) and small size (~100px)
-- [ ] Side-by-side before/after both show athletic wear
-- [ ] Mobile responsive
+- [x] Male avatar: shirtless, wearing dark shorts, torso fully visible
+- [x] Female avatar: sports bra + shorts, midriff and arms visible
+- [x] Low BF% (~10%): muscle definition lines clearly visible (abs, pecs, obliques, delts)
+- [x] High BF% (~25%): definition lines invisible, body shape shows fat distribution
+- [x] Shorts width scales with waist parameter
+- [x] Sports bra scales with chest parameter
+- [x] Projected "after" avatar matches clothing style
+- [ ] Vascularity effect vector visible on exposed arms/legs — NOT built (deferred)
+- [ ] Skin tone shift (Melanotan II) visible across body — NOT built (deferred)
+- [x] Avatar correct at large size (~300px) and small size (~100px)
+- [x] Side-by-side before/after both show athletic wear
+- [ ] Mobile responsive — pending Austin's on-device check
+- NOTE: all the above applies to the inline SVG fallback; the default avatar is the 3D GLB.
