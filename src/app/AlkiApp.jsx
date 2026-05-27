@@ -49,7 +49,7 @@ const SITE_URL =
 // ─────────────────────────────────────────────────────────────
 // App version — bump on every commit so testers can confirm which deploy
 // they're viewing. Shown on the splash/enter screen (upper-left).
-const APP_VERSION = "0.1.97";
+const APP_VERSION = "0.1.98";
 // Auto build id from Vercel's git commit SHA (wired in next.config.mjs).
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
@@ -1641,11 +1641,13 @@ function EidolonHero({
   profile, avatarUrl, avatarParams, eidolonName,
   editingName, nameInput, setNameInput, onStartEditName, onCommitName, onCancelName,
   onCaptureAvatar, onResetAvatar, showAvatarDebug, setShowAvatarDebug,
-  pulse = false,
+  pulse = false, glowLevel = 0,
 }) {
   return (
     <>
-      <style>{`@keyframes alkiDosePulse { 0% { opacity: 0.1; transform: translateX(-50%) scale(1); } 35% { opacity: 0.5; transform: translateX(-50%) scale(1.18); } 100% { opacity: 0.1; transform: translateX(-50%) scale(1); } }`}</style>
+      {/* Completion flourish is scale-only — opacity is driven by glowLevel so the
+          glow brightens as the checklist fills, never dips on check-off (#16 bug). */}
+      <style>{`@keyframes alkiDosePulse { 0% { transform: translateX(-50%) scale(1); } 35% { transform: translateX(-50%) scale(1.22); } 100% { transform: translateX(-50%) scale(1); } }`}</style>
 
       {/* Name — large, centered, inline-editable */}
       <div style={{ textAlign: "center", marginTop: 6, marginBottom: 0 }}>
@@ -1687,14 +1689,17 @@ function EidolonHero({
         </div>
       </div>
 
-      {/* Hero avatar with subtle radial glow */}
+      {/* Hero avatar with radial glow that intensifies as today's protocol is
+          checked off (#16): faint at none → full green when all doses are logged. */}
       <div style={{ position: "relative", display: "flex", justifyContent: "center", padding: "10px 0 4px", width: "100%" }}>
         <div style={{
           position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)",
           width: 300, height: 300, borderRadius: "50%",
-          background: "radial-gradient(circle at center, rgba(26,232,122,0.10) 0%, rgba(26,232,122,0.04) 40%, transparent 70%)",
+          background: "radial-gradient(circle at center, rgba(26,232,122,0.22) 0%, rgba(26,232,122,0.08) 40%, transparent 70%)",
           pointerEvents: "none", filter: "blur(6px)",
-          animation: pulse ? "alkiDosePulse 1.6s ease" : undefined
+          opacity: 0.22 + Math.max(0, Math.min(1, glowLevel)) * 0.78,
+          transition: "opacity 0.45s ease",
+          animation: pulse ? "alkiDosePulse 1.4s ease" : undefined
         }} />
         <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
           {avatarUrl ? (
@@ -1911,6 +1916,17 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     () => resolveAvatarParams(profile, selectedCompounds),
     [profile, selectedCompounds]
   );
+
+  // #16 — fraction of today's protocol that's been checked off (0..1). Drives the
+  // hero avatar's green glow so it intensifies as the checklist fills.
+  const doseProgress = useMemo(() => {
+    const compIds = activeProtocol?.compounds || [];
+    if (!compIds.length) return 0;
+    const eid = activeEidolonId || "solo";
+    const today = new Date().toISOString().slice(0, 10);
+    const taken = new Set((((doseLog || {})[eid] || {})[today] || {}).taken || []);
+    return compIds.filter(id => taken.has(id)).length / compIds.length;
+  }, [doseLog, activeEidolonId, activeProtocol]);
 
   const hasVisualChange = selectedCompounds.some(id => {
     const c = COMPOUNDS.find(x => x.id === id);
@@ -2468,6 +2484,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         showAvatarDebug={showAvatarDebug}
         setShowAvatarDebug={setShowAvatarDebug}
         pulse={dosePulse}
+        glowLevel={doseProgress}
       />
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
