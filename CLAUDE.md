@@ -89,7 +89,8 @@ alki-app/
 │   │   └── avaturnConfig.js   ← Avaturn SDK config (disabled)
 │   │
 │   ├── admin/                 ← Internal tools (not user-facing)
-│   │   └── AlkiTriage.jsx     ← Bug triage board (BUILT but NOT wired to any route)
+│   │   ├── page.js            ← /admin route (renders the triage board; unauthenticated, dev/internal)
+│   │   └── AlkiTriage.jsx     ← Bug triage board (reachable at /admin since 2026-05-27)
 │   │
 │   ├── data/                  ← Static data (no render imports allowed; GOALS is inline in AlkiApp)
 │   │   ├── compounds.js       ← 8-compound core DB (also spreads in the expanded set)
