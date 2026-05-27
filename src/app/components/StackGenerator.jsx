@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { generateStacks, detectPhase } from "./stackGenerator";
+import { generateStacks, detectPhase } from "../lib/stackGenerator";
 
 /**
  * ============================================================

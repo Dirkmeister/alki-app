@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "./lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 // ──────────────────────────────────────────────────────────────
 // Dev-only performance HUD + recorder. OPT-IN — never shows for real

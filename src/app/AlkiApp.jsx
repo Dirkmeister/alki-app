@@ -1,21 +1,21 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import StackIntelligence, { analyzeStack } from "./StackIntelligence";
-import StackGenerator from "./StackGenerator";
-import AlkiProtocolQA from "./AlkiProtocolQA";
-import CycleTimeline from "./CycleTimeline";
+import StackIntelligence, { analyzeStack } from "./components/StackIntelligence";
+import StackGenerator from "./components/StackGenerator";
+import AlkiProtocolQA from "./screens/AlkiProtocolQA";
+import CycleTimeline from "./components/CycleTimeline";
 import { EXPANDED_COMPOUNDS } from "./data/compounds-expanded";
-import Body3DAvatar from "./Body3DAvatar";
-import AvaturnCapture from "./AvaturnCapture";
-import { AVATURN_ENABLED } from "./avaturnConfig";
-import PeptideModeler from "./PeptideModeler";
+import Body3DAvatar from "./avatar/Body3DAvatar";
+import AvaturnCapture from "./avatar/AvaturnCapture";
+import { AVATURN_ENABLED } from "./avatar/avaturnConfig";
+import PeptideModeler from "./components/PeptideModeler";
 import ProgressLog from "./screens/ProgressLog";
 import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
 import { getStackVectors } from "./lib/compoundMorphVectors";
-import FeedbackFAB from "./FeedbackFAB";
-import PerfHUD from "./PerfHUD";
+import FeedbackFAB from "./components/utilities/FeedbackFAB";
+import PerfHUD from "./components/utilities/PerfHUD";
 
 // ─────────────────────────────────────────────────────────────
 // Default 3D parametric body. This is the always-on avatar. "Reset"

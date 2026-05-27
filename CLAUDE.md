@@ -30,9 +30,10 @@ Alki is a personalized peptide research platform — not medical advice, not a v
 npm run dev      # Local dev server (localhost:3000)
 npm run build    # Production build — run before pushing if you want to catch build errors
 npm run start    # Serve production build locally
+npm run lint     # ESLint check (extends next/core-web-vitals)
 ```
 
-No test runner is configured yet. No linter config. Build errors surface on Vercel deploy.
+No test runner is configured yet. Build errors surface on Vercel deploy.
 
 ## Environment Variables
 
@@ -51,9 +52,11 @@ alki-app/
 ├── CLAUDE_CODE_CHEATSHEET.md  ← Quick reference for slash commands and workflow
 ├── ALKI_BUG_THREAD_SEED.md   ← Template for bug-fix sessions
 ├── AVATAR_PLATFORM_PLAN.md   ← Avatar strategy: web → native portability plan
+├── .eslintrc.json             ← ESLint config (extends next/core-web-vitals)
+├── jsconfig.json              ← Path aliases (@/ → ./src/)
 ├── .env.local.example         ← Environment variable template
 ├── next.config.mjs            ← Exposes VERCEL_GIT_COMMIT_SHA as build ID
-├── package.json               ← Dependencies (no test/lint scripts yet)
+├── package.json               ← Dependencies + scripts (dev, build, start, lint)
 │
 ├── src/app/
 │   ├── AlkiApp.jsx            ← ROOT COMPONENT — main app shell, screen routing, global state
@@ -67,11 +70,28 @@ alki-app/
 │   │   ├── Onboarding.jsx
 │   │   ├── Home.jsx
 │   │   ├── Dashboard.jsx      ← Main post-onboarding hub (builder + committed modes)
-│   │   └── ProgressLog.jsx
+│   │   ├── ProgressLog.jsx
+│   │   └── AlkiProtocolQA.jsx ← Protocol Q&A page (per-compound + general FAQs)
 │   │
 │   ├── components/            ← Shared UI components
 │   │   ├── BodyAvatar.jsx     ← SVG parametric body avatar (2D, free tier)
-│   │   └── CompoundCard.jsx   ← Compound detail cards
+│   │   ├── CompoundCard.jsx   ← Compound detail cards
+│   │   ├── StackIntelligence.jsx ← Stack analysis view
+│   │   ├── StackGenerator.jsx ← Stack builder UI
+│   │   ├── CycleTimeline.jsx  ← Protocol timeline visualization
+│   │   ├── PeptideModeler.jsx ← Compound modeling view
+│   │   └── utilities/
+│   │       ├── FeedbackFAB.jsx ← Floating feedback button (dev/testing)
+│   │       └── PerfHUD.jsx    ← Performance debug overlay
+│   │
+│   ├── avatar/                ← All avatar-related rendering
+│   │   ├── Body3DAvatar.jsx   ← Three.js 3D avatar renderer (Pro tier)
+│   │   ├── AvatarHeadshot.jsx ← Avatar head crop for UI
+│   │   ├── AvaturnCapture.jsx ← Avaturn "MAKE IT ME" integration (disabled)
+│   │   └── avaturnConfig.js   ← Avaturn SDK config (disabled)
+│   │
+│   ├── admin/                 ← Internal tools (not user-facing)
+│   │   └── AlkiTriage.jsx     ← Bug triage board
 │   │
 │   ├── data/                  ← Static data (no render imports allowed)
 │   │   ├── compounds.js       ← 8-compound core database
@@ -81,6 +101,7 @@ alki-app/
 │   ├── lib/                   ← Pure logic (no render imports allowed)
 │   │   ├── peptideEngine.js   ← Recommendation engine (deterministic, rule-based)
 │   │   ├── recommendations.js ← Recommendation helpers
+│   │   ├── stackGenerator.js  ← Stack generation logic
 │   │   ├── morphTargets.js    ← Canonical 13-key morph system + baseline driver
 │   │   ├── compoundMorphVectors.js ← Per-compound effect vectors (core IP)
 │   │   ├── avatar.js          ← Avatar parameter resolution
@@ -90,23 +111,11 @@ alki-app/
 │   ├── styles/
 │   │   └── theme.js           ← Design tokens
 │   │
-│   ├── Body3DAvatar.jsx       ← Three.js 3D avatar renderer (Pro tier)
-│   ├── AvatarHeadshot.jsx     ← Avatar head crop for UI
-│   ├── AvaturnCapture.jsx     ← Avaturn "MAKE IT ME" integration
-│   ├── avaturnConfig.js       ← Avaturn SDK config
-│   ├── PeptideModeler.jsx     ← Compound modeling view
-│   ├── AlkiProtocolQA.jsx     ← Protocol Q&A page (per-compound + general FAQs)
-│   ├── StackGenerator.jsx     ← Stack builder UI
-│   ├── stackGenerator.js      ← Stack builder logic
-│   ├── StackIntelligence.jsx  ← Stack analysis view
-│   ├── CycleTimeline.jsx      ← Protocol timeline visualization
-│   ├── FeedbackFAB.jsx        ← Floating feedback button
-│   ├── PerfHUD.jsx            ← Performance debug overlay
 │   └── error.jsx              ← Error boundary
 │
 ├── public/
-│   ├── alki_humgen_male.glb       ← Full HumGen male body (3D)
-│   └── alki_humgen_male_slim.glb  ← Slimmed GLB variant
+│   ├── alki_humgen_male.glb       ← Trimmed HumGen male body (4.5MB, production)
+│   └── alki_humgen_male_slim.glb  ← Stale intermediate (18MB — candidate for deletion)
 │
 ├── blender_scripts/           ← Blender Python scripts for GLB pipeline
 │   ├── build_base_body.py
@@ -116,12 +125,20 @@ alki-app/
 │   └── strip_textures.mjs
 │
 ├── docs/
-│   └── AVATAR_3D_ARCHITECTURE.md  ← 3D avatar architecture + build plan
+│   ├── AVATAR_3D_ARCHITECTURE.md  ← 3D avatar architecture + build plan
+│   └── plans/                     ← Coding plans (from May 17 session)
+│       ├── PLAN_A_HOME_SCREEN.md
+│       ├── PLAN_B_AVATAR_CLOTHING.md
+│       ├── PLAN_C_PROTOCOL_GUIDE.md
+│       ├── PLAN_D_COMPOUND_REVIEW.md
+│       └── PLAN_E_PHOTO_CAPTURE.md
 │
-├── supabase-setup.sql             ← Initial Supabase schema
-├── supabase-migration-eidolons.sql
-├── supabase-migration-progress.sql
-└── supabase-migration-protocol.sql
+└── supabase/
+    └── migrations/
+        ├── 001_setup.sql
+        ├── 002_eidolons.sql
+        ├── 003_progress.sql
+        └── 004_protocol.sql
 ```
 
 ## Architecture Rules
@@ -201,5 +218,10 @@ A comprehensive mathematical/physiological reference document exists covering:
 
 - `AVATAR_PLATFORM_PLAN.md` — Avatar web-to-native strategy
 - `docs/AVATAR_3D_ARCHITECTURE.md` — 3D morph system architecture
+- `docs/plans/PLAN_A_HOME_SCREEN.md` — Home screen redesign + eidolon crash fix
+- `docs/plans/PLAN_B_AVATAR_CLOTHING.md` — Athletic wear + muscle definition lines
+- `docs/plans/PLAN_C_PROTOCOL_GUIDE.md` — Personalized protocol implementation guide
+- `docs/plans/PLAN_D_COMPOUND_REVIEW.md` — Compound classification audit
+- `docs/plans/PLAN_E_PHOTO_CAPTURE.md` — Progress photo UI scaffolding
 - `ALKI_BUG_THREAD_SEED.md` — Bug triage session template
-- Eidolon Engine spec and 5 coding plan docs live in Claude.ai project knowledge (search there for Plans A–E)
+- Eidolon Engine spec lives in Claude.ai project knowledge (search "Eidolon Engine" or "mathematical physiological reference")

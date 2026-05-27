@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "./lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 // ── Floating bug-report button for dev/testing ─────────────
 // Always visible. Stores to Supabase `feedback` table with

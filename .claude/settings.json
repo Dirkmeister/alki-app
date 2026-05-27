@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/settings.schema.json",
+  "permissions": {
+    "allow": [
+      "Read files in the project directory",
+      "Write and edit files in src/",
+      "Write and edit files in docs/",
+      "Write and edit files in public/",
+      "Run npm run dev",
+      "Run npm run build",
+      "Run npm run lint",
+      "Run npx next lint"
+    ],
+    "deny": [
+      "Run rm -rf",
+      "Run git push --force",
+      "Modify .env.local",
+      "Delete files in public/*.glb"
+    ]
+  }
+}

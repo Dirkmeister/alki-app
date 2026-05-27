@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { COMPOUNDS } from "../data/compounds";
 import BodyAvatar from "../components/BodyAvatar";
-import Body3DAvatar from "../Body3DAvatar";
+import Body3DAvatar from "../avatar/Body3DAvatar";
 import { getCultivationVisuals, getRegressionFactor } from "../lib/cultivation";
 
 // ═══════════════════════════════════════════════════════════

@@ -7,7 +7,7 @@ import { getRecommendations } from "../lib/recommendations";
 import { resolveAvatarParams } from "../lib/avatar";
 import BodyAvatar from "../components/BodyAvatar";
 import CompoundCard from "../components/CompoundCard";
-import StackIntelligence, { analyzeStack } from "../StackIntelligence";
+import StackIntelligence, { analyzeStack } from "../components/StackIntelligence";
 
 export default function Dashboard({ profile, onReset }) {
   const [selectedCompounds, setSelectedCompounds] = useState([]);

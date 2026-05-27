@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { buildProfile, simulate, estimateMonthlyCost, kgToLbs, lbsToKg, calcFFMI, feetInchesToCm } from "./lib/peptideEngine";
+import { buildProfile, simulate, estimateMonthlyCost, kgToLbs, lbsToKg, calcFFMI, feetInchesToCm } from "../lib/peptideEngine";
 
 /**
  * ============================================================

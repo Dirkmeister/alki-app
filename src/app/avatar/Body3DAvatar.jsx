@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import { useRef, Suspense, useMemo, useEffect, useState } from "react";
 import * as THREE from "three";
-import { MORPH_KEYS, MORPH_TARGETS } from "./lib/morphTargets";
+import { MORPH_KEYS, MORPH_TARGETS } from "../lib/morphTargets";
 
 /**
  * Body3DAvatar — GLB renderer with shape-key morphing.
