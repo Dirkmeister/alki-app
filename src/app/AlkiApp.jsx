@@ -1624,6 +1624,120 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose, on
   );
 }
 
+// ── EIDOLON HERO ───────────────────────────────────────────
+// Avatar-first header shared by BOTH the committed home and the builder
+// (Plan A Step 2). The eidolon is always front-and-center — large centered
+// avatar, editable name above, biometric stat pills below — whether you're
+// viewing a locked protocol or assembling a new one. Single source of truth:
+// Dashboard renders this once, above the editing/committed split, so the two
+// modes stay visually identical and there's one place to evolve the hero.
+function EidolonHero({
+  profile, avatarUrl, avatarParams, eidolonName,
+  editingName, nameInput, setNameInput, onStartEditName, onCommitName, onCancelName,
+  onCaptureAvatar, onResetAvatar, showAvatarDebug, setShowAvatarDebug,
+  pulse = false,
+}) {
+  return (
+    <>
+      <style>{`@keyframes alkiDosePulse { 0% { opacity: 0.1; transform: translateX(-50%) scale(1); } 35% { opacity: 0.5; transform: translateX(-50%) scale(1.18); } 100% { opacity: 0.1; transform: translateX(-50%) scale(1); } }`}</style>
+
+      {/* Name — large, centered, inline-editable */}
+      <div style={{ textAlign: "center", marginTop: 6, marginBottom: 0 }}>
+        {editingName ? (
+          <input
+            autoFocus
+            type="text"
+            value={nameInput}
+            onChange={e => setNameInput(e.target.value)}
+            onBlur={onCommitName}
+            onKeyDown={e => {
+              if (e.key === "Enter") onCommitName();
+              if (e.key === "Escape") onCancelName();
+            }}
+            maxLength={30}
+            style={{
+              fontSize: 26, fontWeight: 800, background: "transparent", border: "none",
+              borderBottom: `1.5px solid ${S.accent}`, color: "#fff", textAlign: "center",
+              outline: "none", fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em",
+              padding: "4px 14px", minWidth: 220, maxWidth: "90%"
+            }}
+          />
+        ) : (
+          <h1
+            onClick={onStartEditName}
+            title="Tap to rename"
+            style={{
+              fontSize: 26, fontWeight: 800, color: "#fff", margin: 0,
+              fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em", cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 8, padding: "2px 8px"
+            }}
+          >
+            {eidolonName}
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 400 }}>✎</span>
+          </h1>
+        )}
+        <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
+          εἰδωλον
+        </div>
+      </div>
+
+      {/* Hero avatar with subtle radial glow */}
+      <div style={{ position: "relative", display: "flex", justifyContent: "center", padding: "10px 0 4px", width: "100%" }}>
+        <div style={{
+          position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)",
+          width: 300, height: 300, borderRadius: "50%",
+          background: "radial-gradient(circle at center, rgba(26,232,122,0.10) 0%, rgba(26,232,122,0.04) 40%, transparent 70%)",
+          pointerEvents: "none", filter: "blur(6px)",
+          animation: pulse ? "alkiDosePulse 1.6s ease" : undefined
+        }} />
+        <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
+          {avatarUrl ? (
+            <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="large" interactive={true} debugPanel={showAvatarDebug} />
+          ) : (
+            <BodyAvatar params={avatarParams.current} label="" maxWidth={280} />
+          )}
+        </div>
+      </div>
+
+      {/* Avatar customization chip + debug toggle */}
+      <div style={{ textAlign: "center", marginBottom: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
+        {avatarUrl ? (
+          <button onClick={onResetAvatar} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
+            ↺ Reset Avatar
+          </button>
+        ) : (
+          <button onClick={onCaptureAvatar} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
+            {AVATURN_ENABLED ? "✦ Make it me" : "Make it me · setup"}
+          </button>
+        )}
+        <button
+          onClick={() => setShowAvatarDebug(v => !v)}
+          title="Toggle morph debug panel"
+          style={{ background: showAvatarDebug ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${showAvatarDebug ? "rgba(26,232,122,0.25)" : "rgba(255,255,255,0.07)"}`, color: showAvatarDebug ? S.accent : "rgba(255,255,255,0.3)", fontSize: 13, padding: "4px 10px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", lineHeight: 1, transition: "all 0.15s ease" }}
+        >
+          ⚙
+        </button>
+      </div>
+
+      {/* Stat pills */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 14 }}>
+        {[
+          { label: "BF",  value: `${profile.bodyFat}%` },
+          { label: "WT",  value: `${profile.weight}lb` },
+          { label: "HT",  value: `${profile.heightFt}'${profile.heightIn}\"` },
+          { label: "AGE", value: `${profile.age}` },
+          { label: "SEX", value: profile.sex === "male" ? "♂" : "♀" }
+        ].map(p => (
+          <div key={p.label} style={{ padding: "5px 11px", borderRadius: 100, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", fontFamily: "'JetBrains Mono', monospace" }}>{p.label}</span>
+            <span style={{ color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
@@ -2303,74 +2417,27 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         </div>
       </div>
 
-      {/* Profile card — only visible in builder mode; the new avatar-first home replaces it when committed. */}
-      {editing && (
-      <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16, position: 'relative' }}>
-        {/* #63 — removed cryptic top-left ↺ button; "↺ Reset Avatar" below is the real control. */}
-        <div style={{ width: 80, flexShrink: 0 }}>
-          {avatarHeadshot ? (
-            <img
-              src={avatarHeadshot}
-              alt="Your avatar"
-              style={{
-                width: "100%",
-                aspectRatio: "1 / 1",
-                objectFit: "cover",
-                borderRadius: "50%",
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "rgba(255,255,255,0.02)",
-              }}
-            />
-          ) : (
-            <BodyAvatar params={avatarParams.current} label="" />
-          )}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{activeEidolon?.name || 'Eidolon 1'}</div>
-            {!avatarUrl && (
-              <button
-                onClick={onCaptureAvatar}
-                style={{
-                  background: "rgba(26,232,122,0.12)",
-                  border: "1px solid rgba(26,232,122,0.3)",
-                  color: "#1ae87a",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  padding: "5px 10px",
-                  borderRadius: 8,
-                }}
-              >
-                {AVATURN_ENABLED ? "Make it me" : "Make it me · setup"}
-              </button>
-            )}
-          </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.8 }}>
-            {profile.sex === "male" ? "Male" : "Female"} · {profile.age} yrs · {profile.heightFt}'{profile.heightIn}" · {profile.weight} lbs<br />
-            Body fat: <span style={{ color: "#fff", fontWeight: 600 }}>{profile.bodyFat}%</span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-            {(profile.goals || []).map(g => {
-              const goal = GOALS.find(x => x.id === g);
-              return (
-                <span key={g} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "rgba(26,232,122,0.1)", color: S.accent }}>
-                  {goal?.label}
-                </span>
-              );
-            })}
-          </div>
-          {userEmail && (
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 6 }}>
-              {userEmail}
-            </div>
-          )}
-        </div>
-      </div>
-      )}
+      {/* Avatar-first hero — rendered once for BOTH builder and committed modes
+          (Plan A Step 2). Was previously a small profile card in builder and a
+          separate inline hero in committed; now a single EidolonHero above the
+          mode split so the eidolon always greets you, whatever you're doing. */}
+      <EidolonHero
+        profile={profile}
+        avatarUrl={avatarUrl}
+        avatarParams={avatarParams}
+        eidolonName={activeEidolon?.name || 'Eidolon 1'}
+        editingName={editingName}
+        nameInput={nameInput}
+        setNameInput={setNameInput}
+        onStartEditName={() => { setNameInput(activeEidolon?.name || 'Eidolon 1'); setEditingName(true); }}
+        onCommitName={commitEidolonName}
+        onCancelName={() => setEditingName(false)}
+        onCaptureAvatar={onCaptureAvatar}
+        onResetAvatar={onResetAvatar}
+        showAvatarDebug={showAvatarDebug}
+        setShowAvatarDebug={setShowAvatarDebug}
+        pulse={dosePulse}
+      />
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
       {/* #61 — goal selection is inline while building/modifying (no longer hidden
@@ -2405,210 +2472,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* ═══ COMMITTED MODE — Avatar-First Home ═══ */}
       {!editing && activeProtocol && (
         <>
-          <style>{`@keyframes alkiDosePulse { 0% { opacity: 0.1; transform: translateX(-50%) scale(1); } 35% { opacity: 0.5; transform: translateX(-50%) scale(1.18); } 100% { opacity: 0.1; transform: translateX(-50%) scale(1); } }`}</style>
-          {/* 1. Eidolon name — large, centered, inline-editable */}
-          <div style={{ textAlign: "center", marginTop: 6, marginBottom: 0 }}>
-            {editingName ? (
-              <input
-                autoFocus
-                type="text"
-                value={nameInput}
-                onChange={e => setNameInput(e.target.value)}
-                onBlur={commitEidolonName}
-                onKeyDown={e => {
-                  if (e.key === "Enter") commitEidolonName();
-                  if (e.key === "Escape") setEditingName(false);
-                }}
-                maxLength={30}
-                style={{
-                  fontSize: 26,
-                  fontWeight: 800,
-                  background: "transparent",
-                  border: "none",
-                  borderBottom: `1.5px solid ${S.accent}`,
-                  color: "#fff",
-                  textAlign: "center",
-                  outline: "none",
-                  fontFamily: "'Syne', sans-serif",
-                  letterSpacing: "-0.02em",
-                  padding: "4px 14px",
-                  minWidth: 220,
-                  maxWidth: "90%"
-                }}
-              />
-            ) : (
-              <h1
-                onClick={() => {
-                  setNameInput(activeEidolon?.name || 'Eidolon 1');
-                  setEditingName(true);
-                }}
-                style={{
-                  fontSize: 26,
-                  fontWeight: 800,
-                  color: "#fff",
-                  margin: 0,
-                  fontFamily: "'Syne', sans-serif",
-                  letterSpacing: "-0.02em",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "2px 8px"
-                }}
-                title="Tap to rename"
-              >
-                {activeEidolon?.name || 'Eidolon 1'}
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 400 }}>✎</span>
-              </h1>
-            )}
-            <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
-              εἰδωλον
-            </div>
-          </div>
-
-          {/* 2. Hero avatar with subtle radial glow */}
-          <div style={{
-            position: "relative",
-            display: "flex",
-            justifyContent: "center",
-            padding: "10px 0 4px",
-            width: "100%"
-          }}>
-            <div style={{
-              position: "absolute",
-              top: 20,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 300,
-              height: 300,
-              borderRadius: "50%",
-              background: "radial-gradient(circle at center, rgba(26,232,122,0.10) 0%, rgba(26,232,122,0.04) 40%, transparent 70%)",
-              pointerEvents: "none",
-              filter: "blur(6px)",
-              animation: dosePulse ? "alkiDosePulse 1.6s ease" : undefined
-            }} />
-            <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
-              {avatarUrl ? (
-                <Body3DAvatar
-                  avatarUrl={avatarUrl}
-                  params={avatarParams.current}
-                  label=""
-                  size="large"
-                  interactive={true}
-                  debugPanel={showAvatarDebug}
-                />
-              ) : (
-                <BodyAvatar
-                  params={avatarParams.current}
-                  label=""
-                  maxWidth={280}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Avatar customization chip + debug toggle */}
-          <div style={{ textAlign: "center", marginBottom: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
-            {avatarUrl ? (
-              <button
-                onClick={onResetAvatar}
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.07)",
-                  color: "rgba(255,255,255,0.35)",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  padding: "5px 12px",
-                  borderRadius: 100,
-                  cursor: "pointer",
-                  fontFamily: "inherit"
-                }}
-              >
-                ↺ Reset Avatar
-              </button>
-            ) : (
-              <button
-                onClick={onCaptureAvatar}
-                style={{
-                  background: "rgba(26,232,122,0.08)",
-                  border: "1px solid rgba(26,232,122,0.22)",
-                  color: S.accent,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  padding: "7px 16px",
-                  borderRadius: 100,
-                  cursor: "pointer",
-                  fontFamily: "inherit"
-                }}
-              >
-                {AVATURN_ENABLED ? "✦ Make it me" : "Make it me · setup"}
-              </button>
-            )}
-            <button
-              onClick={() => setShowAvatarDebug(v => !v)}
-              title="Toggle morph debug panel"
-              style={{
-                background: showAvatarDebug ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${showAvatarDebug ? "rgba(26,232,122,0.25)" : "rgba(255,255,255,0.07)"}`,
-                color: showAvatarDebug ? S.accent : "rgba(255,255,255,0.3)",
-                fontSize: 13,
-                padding: "4px 10px",
-                borderRadius: 100,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                lineHeight: 1,
-                transition: "all 0.15s ease",
-              }}
-            >
-              ⚙
-            </button>
-          </div>
-
-          {/* 3. Stat pills */}
-          <div style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            marginBottom: 14
-          }}>
-            {[
-              { label: "BF",  value: `${profile.bodyFat}%` },
-              { label: "WT",  value: `${profile.weight}lb` },
-              { label: "HT",  value: `${profile.heightFt}'${profile.heightIn}\"` },
-              { label: "AGE", value: `${profile.age}` },
-              { label: "SEX", value: profile.sex === "male" ? "♂" : "♀" }
-            ].map(p => (
-              <div key={p.label} style={{
-                padding: "5px 11px",
-                borderRadius: 100,
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                fontSize: 12,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6
-              }}>
-                <span style={{
-                  color: "rgba(255,255,255,0.3)",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  fontFamily: "'JetBrains Mono', monospace"
-                }}>
-                  {p.label}
-                </span>
-                <span style={{ color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-                  {p.value}
-                </span>
-              </div>
-            ))}
-          </div>
-
+          {/* Hero (name + avatar + stat pills) now renders above the mode split
+              via <EidolonHero>. Committed home continues straight to status. */}
           {/* 4. Cultivation status */}
           {(() => {
             const cv = getCultivationVisuals(cultivationState?.state || "new");
@@ -2810,35 +2675,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* ═══ BUILDER MODE ═══ */}
       {editing && (
         <>
-          {/* #19 — eidolon context + switcher in builder mode (switching no longer requires lock-in) */}
+          {/* #19 — switch/create eidolons from the builder (no lock-in required).
+              Name editing now lives in the avatar-first hero above (Plan A Step 2). */}
           {eidolons && eidolons.length >= 1 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0 14px", gap: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                Building:{" "}
-                {editingName ? (
-                  <input
-                    autoFocus
-                    type="text"
-                    value={nameInput}
-                    onChange={e => setNameInput(e.target.value)}
-                    onBlur={commitEidolonName}
-                    onKeyDown={e => { if (e.key === "Enter") commitEidolonName(); if (e.key === "Escape") setEditingName(false); }}
-                    maxLength={30}
-                    placeholder={activeEidolon?.name || "Eidolon 1"}
-                    style={{ fontSize: 13, fontWeight: 700, background: "transparent", border: "none", borderBottom: `1.5px solid ${S.accent}`, color: "#fff", outline: "none", fontFamily: "inherit", padding: "2px 6px", maxWidth: 180 }}
-                  />
-                ) : (
-                  <span
-                    onClick={() => { setNameInput(activeEidolon?.name || ""); setEditingName(true); }}
-                    style={{ color: "#fff", cursor: "pointer", borderBottom: "1px dashed rgba(255,255,255,0.25)" }}
-                  >
-                    {activeEidolon?.name || "Eidolon 1"} ✎
-                  </span>
-                )}
-              </div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <button
                 onClick={() => setShowEidolonSwitcher(true)}
-                style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "6px 14px", borderRadius: 100, flexShrink: 0, whiteSpace: "nowrap" }}
+                style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "6px 14px", borderRadius: 100, whiteSpace: "nowrap" }}
               >
                 ⇄ Switch / New
               </button>

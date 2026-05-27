@@ -35,13 +35,27 @@ Everything radiates from the avatar. The avatar IS the home screen.
 
 ## Steps 2–8: Home Screen Redesign
 
-- Step 2: Avatar-first layout (large avatar centered at top, everything below)
-- Step 3: Eidolon name display with inline edit (tap to rename)
-- Step 4: Stat pills row (key biometrics at a glance)
-- Step 5: Active stack as badge row (compound names as small pills)
-- Step 6: Action grid (2x2 grid of action buttons)
-- Step 7: Cultivation status integration (progressing/stagnant/regressing indicator)
-- Step 8: Wire up eidolon switching and creation from the action grid
+Most of this was already built in the later #19/#20/#61/#62 refactors (committed
+mode was already an avatar-first home). Status reconciled with the codebase
+2026-05-27:
+
+- Step 2 — ✅ DONE (2026-05-27): Avatar-first layout. Committed mode already led
+  with a large centered hero. Builder mode used to show a small profile card —
+  now the hero is extracted into a shared `EidolonHero` component and **hoisted
+  above the editing/committed split** in `AlkiApp.jsx`, so both modes lead with
+  the large centered avatar from a single source of truth.
+- Step 3 — ✅ DONE: Eidolon name display with inline edit (tap to rename). Lives
+  in `EidolonHero`, so it now works in builder mode too (verified: renamed to
+  "Apollo" live).
+- Step 4 — ✅ DONE: Stat pills row (BF / WT / HT / AGE / SEX) — in `EidolonHero`.
+- Step 5 — ✅ DONE: Active stack as badge row (committed mode, category-colored).
+- Step 6 — ⚠️ CHANGED BY DESIGN: the 2×2 action grid was superseded by the
+  "Manage ▾" nav dropdown (Modify / Switch / New) + a Projection/Timeline button
+  pair (#62). Eidolon switching in the builder is a centered "⇄ Switch / New"
+  button that opens the switcher modal.
+- Step 7 — ✅ DONE: Cultivation status card (progressing/stagnant/regressing).
+- Step 8 — ✅ DONE: Eidolon switching and creation wired from both the Manage
+  menu and the switcher modal (verified end-to-end, no crash).
 
 ## What NOT to Touch
 
@@ -54,11 +68,11 @@ Everything radiates from the avatar. The avatar IS the home screen.
 ## Testing Checklist
 
 - [x] New eidolon creation no longer crashes (fixed 2026-05-27; build passes)
-- [ ] Avatar renders large and centered on home screen
-- [ ] Eidolon name is displayed and editable (tap to edit)
-- [ ] Stat pills show correct biometric values
-- [ ] Stack badges show correct active compounds
-- [ ] Action grid buttons all navigate correctly
-- [ ] Eidolon switching works without data loss
-- [ ] Cultivation status displays correctly
-- [ ] Mobile responsive (Austin tests on phone)
+- [x] Avatar renders large and centered on home screen (committed AND builder, 2026-05-27)
+- [x] Eidolon name is displayed and editable (tap to edit) — works in both modes
+- [x] Stat pills show correct biometric values
+- [x] Stack badges show correct active compounds
+- [x] Action buttons all navigate correctly (Manage ▾ menu + Projection/Timeline, per #62)
+- [x] Eidolon switching works without data loss (verified end-to-end)
+- [x] Cultivation status displays correctly
+- [ ] Mobile responsive (Austin tests on phone) — pending real-device check by Austin
