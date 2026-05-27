@@ -3791,7 +3791,7 @@ export default function AlkiApp() {
       )}
 
       {/* Dev-only perf HUD — opt-in via ?perf=1 or localStorage alkiPerf=1 */}
-      <PerfHUD />
+      <PerfHUD screen={screen} />
     </div>
   );
 }
