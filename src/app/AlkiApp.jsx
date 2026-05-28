@@ -16,6 +16,8 @@ import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
 import { getStackVectors } from "./lib/compoundMorphVectors";
+import { simulate } from "./engine/simulate";
+import { mapToMorphs } from "./engine/mapToMorphs";
 import FeedbackFAB from "./components/utilities/FeedbackFAB";
 import PerfHUD from "./components/utilities/PerfHUD";
 
@@ -437,9 +439,63 @@ function getRecommendations(profile) {
 // The morphState only takes effect when a GLB with matching shape
 // keys is loaded. With the current Avaturn GLB (no shape keys) the
 // renderer falls back to the legacy scaling automatically.
+// App compound IDs that name a compound the Eidolon Engine models under a
+// DIFFERENT key (compoundVectors.js). Without this map these compounds would
+// be silently dropped by simulate() and contribute nothing to the avatar.
+// Only true renames belong here — same compound, different identifier.
+const ENGINE_KEY_ALIASES = {
+  mk2866: "ostarine",     // Ostarine (MK-2866)
+  slu_pp_332: "slupp332", // SLU-PP-332
+};
+
 function resolveAvatarParams(profile, selectedCompounds = []) {
-  const bf = profile.bodyFat;
   const isMale = profile.sex === "male";
+
+  // ── EIDOLON ENGINE PATH ──────────────────────────────────────────
+  // Run the deterministic engine once (the §6.2 time-course) and derive
+  // EVERY avatar input from its physiological output, so all render paths
+  // reflect the engine: the rich morphState (parametric 3D shape keys),
+  // AND the legacy 2-dim fat/muscle that the SVG avatar + legacy GLB
+  // scaler still consume. Week 0 of the timeline is the user's real body
+  // (current); the 12-week horizon is the projected eidolon. The stack is
+  // the app's selected compound IDs — the engine resolves the ones it has
+  // §5.8 vectors for and silently ignores the rest (e.g. PT-141, nootropics).
+  // `fat` is kept in the SAME 6–40% normalization the SVG inverts at render
+  // (bfPercent = 6 + fat*34), and `muscle` reads the engine's muscle_overall.
+  try {
+    const stack = selectedCompounds.map(id => ENGINE_KEY_ALIASES[id] || id);
+    const sim = simulate(profile, stack, { weeks: 12 });
+    if (sim) {
+      const currentMorph = mapToMorphs(sim, 0);     // baseline snapshot
+      const projectedMorph = mapToMorphs(sim);       // final (12-wk) snapshot
+      const toFat = bfFrac => Math.max(0, Math.min(1, (bfFrac * 100 - 6) / 34));
+      return {
+        current: {
+          fat: toFat(sim.baseline.BF),
+          muscle: Math.max(0, Math.min(1, currentMorph.muscle_overall)),
+          skin: 0,
+          isMale,
+          morphState: currentMorph
+        },
+        projected: {
+          fat: toFat(sim.final.BF),
+          muscle: Math.max(0, Math.min(1, projectedMorph.muscle_overall)),
+          skin: projectedMorph.skin_tone_shift || 0,
+          isMale,
+          morphState: projectedMorph
+        }
+      };
+    }
+  } catch (e) {
+    // Never let an engine error blank the avatar (it's the core engagement
+    // mechanic) — fall through to the legacy calc below.
+    console.error("[Alki] eidolon engine failed, using legacy avatar params:", e);
+  }
+
+  // ── LEGACY FALLBACK ──────────────────────────────────────────────
+  // Used only when the engine can't run (e.g. an incomplete profile
+  // missing weight/height, which makes deriveAll return null). Unchanged.
+  const bf = profile.bodyFat;
 
   // Legacy 2-dim params (still used by SVG BodyAvatar + legacy GLB path)
   const baseFat = Math.max(0, Math.min(1, (bf - 6) / 34));
