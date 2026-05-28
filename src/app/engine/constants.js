@@ -108,14 +108,16 @@ export const TIME_CONSTANTS_WEEKS = {
 };
 
 // ── Decay constants (§6.5) ───────────────────────────────────
-// When no compound is pushing a state, the integrator decays it back to
-// baseline with τ_decay (weeks). Listed for completeness — Sprint 7 will
-// wire these into the regression simulation. Numbers from §6.5:
-//   Water (ECW + glycogen): 2–4 wk → τ ≈ 1.5 wk
-//   Tan: t½ ≈ 2 mo → τ ≈ 12 wk
+// When no compound is pushing a state, the integrator relaxes it back to
+// baseline with τ_decay (weeks). WIRED in Sprint 7 (simulate.js →
+// simulateCessation). Each state decays as dS/dt = −(S − S_baseline)/τ,
+// so ~63% of the gain is shed by t = τ and ~95% by 3τ. Numbers from §6.5:
+//   Water (ECW + glycogen): 2–4 wk → τ ≈ 1.5 wk (the FAST deflate)
+//   Tan: t½ ≈ 2 mo → τ ≈ 12 wk  (t½ = τ·ln2 = 8.3 wk ≈ 2 mo)
 //   SARM LBM: 30–50% lost in 8–12 wk → τ ≈ 16 wk
-//   Collagen: ~50% loss over 3–6 mo → τ ≈ 24 wk
-//   GLP-1 fat: rebound to +11.6% over baseline at wk 120 (Wilding 2022)
+//             (1 − e^(−8/16) = 39% @ 8wk; 1 − e^(−12/16) = 53% @ 12wk)
+//   Collagen: ~50% loss over 3–6 mo → τ ≈ 24 wk (t½ = 16.6 wk ≈ 3.8 mo)
+//   GLP-1 fat: NOT a simple decay — see GLP1_FAT_REBOUND below.
 export const DECAY_CONSTANTS_WEEKS = {
   water:    1.5,
   ecw:      1.5,
@@ -125,8 +127,32 @@ export const DECAY_CONSTANTS_WEEKS = {
   lbm:      16,
   collagen: 24,
   // Fat doesn't decay back deterministically — it follows the Wilding
-  // rebound curve, which Sprint 7 implements separately.
+  // rebound curve (GLP1_FAT_REBOUND), which simulate.js handles separately.
   fat:      null
+};
+
+// ── GLP-1 fat rebound (§6.5, Wilding 2022 STEP-1 extension) ──
+// On GLP-1 discontinuation, fat does NOT relax linearly to baseline like
+// the states above — it REBOUNDS. §6.5 gives two anchors in one sentence:
+//   (a) "rebound to +11.6% above pre-treatment baseline at week 120"
+//   (b) "about two-thirds of prior loss reclaimed within a year of stopping"
+// These are the SAME fact, not a conflict: STEP-1 lost ~17.3% body weight;
+// regaining 11.7 pts to a net −5.6% IS two-thirds reclaimed (11.7/17.3 ≈
+// 0.68). The "+11.6%" is the regain MAGNITUDE in percentage-points for that
+// cohort, NOT an overshoot above baseline (participants stayed net leaner).
+// We therefore generalize the internally-consistent anchor: regain
+// two-thirds of WHATEVER fat was lost, within a year of stopping.
+//
+// Model: FM relaxes from its cessation nadir back TOWARD the pre-treatment
+// baseline (asymptote = baseline; left alone, all the loss eventually
+// returns), with τ calibrated so two-thirds is regained at 52 weeks:
+//   1 − e^(−52/τ) = 2/3  ⇒  τ = 52 / ln(3) ≈ 47.3 wk.
+// Both inputs (2/3, 52 wk) come straight from §6.5 — τ is derived, not
+// invented. Visceral fat (VAT) shares this curve (same caloric mechanism).
+export const GLP1_FAT_REBOUND = {
+  regainFraction: 2 / 3,           // §6.5 "two-thirds of prior loss reclaimed"
+  atWeeks:        52,              // §6.5 "within a year of stopping"
+  tauWeeks:       52 / Math.log(3) // ≈ 47.3 wk — DERIVED from the two anchors above
 };
 
 // ── Training status multipliers (§6.3, Lyle McDonald) ────────

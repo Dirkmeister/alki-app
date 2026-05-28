@@ -16,6 +16,15 @@
 // MATERIAL params — no geometry moves. Everything upstream is unchanged:
 // the §7 `water` expression (Sprint 4), bf_low/waist/abs_def/facial
 // (Sprint 2) and the muscle_* / vascularity morphs (Sprint 3).
+//
+// SCOPE (Sprint 7 — regression): the mapper is state-driven, so it already
+// renders the §6.5 decay timeline correctly (lower LBM → smaller muscle,
+// deflated ECW/ICW → lower water, faded Tan/Coll → reset skin) with NO
+// change to the formulas. The ONE addition: `water` now prefers a
+// per-snapshot `state.estrogenFlag` (which the cessation pass fades toward 0)
+// over the stack-level `ctx.estrogenFlag`, so aromatization puffiness clears
+// on cessation instead of lingering. On-phase snapshots carry no
+// state.estrogenFlag, so they fall back to ctx — Sprints 2–6 unchanged.
 
 import { VISIBLE_THRESHOLDS } from "./constants.js";
 import { predictWaistCm } from "./derivations.js";
@@ -131,7 +140,10 @@ export function mapState(state, ctx) {
   //                      carried stack-level in ctx from sim meta.
   const ecwPos = clamp(state.dECW || 0, 0, 1);
   const icwPos = clamp(state.dICW || 0, 0, 1);
-  const estrogenFlag = clamp(ctx.estrogenFlag || 0, 0, 1);
+  // Prefer a per-snapshot estrogen flag when present (the §6.5 cessation pass
+  // fades it toward 0 so the water morph de-puffs as wet anabolics clear);
+  // fall back to the stack-level ctx value for on-phase snapshots (unchanged).
+  const estrogenFlag = clamp((state.estrogenFlag ?? ctx.estrogenFlag) || 0, 0, 1);
   const water = clamp(0.5 * ecwPos + 0.3 * icwPos + 0.2 * estrogenFlag, 0, 1);
 
   // ── facial_fullness (§7) ─────────────────────────────────────

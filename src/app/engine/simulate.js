@@ -37,7 +37,24 @@
 // cycling caveat). T3's −0.20 LBM rides the existing catabolic loss channel
 // (leaner AND flatter). Clenbuterol desensitization is disclosure-only
 // (2026-05-28) — the §5.8 vector is kept; no invented attenuation depth.
-// The regression (Sprint 7) hook remains present but inert until its sprint.
+//
+// SCOPE (Sprint 7 — regression / "what if I stop?"): the on-phase simulate()
+// above is UNCHANGED (Sprints 2–6 behave identically). This sprint adds the
+// §6.5 decay pass as TWO new pure functions, leaving the on-phase integrator
+// byte-for-byte intact:
+//   • simulateCessation(onResult, {weeks}) — takes a completed protocol and
+//     relaxes every state back toward its pre-treatment baseline using the
+//     §6.5 DECAY_CONSTANTS_WEEKS τ's (the §6.2 "−decay·(S−S_baseline)" term,
+//     now active because no compound is pushing). Water deflates fast (τ≈1.5),
+//     muscle decays slow (τ≈16), tan fades (τ≈12), collagen slowest (τ≈24).
+//     FAT is the exception: it does NOT relax linearly — for a GLP-1 protocol
+//     it follows the Wilding rebound (GLP1_FAT_REBOUND: regain 2/3 of the lost
+//     fat within a year); for a non-GLP-1 protocol fat regression is caloric/
+//     diet-dependent and the spec gives no curve, so FM is HELD with an
+//     explicit disclosure (flag-don't-fabricate, per the §5.8-precedence rule).
+//   • simulateProtocol(profile, stack, {weeks, offWeeks}) — convenience that
+//     runs the on-phase then the cessation phase and stitches them into ONE
+//     continuous absolute-week timeline for the avatar's "ramp then decay" arc.
 
 import { deriveAll } from "./derivations.js";
 import {
@@ -45,7 +62,9 @@ import {
   CEILING_SATURATION_K,
   TRAINING_LBM_MULTIPLIER,
   SEX_MODULATION,
-  ESSENTIAL_FAT_PCT
+  ESSENTIAL_FAT_PCT,
+  DECAY_CONSTANTS_WEEKS,
+  GLP1_FAT_REBOUND
 } from "./constants.js";
 import {
   COMPOUND_VECTORS,
@@ -58,6 +77,12 @@ import {
 // The §5.8 "12-week projection" horizon. The integrator is calibrated
 // so each state equals its summed §5.8 target at exactly this many weeks.
 export const CALIBRATION_HORIZON_WEEKS = 12;
+
+// Default horizon for the §6.5 cessation/decay pass (weeks AFTER stopping).
+// 26 wk (~6 mo) is long enough to show the full arc: water gone in ~3 wk,
+// most muscle decay by ~12 wk, collagen still mid-fade, GLP-1 fat ~halfway
+// back. The Wilding rebound anchor itself is at 52 wk (GLP1_FAT_REBOUND).
+export const DEFAULT_CESSATION_WEEKS = 26;
 
 // Normalized→kg scale for the weight-changing states (FM, LBM).
 // DERIVED (not invented) from the §5.1 semaglutide anchor:
@@ -447,6 +472,246 @@ export function simulate(profile, stack = [], options = {}) {
       deltaFM_kg: final.FM - FM0,
       deltaLBM_kg: final.LBM - LBM0,
       deltaBF_pts: (final.BF - BF0) * 100
+    }
+  };
+}
+
+/**
+ * §6.5 REGRESSION — "what happens if I stop?"
+ *
+ * Takes a COMPLETED on-phase result from simulate() and projects the decay
+ * back toward the user's pre-treatment baseline once every compound is
+ * withdrawn. This is the §6.2 integrator running with all compound drive at
+ * zero, so only the "−decay·(S − S_baseline)" term is left — each state
+ * relaxes toward baseline with its §6.5 time-constant. Fat is special (see
+ * the GLP-1 rebound block below).
+ *
+ * The returned timeline's weeks are counted FROM cessation (week 0 == the
+ * last on-phase week, i.e. onResult.final). Snapshots share the exact shape
+ * simulate() emits, so mapToMorphs() consumes them unchanged.
+ *
+ * @param {object} onResult  output of simulate()
+ * @param {object} [options]
+ *   @param {number} options.weeks  weeks to project post-cessation (default 26)
+ * @returns {{ baseline, timeline, final, derivations, meta } | null}
+ */
+export function simulateCessation(onResult, options = {}) {
+  if (!onResult || !onResult.final || !onResult.derivations) return null;
+
+  const der = onResult.derivations;
+  const sex = onResult.meta.sex;
+  const weeks = options.weeks ?? DEFAULT_CESSATION_WEEKS;
+  const W0 = der.inputs.weightKg;
+  const FM0 = der.composition.fatMassKg;   // pre-treatment fat (baseline)
+  const LBM0 = der.composition.lbmKg;       // pre-treatment lean (baseline)
+  const BF0 = der.inputs.bfFrac;
+  const essentialFatKg = (ESSENTIAL_FAT_PCT[sex] / 100) * W0;
+
+  // Did the on-phase stack include a GLP-1? Fat (FM + VAT) only rebounds
+  // deterministically for GLP-1 discontinuation (§6.5, Wilding 2022).
+  // Without a GLP-1, §6.5 says fat "regresses only if the user reverts to
+  // caloric surplus" — diet-dependent, no curve given — so we HOLD fat and
+  // disclose, rather than fabricate a rebound (§5.8-precedence rule).
+  const fatRebounds = (onResult.meta.stack || []).some(s => {
+    const c = getCompound(s.key);
+    return c && c.class === "glp1";
+  });
+
+  // Live decay state — seeded from the on-phase FINAL snapshot (the nadir
+  // for fat / peak for muscle & water).
+  const start = onResult.final;
+  let FM   = start.FM;
+  let LBM  = start.LBM;
+  let dVAT = start.dVAT || 0;
+  let dECW = start.dECW || 0;
+  let dICW = start.dICW || 0;
+  let dColl = start.dColl || 0;
+  let dTan = start.dTan || 0;
+  // Drug-presence scalars (boosts) clear on a PK timescale once dosing stops.
+  let vaso = start.vasodilatorBoost || 0;
+  let androgen = start.androgenTone || 0;
+  // §7 water 3rd term — aromatization puffiness from wet anabolics. Carried
+  // stack-level in on-phase meta; during decay it fades with the cleared
+  // androgen so the water morph doesn't stay artificially puffy. Surfaced
+  // per-snapshot (mapState prefers state.estrogenFlag over the ctx fallback).
+  let estro = onResult.meta.estrogenFlag || 0;
+
+  // Euler relaxation toward a target with time-constant τ (weeks), step DT.
+  const relax = (x, target, tau) => x + ((target - x) / tau) * DT;
+
+  function mkSnap(week) {
+    const waterAddedKg = (dECW + dICW) * WATER_RESPONSE_KG * (LBM0 / 70);
+    const BW = FM + LBM + waterAddedKg;
+    const BF = BW > 0 ? FM / BW : BF0;
+    const s = snapshot(round2(week), FM, LBM, BW, BF, dVAT, dECW, dICW, dColl, dTan, FM0, LBM0, der, vaso, androgen);
+    s.estrogenFlag = estro; // decay-phase fade, read by mapState
+    return s;
+  }
+
+  const baseline = mkSnap(0);
+  const timeline = [baseline];
+
+  const steps = Math.round(weeks / DT);
+  for (let i = 1; i <= steps; i++) {
+    const t = i * DT;
+
+    // Water — FAST deflate (§6.5: ECW+glycogen gone in 2–4 wk). This is the
+    // first and most visible regression; the avatar "de-puffs" within weeks.
+    dECW = relax(dECW, 0, DECAY_CONSTANTS_WEEKS.ecw);
+    dICW = relax(dICW, 0, DECAY_CONSTANTS_WEEKS.icw);
+
+    // Tan — t½ ≈ 2 months (τ = 12 wk).
+    dTan = relax(dTan, 0, DECAY_CONSTANTS_WEEKS.tan);
+
+    // Collagen — slowest (τ = 24 wk; ~50% of gains lost over 3–6 mo).
+    dColl = relax(dColl, 0, DECAY_CONSTANTS_WEEKS.collagen);
+
+    // LBM — slow relaxation toward baseline (§6.5: 30–50% of compound-driven
+    // lean lost in 8–12 wk, τ = 16 wk). Only the GAINED portion (LBM − LBM0)
+    // decays; baseline muscle is the floor. The same relaxation recovers any
+    // catabolic deficit (e.g. a T3 cut) back up toward baseline.
+    LBM = relax(LBM, LBM0, DECAY_CONSTANTS_WEEKS.lbm);
+
+    // Drug-presence boosts clear quickly once dosing stops (τ_androgen ≈ 1.5
+    // wk ≈ ester/active clearance). Modeling choice: the spec gives no decay
+    // τ for these scalars, so we reuse the accrual/clearance constant rather
+    // than invent one — they track drug PRESENCE, not a tissue state.
+    vaso     = relax(vaso, 0, TIME_CONSTANTS_WEEKS.androgen);
+    androgen = relax(androgen, 0, TIME_CONSTANTS_WEEKS.androgen);
+    estro    = relax(estro, 0, TIME_CONSTANTS_WEEKS.androgen);
+
+    // FAT (FM + VAT) — §6.5 rebound, NOT a linear decay.
+    if (fatRebounds) {
+      // GLP-1 Wilding curve: relax FM back toward the pre-treatment baseline
+      // so two-thirds of the lost fat is regained by ~52 wk (τ ≈ 47.3).
+      FM = relax(FM, FM0, GLP1_FAT_REBOUND.tauWeeks);
+      FM = Math.max(essentialFatKg, FM);
+      // VAT shares the same caloric mechanism → same rebound τ.
+      dVAT = relax(dVAT, 0, GLP1_FAT_REBOUND.tauWeeks);
+    }
+    // else: FM and dVAT are HELD at their end-of-protocol values — non-GLP-1
+    // fat regression is diet-dependent and outside the deterministic model
+    // (disclosed in meta.warnings).
+
+    const isWeekBoundary = Math.abs(t - Math.round(t)) < 1e-9;
+    if (isWeekBoundary || i === steps) timeline.push(mkSnap(t));
+  }
+
+  const final = timeline[timeline.length - 1];
+
+  // §6.5 honest disclosures — only surface a caveat for a state that actually
+  // moved during the on-phase, so a fat-loss-only protocol doesn't show a
+  // muscle-decay warning (and vice versa). Every string is an engine-authored
+  // disclosure of a MODELING ASSUMPTION, not a fabricated magnitude.
+  const warnings = [];
+  if (fatRebounds) {
+    warnings.push({
+      kind: "fat-rebound",
+      text: "Projected fat regain assumes no change to diet after stopping: about two-thirds of the lost fat is reclaimed within a year (Wilding 2022). Maintaining a calorie-controlled diet can prevent most of this rebound."
+    });
+  } else if (start.FM < FM0 - 1e-6) {
+    warnings.push({
+      kind: "fat-held",
+      text: "Fat regression after stopping a non-GLP-1 protocol is diet-dependent and is not deterministically projected here (§6.5) — fat is held at its end-of-protocol level."
+    });
+  }
+  if (start.LBM > LBM0 + 1e-6) {
+    warnings.push({
+      kind: "muscle-decay",
+      text: "About 30–50% of compound-driven lean mass is projected lost within 8–12 weeks of stopping without proper post-cycle support or continued training (§6.5)."
+    });
+  }
+  if ((start.dTan || 0) > 1e-6) {
+    warnings.push({ kind: "tan-fade", text: "Tan fades with a half-life of roughly two months after stopping Melanotan (§6.5)." });
+  }
+  if ((start.dColl || 0) > 1e-6) {
+    warnings.push({ kind: "collagen-fade", text: "Skin/collagen gains fade slowly — roughly 50% lost over 3–6 months without continued use (§6.5)." });
+  }
+
+  return {
+    baseline,
+    timeline,
+    final,
+    derivations: der,
+    meta: {
+      sex,
+      phase: "cessation",
+      weeks,
+      fatRebounds,
+      // Carried from the on-phase so mapToMorphs() renders tan/collagen at
+      // their own §8 confidence and caps tan to the right Fitzpatrick type.
+      fitzpatrick: onResult.meta.fitzpatrick,
+      skinEvidence: onResult.meta.skinEvidence,
+      LBM_max_effectiveKg: onResult.meta.LBM_max_effectiveKg,
+      // Fallback for mapToMorphs ctx; per-snapshot estrogenFlag overrides it.
+      estrogenFlag: onResult.meta.estrogenFlag,
+      // Reference of where decay started (end-of-protocol) for UI readouts.
+      from: { FM: start.FM, LBM: start.LBM, BF: start.BF },
+      decayConstants: {
+        ecw: DECAY_CONSTANTS_WEEKS.ecw,
+        icw: DECAY_CONSTANTS_WEEKS.icw,
+        tan: DECAY_CONSTANTS_WEEKS.tan,
+        collagen: DECAY_CONSTANTS_WEEKS.collagen,
+        lbm: DECAY_CONSTANTS_WEEKS.lbm,
+        fatReboundTau: fatRebounds ? round2(GLP1_FAT_REBOUND.tauWeeks) : null
+      },
+      warnings,
+      // Δ from end-of-protocol → end-of-decay (how much was given back).
+      deltaFM_kg: round2(final.FM - start.FM),
+      deltaLBM_kg: round2(final.LBM - start.LBM),
+      deltaBF_pts: round2((final.BF - start.BF) * 100)
+    }
+  };
+}
+
+/**
+ * Convenience: run the on-phase protocol then the §6.5 cessation phase as
+ * ONE continuous timeline (the avatar's "ramp up, then watch it fade" arc).
+ * Weeks are ABSOLUTE: 0..onWeeks is the protocol, onWeeks..onWeeks+offWeeks
+ * is post-cessation. The cessation phase's own week-0 (== on-phase final) is
+ * dropped to avoid a duplicate sample at the seam.
+ *
+ * @param {object} profile  imperial profile (same as simulate())
+ * @param {Array}  stack     compound keys or { key, dose } objects
+ * @param {object} [options]
+ *   @param {number} options.weeks      on-phase duration (default 12)
+ *   @param {number} options.offWeeks   post-cessation duration (default 26; 0 = skip)
+ *   plus any simulate() options (trainingStatus, fitzpatrick, …)
+ * @returns {{ baseline, timeline, final, onPhase, offPhase, derivations, meta } | null}
+ */
+export function simulateProtocol(profile, stack = [], options = {}) {
+  const onWeeks = options.weeks ?? CALIBRATION_HORIZON_WEEKS;
+  const offWeeks = options.offWeeks ?? DEFAULT_CESSATION_WEEKS;
+
+  const onPhase = simulate(profile, stack, { ...options, weeks: onWeeks });
+  if (!onPhase) return null;
+  if (offWeeks <= 0) {
+    return { ...onPhase, onPhase, offPhase: null, meta: { ...onPhase.meta, phase: "protocol", onWeeks, offWeeks: 0, cessationWeek: onWeeks } };
+  }
+
+  const offPhase = simulateCessation(onPhase, { weeks: offWeeks });
+  // Re-index the decay timeline onto absolute weeks and drop its week-0
+  // duplicate (identical to onPhase.final).
+  const offShifted = offPhase.timeline.slice(1).map(s => ({ ...s, week: round2(onWeeks + s.week) }));
+  const timeline = [...onPhase.timeline, ...offShifted];
+
+  return {
+    baseline: onPhase.baseline,
+    timeline,
+    final: timeline[timeline.length - 1],
+    onPhase,
+    offPhase,
+    derivations: onPhase.derivations,
+    meta: {
+      ...offPhase.meta,
+      phase: "protocol",
+      onWeeks,
+      offWeeks,
+      cessationWeek: onWeeks,
+      // Keep the on-phase peak readouts alongside the give-back deltas.
+      peak: { FM: onPhase.final.FM, LBM: onPhase.final.LBM, BF: onPhase.final.BF },
+      onWarnings: onPhase.meta.warnings,
+      gainsAccelerator: onPhase.meta.gainsAccelerator
     }
   };
 }
