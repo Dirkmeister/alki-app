@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { buildProfile, simulate, estimateMonthlyCost, kgToLbs, lbsToKg, calcFFMI, feetInchesToCm } from "../lib/peptideEngine";
 
 /**
@@ -182,16 +182,25 @@ function Meter({ value, max = 100, color = C.accent }) {
 // MAIN COMPONENT
 // ============================================================
 
-export default function PeptideModeler({ profile, selectedCompounds, compoundCatalog, onBack }) {
+export default function PeptideModeler({ profile, selectedCompounds, compoundCatalog, onBack, initialInputs = {}, onPersist }) {
   // ── Extended model inputs (beyond what onboarding captures) ──
-  const [activityLevel, setActivityLevel]           = useState("moderate");
-  const [trainingExperience, setTrainingExperience] = useState("intermediate");
-  const [trainingFrequency, setTrainingFrequency]   = useState(4);
-  const [sleepQuality, setSleepQuality]             = useState("average");
-  const [caloricContext, setCaloricContext]          = useState("deficit");
-  const [aggressiveness, setAggressiveness]         = useState("moderate");
-  const [protocolWeeks, setProtocolWeeks]           = useState(12);
+  // #33 — seeded from the persisted profile inputs so they survive across sessions
+  // (Option B); changes are written back via onPersist below.
+  const [activityLevel, setActivityLevel]           = useState(initialInputs.activityLevel || "moderate");
+  const [trainingExperience, setTrainingExperience] = useState(initialInputs.trainingExperience || "intermediate");
+  const [trainingFrequency, setTrainingFrequency]   = useState(initialInputs.trainingFrequency ?? 4);
+  const [sleepQuality, setSleepQuality]             = useState(initialInputs.sleepQuality || "average");
+  const [caloricContext, setCaloricContext]          = useState(initialInputs.caloricContext || "deficit");
+  const [aggressiveness, setAggressiveness]         = useState(initialInputs.aggressiveness || "moderate");
+  const [protocolWeeks, setProtocolWeeks]           = useState(initialInputs.protocolWeeks ?? 12);
   const [showTable, setShowTable]                   = useState(false);
+  const [showFFMI, setShowFFMI]                     = useState(false); // #34 — FFMI explainer
+
+  // #33 — persist inputs whenever they change (debounced write happens upstream).
+  useEffect(() => {
+    if (!onPersist) return;
+    onPersist({ activityLevel, trainingExperience, trainingFrequency, sleepQuality, caloricContext, aggressiveness, protocolWeeks });
+  }, [activityLevel, trainingExperience, trainingFrequency, sleepQuality, caloricContext, aggressiveness, protocolWeeks]);
 
   // ── Build enriched profile ──
   const enrichedProfile = useMemo(() => {
@@ -254,7 +263,7 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
             ← Back
           </button>
         )}
-        <div style={{ ...label, color: C.accent, letterSpacing: "0.18em", marginBottom: 4 }}>Peptide Modeler</div>
+        <div style={{ ...label, color: C.accent, letterSpacing: "0.18em", marginBottom: 4 }}>Analytics</div>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15 }}>
           Body Composition Projections
         </h1>
@@ -277,6 +286,19 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
             <Stat value={`${enrichedProfile.fatMassLbs.toFixed(0)}`} label="Fat Mass" sub="lbs" />
             <Stat value={`${enrichedProfile.bodyFat}%`} label="Body Fat" sub={enrichedProfile.bfCategory} color={enrichedProfile.bodyFat > 25 ? C.yellow : enrichedProfile.bodyFat < 15 ? C.accent : "#fff"} />
           </div>
+          {/* #34 — FFMI explainer */}
+          <button
+            onClick={() => setShowFFMI(v => !v)}
+            style={{ marginTop: 12, background: "none", border: "none", color: C.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT, padding: 0, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <span>ⓘ What's FFMI?</span>
+            <span style={{ fontSize: 10, transition: "transform 0.2s", display: "inline-block", transform: showFFMI ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+          </button>
+          {showFFMI && (
+            <div style={{ marginTop: 8, padding: "12px 14px", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 12, color: C.textDim, lineHeight: 1.55 }}>
+              <strong style={{ color: C.text }}>FFMI (Fat-Free Mass Index)</strong> measures how muscular you are relative to your height — think of it as BMI but for muscle. As a rough guide: <strong style={{ color: C.text }}>~18–20</strong> is average, <strong style={{ color: C.text }}>~22–23</strong> is athletic, and <strong style={{ color: C.text }}>~25</strong> is the natural ceiling.
+            </div>
+          )}
         </div>
       )}
 

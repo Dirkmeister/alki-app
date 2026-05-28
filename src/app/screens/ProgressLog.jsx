@@ -56,7 +56,7 @@ function ScoreInput({ label, value, onChange, icon, hint }) {
   );
 }
 
-export default function ProgressLog({ onBack, userId, eidolonId, profile, cultivationState, onLogsChanged }) {
+export default function ProgressLog({ onBack, userId, eidolonId, profile, cultivationState, onLogsChanged, cycleStart }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,6 +66,7 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
   // Form state
   const [weight, setWeight] = useState(profile?.weight ? String(profile.weight) : "");
   const [bodyFat, setBodyFat] = useState(profile?.bodyFat ? String(profile.bodyFat) : "");
+  const [waist, setWaist] = useState(""); // #35 — third body measurement (in)
   const [wellbeing, setWellbeing] = useState(7);
   const [energy, setEnergy] = useState(7);
   const [sleepQuality, setSleepQuality] = useState(7);
@@ -118,6 +119,7 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
       logged_at: new Date().toISOString(),
       weight: parseFloat(weight) || null,
       body_fat: parseFloat(bodyFat) || null,
+      waist: parseFloat(waist) || null,
       wellbeing,
       energy,
       sleep_quality: sleepQuality,
@@ -183,7 +185,11 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
     return { bfDelta, wtDelta };
   }, [logs]);
 
-  const canSave = (weight || bodyFat);
+  const canSave = (weight || bodyFat || waist);
+
+  // #35 — cycle start (eidolon lock-in date) + days elapsed
+  const cycleStartDate = cycleStart ? new Date(cycleStart) : null;
+  const cycleDay = cycleStartDate ? Math.max(1, Math.floor((Date.now() - cycleStartDate.getTime()) / 86400000) + 1) : null;
 
   return (
     <div style={S.inner}>
@@ -196,6 +202,22 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
           εἰδωλον · Progress
         </div>
       </div>
+
+      {/* #35 — cycle start (from the eidolon's lock-in date) + day counter */}
+      {cycleStartDate && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", marginBottom: 12, borderRadius: 10, background: "rgba(34,214,138,0.06)", border: "1px solid rgba(34,214,138,0.18)" }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>Cycle Start</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginTop: 2 }}>
+              {cycleStartDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>Day</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#22d68a", fontVariantNumeric: "tabular-nums", marginTop: 1 }}>{cycleDay}</div>
+          </div>
+        </div>
+      )}
 
       {/* Cultivation Status Banner */}
       <div style={{
@@ -263,7 +285,9 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
         <div style={{ ...S.card, borderColor: "rgba(34,214,138,0.2)" }}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Weekly Research Check-in</div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          {/* #35 — three body measurements: weight, BF%, and waist (the most
+              visible fat-loss indicator). */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
             <div>
               <label style={S.label}>Weight (lbs)</label>
               <input type="number" placeholder={profile?.weight ? String(profile.weight) : "185"} value={weight} onChange={e => setWeight(e.target.value)} style={S.input} />
@@ -271,6 +295,10 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
             <div>
               <label style={S.label}>Body Fat %</label>
               <input type="number" placeholder={profile?.bodyFat ? String(profile.bodyFat) : "18"} value={bodyFat} onChange={e => setBodyFat(e.target.value)} style={S.input} />
+            </div>
+            <div>
+              <label style={S.label}>Waist (in)</label>
+              <input type="number" placeholder="34" value={waist} onChange={e => setWaist(e.target.value)} style={S.input} />
             </div>
           </div>
 
@@ -367,6 +395,12 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
                 <div style={{ fontSize: 13 }}>
                   <span style={{ color: "rgba(255,255,255,0.4)" }}>BF </span>
                   <span style={{ color: "#fff", fontWeight: 600 }}>{log.body_fat}%</span>
+                </div>
+              )}
+              {log.waist && (
+                <div style={{ fontSize: 13 }}>
+                  <span style={{ color: "rgba(255,255,255,0.4)" }}>Waist </span>
+                  <span style={{ color: "#fff", fontWeight: 600 }}>{log.waist}"</span>
                 </div>
               )}
               {log.wellbeing && (

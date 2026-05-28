@@ -49,7 +49,7 @@ const SITE_URL =
 // ─────────────────────────────────────────────────────────────
 // App version — bump on every commit so testers can confirm which deploy
 // they're viewing. Shown on the splash/enter screen (upper-left).
-const APP_VERSION = "0.1.98";
+const APP_VERSION = "0.1.99";
 // Auto build id from Vercel's git commit SHA (wired in next.config.mjs).
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
@@ -246,6 +246,17 @@ const CAT_COLORS = {
   Hormonal: "#f43f5e",
   Cosmetic: "#f783ac"
 };
+
+// #3G — compounds that suppress the natural HPG axis (need a visible PCT warning):
+// all androgen-receptor SARMs + Hormonal compounds. The two GW "SARMs" (Cardarine /
+// GW-0742) are PPARδ agonists, not androgenic, so they don't suppress — excluded.
+const NON_SUPPRESSIVE_SARMS = new Set(["gw501516", "gw0742"]);
+function isSuppressiveCompound(c) {
+  if (!c) return false;
+  if (c.category === "Hormonal") return true;
+  if (c.category === "SARM" && !NON_SUPPRESSIVE_SARMS.has(c.id)) return true;
+  return false;
+}
 
 const GOALS = [
   { id: "fat_loss", label: "Fat Loss", icon: "🔥" },
@@ -545,13 +556,28 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
   const braTopY = chestY - 12;
   const braBottomY = chestY + 12;
 
-  const skinColor = glow ? "#d4a574" : "#c4956a";
-  const skinDark = glow ? "#c49464" : "#b4855a";
+  // #22 — warmer, cleaner palette + a vertical skin gradient (top-lit) so the body
+  // reads with form instead of a flat muddy fill. skinColor now points at a gradient;
+  // skinDark stays solid for shading accents (ears, hands, feet, pec shadow).
+  const gradId = glow ? "alkiSkinGradGlow" : "alkiSkinGrad";
+  const skinLight = glow ? "#e8bd8c" : "#dcae80";
+  const skinMid   = glow ? "#d4a274" : "#c89570";
+  const skinDeep  = glow ? "#bb8f5e" : "#ac7d54";
+  const skinColor = `url(#${gradId})`;
+  const skinDark = glow ? "#a67b4f" : "#936a48";
   const glowFilter = glow ? "url(#avatarGlow)" : "";
 
   return (
     <div style={{ textAlign: "center" }}>
       <svg viewBox="0 0 200 260" style={{ width: "100%", maxWidth }}>
+        {/* #22 — always-present skin gradient for depth */}
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0.15" y2="1">
+            <stop offset="0%" stopColor={skinLight} />
+            <stop offset="48%" stopColor={skinMid} />
+            <stop offset="100%" stopColor={skinDeep} />
+          </linearGradient>
+        </defs>
         {glow && (
           <defs>
             <filter id="avatarGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -564,6 +590,9 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
             </linearGradient>
           </defs>
         )}
+
+        {/* #22 — soft ground shadow to anchor the figure on the dark theme */}
+        <ellipse cx={cx} cy={footY + 6} rx={26 + fat * 6} ry={3.5} fill="#000" opacity="0.28" />
 
         <g filter={glowFilter}>
           {/* Head */}
@@ -1417,6 +1446,17 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
         )}
       </div>
 
+      {/* #3G — unmissable testosterone-suppression warning on every SARM / hormonal
+          compound. Sits at the top of the card, not buried in the detail text. */}
+      {isSuppressiveCompound(c) && (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "9px 12px", borderRadius: 8, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", marginBottom: 10 }}>
+          <span style={{ fontSize: 14, lineHeight: 1.3, flexShrink: 0 }}>⚠️</span>
+          <span style={{ fontSize: 12, color: "#fca5a5", fontWeight: 600, lineHeight: 1.45 }}>
+            Suppresses natural testosterone. Post-Cycle Therapy (PCT) may be required.
+          </span>
+        </div>
+      )}
+
       {blocked && rec.flags.length > 0 && (
         <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 12, color: "#fca5a5", marginBottom: 10 }}>
           ⚠ {rec.flags[0]}
@@ -1641,7 +1681,7 @@ function EidolonHero({
   profile, avatarUrl, avatarParams, eidolonName,
   editingName, nameInput, setNameInput, onStartEditName, onCommitName, onCancelName,
   onCaptureAvatar, onResetAvatar, showAvatarDebug, setShowAvatarDebug,
-  pulse = false, glowLevel = 0,
+  pulse = false, glowLevel = 0, projection = null,
 }) {
   return (
     <>
@@ -1745,6 +1785,33 @@ function EidolonHero({
           </div>
         ))}
       </div>
+
+      {/* #11 — live projection summary: updates reactively as compounds are added/
+          removed in the builder. Shows current → projected for the headline metrics. */}
+      {projection && (() => {
+        const cells = [
+          { k: "BODY FAT", cur: `${profile.bodyFat}%`, proj: `${projection.projectedBodyFat}%`, delta: projection.bfChange, good: "down", unit: "%" },
+          { k: "WEIGHT", cur: `${profile.weight}lb`, proj: `${projection.projectedWeight}lb`, delta: projection.weightChange, good: "down", unit: "lb" },
+          { k: "LEAN MASS", cur: null, proj: projection.muscleChange === 0 ? "—" : `${projection.muscleChange > 0 ? "+" : ""}${projection.muscleChange}%`, delta: projection.muscleChange, good: "up", unit: "" },
+        ];
+        const col = (d, good) => (!d || d === 0) ? "rgba(255,255,255,0.4)" : ((good === "up" ? d > 0 : d < 0) ? "#22d68a" : "#ef4444");
+        return (
+          <div style={{ ...S.card, padding: "12px 14px", marginBottom: 14, borderColor: S.accentBorder, background: S.accentDim }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+              Projected · {projection.timeline}-wk
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              {cells.map(c => (
+                <div key={c.k} style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: "rgba(255,255,255,0.35)", marginBottom: 3 }}>{c.k}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: col(c.delta, c.good), fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{c.proj}</div>
+                  {c.cur && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 1 }}>from {c.cur}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }
@@ -2406,7 +2473,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {/* Header */}
       <div style={{ padding: "16px 0 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", fontFamily: "'Syne', sans-serif" }}>
+          {/* #3F — ALKI wordmark doubles as a home shortcut: collapses the
+              projection / exits the builder back to the committed home view. */}
+          <span
+            onClick={() => { setShowTransform(false); if (activeProtocol) setEditing(false); }}
+            title="Home"
+            style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", fontFamily: "'Syne', sans-serif", cursor: "pointer" }}
+          >
             <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
           </span>
         </div>
@@ -2451,7 +2524,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             </div>
           )}
           <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Modeler
+            Analytics
           </button>
           <button onClick={onQA} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Q&amp;A
@@ -2485,6 +2558,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         setShowAvatarDebug={setShowAvatarDebug}
         pulse={dosePulse}
         glowLevel={doseProgress}
+        projection={editing && selectedCompounds.length > 0 ? projectedChanges : null}
       />
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
@@ -3493,6 +3567,7 @@ export default function AlkiApp() {
   const [showAvatarCapture, setShowAvatarCapture] = useState(false);
   const [progressLogs, setProgressLogs] = useState([]);
   const [doseLog, setDoseLog] = useState({}); // #16 — { [eidolonId]: { [YYYY-MM-DD]: { taken:[ids], done:bool } } }
+  const [trainingInputs, setTrainingInputs] = useState({}); // #33 — persisted Analytics inputs (activity, training, sleep, etc.)
   // Plan E — progress photos, in-memory ONLY (deliberately not in saveProfile/auto-save;
   // Supabase Storage is a future task). { [eidolonId]: [{ id, dataUrl, ts }] }
   const [photos, setPhotos] = useState({});
@@ -3513,6 +3588,14 @@ export default function AlkiApp() {
   useEffect(() => {
     try { localStorage.setItem("alki_dose_log", JSON.stringify(doseLog)); } catch (_) {}
   }, [doseLog]);
+  // #33 — persist Analytics (modeler) training inputs across sessions.
+  useEffect(() => {
+    try { const t = localStorage.getItem("alki_training_inputs"); if (t) setTrainingInputs(JSON.parse(t)); } catch (_) {}
+  }, []);
+  const persistTrainingInputs = useCallback((inputs) => {
+    setTrainingInputs(inputs);
+    try { localStorage.setItem("alki_training_inputs", JSON.stringify(inputs)); } catch (_) {}
+  }, []);
 
   useEffect(() => {
     try {
@@ -3839,6 +3922,7 @@ export default function AlkiApp() {
           profile={profile}
           cultivationState={cultivationState}
           onLogsChanged={setProgressLogs}
+          cycleStart={(eidolons.find(e => e.id === activeEidolonId)?.lockedAt) || activeProtocol?.lockedAt || null}
         />
       )}
       {screen === "photos" && (() => {
@@ -3892,27 +3976,32 @@ export default function AlkiApp() {
           selectedCompounds={selectedCompounds}
           compoundCatalog={COMPOUNDS}
           onBack={navBack}
+          initialInputs={trainingInputs}
+          onPersist={persistTrainingInputs}
         />
       )}
 
-      {/* #64 — persistent Home button, shown once the user is 2+ screens deep
-          (e.g. dashboard → protocol guide → timeline). Back steps one level;
-          this jumps straight home. Bottom-left to clear the feedback FAB. */}
-      {navHistory.length >= 2 && (
+      {/* #65/#3F — persistent ALKI home control on every inner screen: the
+          wordmark is the brand touchpoint AND a one-tap return to the dashboard
+          from anywhere (per-screen "← Back" still steps one level). Top-right so
+          it clears each screen's top-left back button. */}
+      {["modeler", "progress", "qa", "timeline", "protocol_guide", "photos"].includes(screen) && (
         <button
           onClick={goHome}
-          title="Back to home"
+          title="Home"
           style={{
-            position: "fixed", left: 16, bottom: 24, zIndex: 901,
+            position: "fixed", top: 12, right: 14, zIndex: 901,
             display: "flex", alignItems: "center", gap: 7,
-            padding: "10px 16px", borderRadius: 100,
-            background: "rgba(20,20,20,0.92)", border: "1px solid rgba(26,232,122,0.3)",
-            color: "#1ae87a", fontSize: 13, fontWeight: 700, cursor: "pointer",
-            fontFamily: "'Syne', 'DM Sans', sans-serif",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+            padding: "7px 13px", borderRadius: 100,
+            background: "rgba(10,10,12,0.82)", border: "1px solid rgba(255,255,255,0.1)",
+            cursor: "pointer", fontFamily: "'Syne', 'DM Sans', sans-serif",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.5)", backdropFilter: "blur(6px)",
           }}
         >
-          ⌂ Home
+          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+          </span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1 }}>⌂</span>
         </button>
       )}
 
