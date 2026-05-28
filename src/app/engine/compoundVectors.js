@@ -18,10 +18,11 @@
 // SCOPE NOTE: every §5.8 row was transcribed up front as declarative data
 // (all sourced from §5.8 / §5.6 / §8) so each sprint adds only the
 // consuming LOGIC, never new numbers — mirroring how constants.js already
-// declares every reference dose. Live as of Sprint 5: FM/LBM/VAT (Sprints
-// 2–3), ECW/ICW + GH-axis tone (Sprint 4), and Coll/Tan + the skin
-// metadata below (Sprint 5). Still inert until their sprint: the recovery
-// multiplier R (Sprint 6) and the regression/decay path (Sprint 7).
+// declares every reference dose. Live as of Sprint 6: FM/LBM/VAT (Sprints
+// 2–3), ECW/ICW + GH-axis tone (Sprint 4), Coll/Tan + the skin metadata
+// (Sprint 5), and the §5.3 recovery multiplier R + the §5.7 thermogenic
+// class with their §5.7 safety flags (Sprint 6). Still inert until its
+// sprint: the regression/decay path (Sprint 7).
 
 import { REFERENCE_DOSES_PER_WEEK } from "./constants.js";
 
@@ -154,14 +155,20 @@ export const COMPOUND_VECTORS = {
   bpc157: {
     label: "BPC-157", class: "recovery", evidence: "D",
     refDoseKey: "bpc157", wet: false,
+    // §5.8 gives a small +0.05 Coll (tendon/skin repair) — the ONLY direct
+    // morph BPC moves. §5.3 is explicit it must NOT move muscle/fat morphs,
+    // and the §5.8 row confirms that (FM/LBM/VAT/ECW/ICW all 0). Its real
+    // role is the R multiplier below, surfaced as a "gains accelerator."
     vector: vec({ Coll: 0.05 }),
-    ceilingLift: 0, recoveryMultiplier: 0.10
+    ceilingLift: 0, recoveryMultiplier: 0.10,
+    warnings: ["BPC-157 does not visibly transform the body — it is projected to accelerate the gains of co-stacked anabolics via improved recovery. Human evidence is preclinical; WADA-prohibited (S0) (§5.3)."]
   },
   tb500: {
     label: "TB-500", class: "recovery", evidence: "D",
     refDoseKey: "tb500", wet: false,
     vector: vec({ Coll: 0.03 }),
-    ceilingLift: 0, recoveryMultiplier: 0.10
+    ceilingLift: 0, recoveryMultiplier: 0.10,
+    warnings: ["TB-500 does not visibly transform the body — like BPC-157 it accelerates co-stacked anabolics via recovery. Human evidence is preclinical; WADA-prohibited (S0) (§5.3)."]
   },
 
   // ── §5.4 Skin / anti-aging peptides (Sprint 5) ───────────────────
@@ -247,25 +254,41 @@ export const COMPOUND_VECTORS = {
   },
 
   // ── §5.7 Metabolic / thermogenic research chemicals (Sprint 6) ───
+  // Vectors from §5.8; evidence + safety flags from §5.7/§8. Clenbuterol
+  // is A-grade (Hostrup 2025 RCT, §8) — NOT a D-grade preclinical like the
+  // rest of this class. β2 desensitization is surfaced as a cycling caveat
+  // only (product decision 2026-05-28): the §5.8 vector is kept as the
+  // projection rather than scaled by an attenuation depth the spec never
+  // gives. T3 is catabolic — its −0.20 LBM debits lean mass via the §6.2
+  // loss channel, so the avatar reads leaner AND flatter (§5.7 / Caveats).
   gw501516: {
     label: "GW-501516 (Cardarine)", class: "thermogenic", evidence: "D",
     refDoseKey: "gw501516", wet: false,
     vector: vec({ FM: -0.20, VAT: -0.05, Vasc: 0.10 }),
-    ceilingLift: 0, recoveryMultiplier: 0
+    ceilingLift: 0, recoveryMultiplier: 0,
+    // §5.7: "Carcinogen flag must appear in UI." Non-negotiable.
+    warnings: ["Carcinogen flag: rodent studies showed dose-dependent tumors across multiple organs; development was halted on this basis. Preclinical (rodent) efficacy only (§5.7)."]
   },
   sr9009: {
     label: "SR-9009 (Stenabolic)", class: "thermogenic", evidence: "D",
     refDoseKey: "sr9009", wet: false,
     vector: vec({ FM: -0.10, Vasc: 0.05 }),
-    ceilingLift: 0, recoveryMultiplier: 0
+    ceilingLift: 0, recoveryMultiplier: 0,
+    // §5.7: rodent-only; the −0.10 FM is "~0.5× Cardarine" and assumes
+    // systemic exposure that oral dosing largely fails to achieve.
+    warnings: ["Preclinical (rodent) only; poor oral bioavailability means the real-world effect is likely well below this projection (§5.7)."]
   },
   clenbuterol: {
     label: "Clenbuterol", class: "thermogenic", evidence: "A",
     refDoseKey: "clenbuterol", wet: false,
     vector: vec({ FM: -0.20, LBM: 0.05, Vasc: 0.15 }),
     ceilingLift: 0.02, recoveryMultiplier: 0,
-    // §5.7: β2 desensitization is rapid (~2 wk) — Sprint 6 attenuates.
-    desensitizeWeeks: 2
+    // §5.7: β2-receptor desensitization is rapid (~2 wk). Disclosure-only
+    // (2026-05-28): no attenuation magnitude in the spec, so we keep the
+    // §5.8 vector and surface the cycling caveat instead of guessing a
+    // decay depth. desensitizeWeeks kept as machine-readable metadata.
+    desensitizeWeeks: 2,
+    warnings: ["β2 receptors desensitize within ~2 weeks; this projection assumes proper cycling (e.g. 2 weeks on / 2 off). Continuous use loses fat-loss efficacy quickly (§5.7)."]
   },
   t3: {
     // §5.7: catabolic — DEBITS lean mass as well as fat. The avatar
@@ -273,19 +296,22 @@ export const COMPOUND_VECTORS = {
     label: "T3 (liothyronine)", class: "thermogenic", evidence: "B",
     refDoseKey: "t3", wet: false,
     vector: vec({ FM: -0.30, LBM: -0.20, Coll: -0.05, Vasc: 0.05 }),
-    ceilingLift: 0, recoveryMultiplier: 0
+    ceilingLift: 0, recoveryMultiplier: 0,
+    warnings: ["Catabolic: debits lean mass as well as fat — the projection shows you leaner but visibly flatter/smaller in the muscle morphs (§5.7 / Caveats)."]
   },
   aicar: {
     label: "AICAR", class: "thermogenic", evidence: "D",
     refDoseKey: "aicar", wet: false,
     vector: vec({ FM: -0.05, Vasc: 0.05 }),
-    ceilingLift: 0, recoveryMultiplier: 0
+    ceilingLift: 0, recoveryMultiplier: 0,
+    warnings: ["Preclinical (rodent) only — mechanistic extrapolation; effect in humans is unproven (§5.7)."]
   },
   slupp332: {
     label: "SLU-PP-332", class: "thermogenic", evidence: "D",
     refDoseKey: "slupp332", wet: false,
     vector: vec({ FM: -0.15, LBM: 0.05, Vasc: 0.10 }),
-    ceilingLift: 0, recoveryMultiplier: 0
+    ceilingLift: 0, recoveryMultiplier: 0,
+    warnings: ["Preclinical (mouse) only — ERRα/β/γ agonist; effect in humans is unproven (§5.7)."]
   }
 };
 

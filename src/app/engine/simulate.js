@@ -22,16 +22,22 @@
 //      shorter protocols stop early. This honors §5.8 at its stated
 //      horizon while giving a realistic exponential ramp.
 //
-// SCOPE (Sprint 5 — skin material): the fat-loss (Sprint 2), muscle-gain
-// (Sprint 3) and GH-axis/water (Sprint 4) paths are unchanged. The Coll
-// and Tan states were already integrated generically by the §6.2 loop;
-// Sprint 5 makes them first-class by surfacing the §8 per-material
-// evidence grades (skinEvidence) and carrying Fitzpatrick through meta so
-// mapToMorphs can clamp the Melanotan tan at its per-type ceiling. Tan
-// rides a fast-ish τ ≈ 4 wk (STATE_TAU.Tan); collagen the slow τ ≈ 12 wk
-// (STATE_TAU.Coll). No geometry — these drive material params only. The
-// recovery multiplier (Sprint 6) and regression (Sprint 7) hooks remain
-// present but inert until their sprint.
+// SCOPE (Sprint 6 — recovery multiplier + thermogenics): Sprints 2–5 are
+// unchanged. This sprint makes the §5.3 recovery multiplier R first-class.
+// R was already applied to the anabolic LBM-gain rate (it is the §6.2
+// R_multiplier term); Sprint 6 (a) combines the BPC/TB-500 contributions
+// with the same saturating rule the GH-axis/water states use, so a pile of
+// repair peptides can't run R past the §5.3 +0.15–0.20 combined ceiling,
+// and (b) surfaces R honestly as a "gains accelerator" in meta — a number
+// that ONLY changes the body when a co-stacked anabolic is present (BPC/TB
+// alone move no body-composition morph). The §5.7 thermogenics (Cardarine,
+// SR-9009, AICAR, SLU-PP-332, clenbuterol, T3) already flow through the
+// §6.2 loop from their §5.8 vectors; Sprint 6 collects their §5.7 safety
+// flags into meta.warnings (carcinogen, preclinical, β2-desensitization
+// cycling caveat). T3's −0.20 LBM rides the existing catabolic loss channel
+// (leaner AND flatter). Clenbuterol desensitization is disclosure-only
+// (2026-05-28) — the §5.8 vector is kept; no invented attenuation depth.
+// The regression (Sprint 7) hook remains present but inert until its sprint.
 
 import { deriveAll } from "./derivations.js";
 import {
@@ -191,7 +197,7 @@ export function simulate(profile, stack = [], options = {}) {
   let sumLbmGain = 0;
   let sumLbmLoss = 0;
   let ceilingLiftSum = 0;     // §2.3 LBM_max_effective
-  let recoveryBonus = 0;      // §5.3 R multiplier (Sprint 6 consumer)
+  const recoveryContribs = []; // §5.3 R multiplier — saturating combine (Sprint 6)
   const androgenTones = [];   // §6.4 upper-body bias (drives regional morphs)
   const ghAxisTones = [];     // §5.2 GH-axis tone — saturating combine
   const ecwContribs = [];     // §5.2 water states combine saturatingly, NOT additively
@@ -232,7 +238,11 @@ export function simulate(profile, stack = [], options = {}) {
       sumV[k] += v;
     }
     ceilingLiftSum += (compound.ceilingLift || 0) * doseFactor;
-    recoveryBonus += (compound.recoveryMultiplier || 0) * doseFactor;
+    // §5.3 R: each repair peptide contributes its recoveryMultiplier; we
+    // collect and saturating-combine after the loop (see R below) so two
+    // (BPC+TB) land at ~0.19 — inside §5.3's "+0.15 to +0.20 combined" —
+    // and three can't sum past the body's finite repair-capacity ceiling.
+    if (compound.recoveryMultiplier) recoveryContribs.push(compound.recoveryMultiplier * doseFactor);
     if (compound.androgenTone) androgenTones.push(compound.androgenTone * doseFactor);
     if (compound.ghAxisTone)   ghAxisTones.push(compound.ghAxisTone * doseFactor);
     // §3/§5.6 estrogen-aromatization flag (E): driven by WET ANABOLIC
@@ -258,7 +268,11 @@ export function simulate(profile, stack = [], options = {}) {
 
   // §2.3 dynamically-lifted ceiling — governs the anabolic gain brake below.
   const LBM_max_effective = LBM_max * (1 + ceilingLiftSum);
-  // §5.3/§6.2 R multiplier applies to LBM GAIN only (≈1 until Sprint 6 adds BPC/TB).
+  // §5.3/§6.2 R multiplier applies to LBM GAIN only. Saturating combine of
+  // the repair-peptide contributions (BPC/TB-500): single ≈0.10 → R 1.10
+  // (§5.3 "+0.10 to +0.15"); both ≈0.19 → R 1.19 (§5.3 "+0.15 to +0.20").
+  // Empty stack → 0 → R 1 (no effect on Sprints 2–5).
+  const recoveryBonus = saturatingCombine(recoveryContribs);
   const R = 1 + recoveryBonus;
   // §6.4 androgen tone — saturating combine `1 − ∏(1 − tone_i)` (not additive).
   const androgenTone = saturatingCombine(androgenTones);
@@ -371,6 +385,38 @@ export function simulate(profile, stack = [], options = {}) {
     collagen: collDrivers.length ? lowestEvidence(collDrivers.map(r => r.compound.evidence)) : null
   };
 
+  // §5.3 "gains accelerator" honest readout (Sprint 6). R only changes the
+  // body when there is a co-stacked anabolic for it to multiply (sumLbmGain
+  // > 0); a recovery peptide on its own raises R but produces NO visible
+  // body change (lbmGainCoeff is 0). `active` makes that distinction explicit
+  // so the protocol summary can say "accelerator" vs. "does nothing alone."
+  const recoveryDrivers = resolved.filter(r => (r.compound.recoveryMultiplier || 0) > 0);
+  const gainsAccelerator = {
+    multiplier: round2(R),                 // e.g. 1.19
+    bonusPct: Math.round(recoveryBonus * 100), // e.g. 19 (% faster LBM gain)
+    active: recoveryDrivers.length > 0 && sumLbmGain > 0,
+    drivers: recoveryDrivers.map(r => r.compound.label),
+    note: recoveryDrivers.length === 0
+      ? null
+      : (sumLbmGain > 0
+          ? "Accelerates the lean-mass gains of the co-stacked anabolic(s); it does not add muscle on its own."
+          : "No anabolic in this stack to accelerate — these repair peptides produce no visible body change alone (§5.3).")
+  };
+
+  // §5.7/§5.3/§5.5 safety + honesty flags surfaced for the UI. Each
+  // compound declares its own `warnings`; we collect them stack-level so a
+  // protocol summary can render carcinogen / preclinical / β2-desensitization
+  // / catabolic caveats next to the projection (no invented copy here —
+  // every string is authored on its compound in compoundVectors.js).
+  const warnings = [];
+  for (const r of resolved) {
+    if (Array.isArray(r.compound.warnings)) {
+      for (const text of r.compound.warnings) {
+        warnings.push({ key: r.key, label: r.compound.label, evidence: r.compound.evidence, text });
+      }
+    }
+  }
+
   return {
     baseline,
     timeline,
@@ -389,6 +435,10 @@ export function simulate(profile, stack = [], options = {}) {
       ceilingLiftSum,
       LBM_max_effectiveKg: LBM_max_effective,
       recoveryMultiplier: R,
+      // §5.3 honest "gains accelerator" readout for the protocol summary.
+      gainsAccelerator,
+      // §5.7/§5.5/§5.3 per-compound safety + honesty flags for the UI.
+      warnings,
       androgenTone,
       ghAxisTone,
       estrogenFlag,
