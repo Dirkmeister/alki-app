@@ -22,12 +22,14 @@
 //      shorter protocols stop early. This honors §5.8 at its stated
 //      horizon while giving a realistic exponential ramp.
 //
-// SCOPE (Sprint 2 — fat-loss class): FM, LBM(loss), VAT, BF, waist,
-// facial fullness are wired + verified. The hooks for ceiling-lifted
-// LBM GAIN (Sprint 3), GH-axis saturating water combine (Sprint 4),
+// SCOPE (Sprint 3 — muscle class added): the fat-loss class (FM,
+// LBM-loss, VAT, BF, waist, facial fullness) from Sprint 2 is unchanged.
+// Sprint 3 wires the ANABOLIC LBM-GAIN path: a §6.2 saturating-rate ODE
+// braked by the dynamically-lifted Casey-Butt ceiling (§2.3), anchored to
+// the testosterone +7.9 kg/20 wk figure (§5.6), with §6.3 training and
+// §6.4 sex modulation. The GH-axis saturating water combine (Sprint 4),
 // skin/tan (Sprint 5), recovery multiplier (Sprint 6) and regression
-// (Sprint 7) are present but clearly marked — they stay inert for a
-// pure fat-loss stack.
+// (Sprint 7) hooks are present but clearly marked — inert until their sprint.
 
 import { deriveAll } from "./derivations.js";
 import {
@@ -58,6 +60,33 @@ export const CALIBRATION_HORIZON_WEEKS = 12;
 // This reproduces semaglutide's published 12-wk weight loss exactly and
 // scales every other fat-loss compound by its §5.8 vector relative to it.
 export const WEIGHT_RESPONSE = 0.048;
+
+// Normalized→(kg/week) scale for ANABOLIC LBM GAIN — the Sprint-3 muscle
+// anchor. This is a RATE coefficient, not a 12-wk target: §6.2 puts the
+// ceiling brake `(1 − LBM/LBM_max)^k` on the GAIN RATE, so a fixed 12-wk
+// target can't be guaranteed (saturation reshapes the curve per subject).
+// We therefore integrate dLBM/dt = G·ΔLBM·trainMult·R·(1 − LBM/LBM_max_eff)^k
+// and DERIVE G from the testosterone anchor (no invented number):
+//
+//   §5.6 anchor: Bhasin 1996 — untrained men, +7.9 kg FFM @ 20 wk on
+//                testosterone 600 mg/wk (the figure §6.1 builds its
+//                "half the gain by wk 8–10" time-course around).
+//   Reference subject (the Sprint-1 verify profile): M, 180 cm, 80 kg,
+//                15% BF → LBM₀ = 68.0 kg; Casey-Butt LBM_max ≈ 86.3 kg.
+//   Testosterone §5.8: ΔLBM = +0.70, ceiling lift +0.40
+//                → LBM_max_eff = 86.3 × 1.40 = 120.8 kg.
+//   Training: untrained → trainMult = 1.5 (§6.3).
+//
+//   Solve the separable ODE (k = 1.5) for G so LBM(20) = 75.9 kg:
+//     ∫ closed form → 2(u^−½ − u₀^−½) = (a/LBM_max_eff)·t,  u = 1 − LBM/LBM_max_eff
+//     u₀ = 0.43699 (u₀^−½ = 1.5128);  u₂₀ = 0.37158 (u₂₀^−½ = 1.6405)
+//     a = 2(1.6405 − 1.5128)·120.8/20 = 1.543  (a = G·ΔLBM·trainMult)
+//     G = 1.543 / (0.70 × 1.5) = 1.469
+//
+// At wk 12 this reference case reaches +5.0 kg (≈63% of the 20-wk gain) —
+// matching §6.1's "roughly half by wk 8–10." Every other anabolic scales
+// off its own §5.8 ΔLBM relative to testosterone's +0.70.
+export const LBM_GAIN_RESPONSE = 1.469;
 
 // Normalized→kg scale for water compartments (ECW + ICW). §2.4: a fully
 // glycogen/water-loaded trained male swings ~2.7 kg; MK-677 edema can add
@@ -140,9 +169,15 @@ export function simulate(profile, stack = [], options = {}) {
   // (Sprint 4 swaps ECW/ICW/GH-tone for the saturating `1−∏(1−tone_i)`
   // combine; additive is correct for a non-GH fat-loss stack.)
   const sumV = Object.fromEntries(STATE_KEYS.map(k => [k, 0]));
-  let ceilingLiftSum = 0;   // §2.3 LBM_max_effective (Sprint 3 consumer)
+  // §6.2 LBM is split into two channels with different dynamics:
+  //   sumLbmGain — anabolic gain (saturating-rate ODE, ceiling-braked)
+  //   sumLbmLoss — catabolic / GLP-1 lean loss (relaxation, NO ceiling)
+  // Both already dose-scaled; gain is sex-modulated below per §6.4.
+  let sumLbmGain = 0;
+  let sumLbmLoss = 0;
+  let ceilingLiftSum = 0;   // §2.3 LBM_max_effective
   let recoveryBonus = 0;    // §5.3 R multiplier (Sprint 6 consumer)
-  const androgenTones = []; // §6.4 upper-body bias (Sprint 3 consumer)
+  const androgenTones = []; // §6.4 upper-body bias (drives regional morphs)
   let fitzpatrick = options.fitzpatrick ?? null;
 
   const sexMod = SEX_MODULATION[sex] || SEX_MODULATION.male;
@@ -152,37 +187,50 @@ export function simulate(profile, stack = [], options = {}) {
     for (const k of STATE_KEYS) {
       let v = (compound.vector[k] || 0) * doseFactor;
 
-      // §6.4 sex modulation, applied to LBM only.
-      if (k === "LBM" && v > 0) {
-        // Anabolic GAIN: SARMs double for women; non-anabolic halve.
-        if (compound.class === "sarm" || compound.class === "anabolic") {
-          v *= sexMod.sarmLbmRate;     // ×2 for women (Sprint 3 verifies)
+      if (k === "LBM") {
+        if (v > 0) {
+          // §6.4 sex modulation of anabolic GAIN. The Neil-2018 doubling
+          // is specifically a SARM result, so it applies to class "sarm"
+          // only. Testosterone (class "anabolic") is neither a SARM nor a
+          // "non-anabolic" stack → unmodulated (×1). GH-axis and other
+          // gains are non-anabolic → halved for women.
+          if (compound.class === "sarm")            v *= sexMod.sarmLbmRate;
+          else if (compound.class !== "anabolic")   v *= sexMod.nonAnabolicLbmRate;
+          sumLbmGain += v;
         } else {
-          v *= sexMod.nonAnabolicLbmRate; // ×0.5 for women on GH-axis etc.
+          sumLbmLoss += v; // catabolic/GLP-1 loss — not sex-modulated (§6.4)
         }
       }
-      sumV[k] += v;
+      sumV[k] += v; // sumV.LBM keeps the net for meta/debug readouts
     }
     ceilingLiftSum += (compound.ceilingLift || 0) * doseFactor;
     recoveryBonus += (compound.recoveryMultiplier || 0) * doseFactor;
     if (compound.androgenTone) androgenTones.push(compound.androgenTone * doseFactor);
   }
 
-  // §2.3 dynamically-lifted ceiling (Sprint 3 uses for LBM gain saturation).
+  // §2.3 dynamically-lifted ceiling — governs the anabolic gain brake below.
   const LBM_max_effective = LBM_max * (1 + ceilingLiftSum);
-  // §6.2 R multiplier applies to LBM GAIN only (Sprint 6).
+  // §5.3/§6.2 R multiplier applies to LBM GAIN only (≈1 until Sprint 6 adds BPC/TB).
   const R = 1 + recoveryBonus;
   // §6.4 androgen tone — saturating combine `1 − ∏(1 − tone_i)` (not additive).
   const androgenTone = 1 - androgenTones.reduce((p, t) => p * (1 - clamp(t, 0, 1)), 1);
   // Vasodilator boost feeds the §7 vascularity formula. Clamp [0,1].
   const vasodilatorBoost = clamp(sumV.Vasc, 0, 1);
 
+  // ── Anabolic LBM-gain driving coefficient (kg/week, §6.2) ────
+  // dLBM/dt = lbmGainCoeff × (1 − LBM/LBM_max_eff)^k. Sex modulation is
+  // already folded into sumLbmGain; trainMult (§6.3) and R (§5.3) scale
+  // the whole gain. The ceiling brake is applied per-step in the loop.
+  const lbmGainCoeff = LBM_GAIN_RESPONSE * sumLbmGain * trainMult * R;
+
   // ── Convert summed targets → physical 12-week deltas ─────────
-  // FM and LBM in kg; VAT/ECW/ICW/Coll/Tan stay normalized.
-  // ΔX_12 is the value the state should reach at CALIBRATION_HORIZON_WEEKS.
+  // FM in kg; LBM-LOSS in kg (GLP-1/T3, relaxation, no ceiling — same
+  // WEIGHT_RESPONSE scale as the §5.1 GLP-1 lean-loss anchor);
+  // VAT/ECW/ICW/Coll/Tan stay normalized. ΔX_12 is the value each state
+  // should reach at CALIBRATION_HORIZON_WEEKS.
   const target12 = {
-    FM_kg:  sumV.FM * WEIGHT_RESPONSE * W0,
-    LBM_kg: computeLbmTarget12(sumV.LBM, W0, LBM0, LBM_max_effective, trainMult, R),
+    FM_kg:      sumV.FM   * WEIGHT_RESPONSE * W0,
+    LBMloss_kg: sumLbmLoss * WEIGHT_RESPONSE * W0, // ≤ 0
     VAT:    sumV.VAT,   // normalized reduction multiplier (drives visceral morph)
     ECW:    sumV.ECW,   // normalized
     ICW:    sumV.ICW,   // normalized
@@ -199,18 +247,20 @@ export function simulate(profile, stack = [], options = {}) {
   }
 
   const asym = {
-    FM:  asymptoteDelta(target12.FM_kg,  STATE_TAU.FM),
-    LBM: asymptoteDelta(target12.LBM_kg, STATE_TAU.LBM),
-    VAT: asymptoteDelta(target12.VAT,    STATE_TAU.VAT),
-    ECW: asymptoteDelta(target12.ECW,    STATE_TAU.ECW),
-    ICW: asymptoteDelta(target12.ICW,    STATE_TAU.ICW),
-    Coll: asymptoteDelta(target12.Coll,  STATE_TAU.Coll),
-    Tan: asymptoteDelta(target12.Tan,    STATE_TAU.Tan)
+    FM:      asymptoteDelta(target12.FM_kg,      STATE_TAU.FM),
+    LBMloss: asymptoteDelta(target12.LBMloss_kg, STATE_TAU.LBM),
+    VAT:  asymptoteDelta(target12.VAT,  STATE_TAU.VAT),
+    ECW:  asymptoteDelta(target12.ECW,  STATE_TAU.ECW),
+    ICW:  asymptoteDelta(target12.ICW,  STATE_TAU.ICW),
+    Coll: asymptoteDelta(target12.Coll, STATE_TAU.Coll),
+    Tan:  asymptoteDelta(target12.Tan,  STATE_TAU.Tan)
   };
 
-  // Live state (deltas from baseline, except FM/LBM which are absolute kg).
+  // Live state. FM is absolute kg; LBM is rebuilt each step from its two
+  // channels (anabolic gain accumulator + catabolic-loss relaxation delta).
   let FM = FM0;
-  let LBM = LBM0;
+  let lbmGainAccum = 0; // kg of anabolic LBM accrued (saturating)
+  let lbmLossDelta = 0; // kg of catabolic/GLP-1 LBM loss (≤ 0, relaxation)
   let dVAT = 0, dECW = 0, dICW = 0, dColl = 0, dTan = 0;
 
   const baseline = snapshot(0, FM0, LBM0, W0, BF0, 0, 0, 0, 0, 0, FM0, LBM0, der, vasodilatorBoost, androgenTone);
@@ -225,16 +275,20 @@ export function simulate(profile, stack = [], options = {}) {
     FM += ((fmTargetAbs - FM) / STATE_TAU.FM) * DT;
     FM = Math.max(essentialFatKg, FM);
 
-    // LBM: relax toward LBM0 + asym.LBM.
-    // GAINS saturate against the (lifted) Casey-Butt ceiling (§2.3);
-    // losses (catabolic / GLP-1 lean loss) have no upper-ceiling brake.
-    const lbmTargetAbs = LBM0 + asym.LBM;
-    let lbmRate = (lbmTargetAbs - LBM) / STATE_TAU.LBM;
-    if (lbmRate > 0) {
-      const sat = Math.pow(Math.max(0, 1 - LBM / LBM_max_effective), CEILING_SATURATION_K);
-      lbmRate *= sat;
+    // LBM — two coupled channels (§6.2):
+    //   • Anabolic GAIN: saturating-rate ODE braked by the (lifted)
+    //     Casey-Butt ceiling (§2.3). Rate is highest at baseline and
+    //     decays toward 0 as LBM approaches LBM_max_effective — this is
+    //     what reproduces diminishing returns / "advanced gains far less."
+    //   • Catabolic / GLP-1 LOSS: exponential relaxation toward its 12-wk
+    //     target, with NO ceiling brake.
+    const lbmNow = LBM0 + lbmGainAccum + lbmLossDelta;
+    if (lbmGainCoeff > 0) {
+      const sat = Math.pow(Math.max(0, 1 - lbmNow / LBM_max_effective), CEILING_SATURATION_K);
+      lbmGainAccum += lbmGainCoeff * sat * DT;
     }
-    LBM += lbmRate * DT;
+    lbmLossDelta += ((asym.LBMloss - lbmLossDelta) / STATE_TAU.LBM) * DT;
+    const LBM = LBM0 + lbmGainAccum + lbmLossDelta;
 
     // Normalized states — simple relaxation toward their asymptote.
     dVAT += ((asym.VAT - dVAT) / STATE_TAU.VAT) * DT;
@@ -281,21 +335,6 @@ export function simulate(profile, stack = [], options = {}) {
       deltaBF_pts: (final.BF - BF0) * 100
     }
   };
-}
-
-// ── LBM 12-week target (kg) ──────────────────────────────────
-// Sprint 2: both signs use the WEIGHT_RESPONSE × W₀ scale (matches the
-// §5.1 GLP-1 lean-loss anchor). The positive-gain branch is intentionally
-// provisional — SPRINT 3 replaces it with a Casey-Butt headroom model
-// anchored to testosterone +7.9 kg/20 wk (§5.6), applying training (§6.3)
-// and the ceiling lift (§2.3). trainMult/R are threaded now so that swap
-// is local to this function.
-function computeLbmTarget12(sumVLbm, W0, LBM0, LBM_max_effective, trainMult, R) {
-  const base = sumVLbm * WEIGHT_RESPONSE * W0;
-  if (base <= 0) return base; // catabolic / GLP-1 lean loss — no training buff
-  // Provisional gain path (Sprint 3 will re-anchor): apply newbie-gains and
-  // recovery multipliers; ceiling saturation is handled in the integrator.
-  return base * trainMult * R;
 }
 
 // ── Snapshot builder ─────────────────────────────────────────
