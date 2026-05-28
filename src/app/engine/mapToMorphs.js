@@ -7,12 +7,14 @@
 //
 // Pure module: zero React/DOM imports. Ports to React Native untouched.
 //
-// SCOPE (Sprint 2 — fat-loss class): bf_low, waist (cm + bf_high proxy),
-// abs_def and facial_fullness are the verified outputs. visceral, water,
-// muscle_*, vascularity and the skin material values are implemented per
-// §7 too (it's a single coherent function) but stay near baseline for a
-// pure fat-loss stack — they come alive in Sprints 3–5 when SARMs /
-// GH-axis / skin compounds populate androgen_tone, ECW and Coll/Tan.
+// SCOPE (Sprint 4 — GH-axis + water): the `water` morph is now the full
+// §7 expression — 0.5·ECW_delta + 0.3·glycogen(ICW) + 0.2·estrogen_flag —
+// not just the ECW stub from Sprint 2. ECW = "puffy" extracellular
+// retention; the ICW delta supplies the §2.4 glycogen/creatine "fullness"
+// term; the estrogen flag (from sim meta) adds aromatization puffiness.
+// bf_low, waist, abs_def, facial_fullness (Sprint 2) and the muscle_* /
+// vascularity morphs (Sprint 3) are unchanged. Skin material values
+// (Coll/Tan) stay near baseline until Sprint 5 populates them.
 
 import { VISIBLE_THRESHOLDS } from "./constants.js";
 import { predictWaistCm } from "./derivations.js";
@@ -54,6 +56,7 @@ const FITZPATRICK_TAN_CAP = { 1: 0.40, 2: 0.55, 3: 0.75, 4: 1.0, 5: 1.0, 6: 1.0 
  *   @param {number} ctx.heightCm
  *   @param {number} ctx.LBM_max_naturalKg    Natural Casey-Butt ceiling — muscle/vascularity morph reference
  *   @param {number} [ctx.LBM_max_effectiveKg] Lifted ceiling (gain dynamics; not used by the mapping itself)
+ *   @param {number} [ctx.estrogenFlag] 0–1 aromatization flag — §7 water 3rd term (Sprint 4)
  *   @param {number} [ctx.fitzpatrick]  1–6 (Sprint 5)
  * @returns {object} morph keys + material values + engine-native extras
  */
@@ -116,11 +119,18 @@ export function mapState(state, ctx) {
   const visceralBaseline = clamp((BF0 * 100 - 22) / 18, 0, 0.6);
   const visceral = clamp(visceralBaseline * (1 + (state.dVAT || 0)), 0, 1);
 
-  // ── water (§7): ECW retention dominant; glycogen + estrogen later ──
-  // Sprint 4 wires glycogen_state and the estrogen/aromatization flag;
-  // for now water tracks positive ECW retention only.
+  // ── water (§7): 0.5·ECW + 0.3·glycogen + 0.2·estrogen flag ──
+  //   ECW_delta        → "puffy" extracellular retention (GH-axis, sodium).
+  //   glycogen_state   → §2.4 puts glycogen + creatine "fullness" in the
+  //                      INTRACELLULAR compartment, so the §5.8 ICW column
+  //                      IS the glycogen/fullness driver — no separate
+  //                      gram-level model needed; read it straight off dICW.
+  //   estrogen flag    → aromatization puffiness from wet anabolics,
+  //                      carried stack-level in ctx from sim meta.
   const ecwPos = clamp(state.dECW || 0, 0, 1);
-  const water = clamp(0.5 * ecwPos /* + 0.3*glycogen + 0.2*estrogen (Sprint 4) */, 0, 1);
+  const icwPos = clamp(state.dICW || 0, 0, 1);
+  const estrogenFlag = clamp(ctx.estrogenFlag || 0, 0, 1);
+  const water = clamp(0.5 * ecwPos + 0.3 * icwPos + 0.2 * estrogenFlag, 0, 1);
 
   // ── facial_fullness (§7) ─────────────────────────────────────
   const facial_fullness = clamp(
@@ -189,6 +199,7 @@ export function mapToMorphs(simResult, atWeek) {
     heightCm: simResult.derivations.inputs.heightCm,
     LBM_max_naturalKg: simResult.derivations.caseyButt.lbmMaxKg,  // morph reference
     LBM_max_effectiveKg: simResult.meta.LBM_max_effectiveKg,      // gain-dynamics ceiling
+    estrogenFlag: simResult.meta.estrogenFlag,                    // §7 water estrogen term (Sprint 4)
     fitzpatrick: simResult.meta.fitzpatrick
   };
   let state = simResult.final;

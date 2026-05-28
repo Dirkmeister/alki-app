@@ -22,14 +22,18 @@
 //      shorter protocols stop early. This honors §5.8 at its stated
 //      horizon while giving a realistic exponential ramp.
 //
-// SCOPE (Sprint 3 — muscle class added): the fat-loss class (FM,
-// LBM-loss, VAT, BF, waist, facial fullness) from Sprint 2 is unchanged.
-// Sprint 3 wires the ANABOLIC LBM-GAIN path: a §6.2 saturating-rate ODE
-// braked by the dynamically-lifted Casey-Butt ceiling (§2.3), anchored to
-// the testosterone +7.9 kg/20 wk figure (§5.6), with §6.3 training and
-// §6.4 sex modulation. The GH-axis saturating water combine (Sprint 4),
-// skin/tan (Sprint 5), recovery multiplier (Sprint 6) and regression
-// (Sprint 7) hooks are present but clearly marked — inert until their sprint.
+// SCOPE (Sprint 4 — GH-axis + water): the fat-loss (Sprint 2) and
+// muscle-gain (Sprint 3) paths are unchanged. Sprint 4 wires the
+// PUFFINESS layer: ECW/ICW now combine via the §5.2 saturating function
+// `1 − ∏(1 − vᵢ)` (GH-axis peptides do NOT stack linearly) instead of
+// summing additively; a single GH-axis tone scalar is exposed for the
+// §5.2 ceiling (MK-677 + CJC-DAC ≈ 0.85, never 1.0+); and an
+// estrogen/aromatization flag (E) is derived for the §7 water term.
+// Water rides the FAST τ ≈ 1 wk constant (STATE_TAU.ECW), so a wet stack
+// visibly puffs the Eidolon within the first simulated week — before any
+// fat (τ ≈ 10 wk) or lean (τ ≈ 20 wk) tissue change. The skin/tan
+// (Sprint 5), recovery multiplier (Sprint 6) and regression (Sprint 7)
+// hooks remain present but inert until their sprint.
 
 import { deriveAll } from "./derivations.js";
 import {
@@ -113,6 +117,17 @@ const STATE_TAU = {
 // ── Helpers ──────────────────────────────────────────────────
 function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
 
+// §5.2 / §6.1 — same-pathway SATURATING COMBINE: tone = 1 − ∏(1 − vᵢ).
+// GH-axis peptides (and water compartments generally) do NOT add
+// linearly — three GH-axis agents can't push past the body's retention
+// ceiling. This combine reduces to vᵢ for a single contributor, so every
+// single-compound Sprint 2/3 projection is unchanged; only multi-compound
+// water/GH stacks now saturate instead of summing. Each vᵢ is clamped to
+// [0,1] before the product (the §5.8 ECW/ICW/tone columns are all ≥ 0).
+function saturatingCombine(contribs) {
+  return 1 - contribs.reduce((p, v) => p * (1 - clamp(v, 0, 1)), 1);
+}
+
 // Fraction of the way to the asymptote that an exponential approach with
 // time-constant τ has covered at week t. We calibrate the asymptote by
 // DIVIDING the 12-wk target by rampFrac(12) so the state == target at wk 12.
@@ -165,9 +180,11 @@ export function simulate(profile, stack = [], options = {}) {
   const resolved = (stack || []).map(normalizeStackEntry).filter(Boolean);
 
   // ── Aggregate the stack into per-state 12-week targets (§6.2 Σ) ──
-  // sumV[state] = Σ_compounds V_state × dose_factor. Additive, per §6.2.
-  // (Sprint 4 swaps ECW/ICW/GH-tone for the saturating `1−∏(1−tone_i)`
-  // combine; additive is correct for a non-GH fat-loss stack.)
+  // sumV[state] = Σ_compounds V_state × dose_factor. Additive for the
+  // tissue states (FM/LBM/VAT/Coll/Tan/Vasc, per §6.2). The water
+  // compartments (ECW/ICW) and the GH-axis tone are the EXCEPTION: §5.2
+  // mandates a saturating combine `1 − ∏(1 − vᵢ)`, collected below and
+  // combined after the loop.
   const sumV = Object.fromEntries(STATE_KEYS.map(k => [k, 0]));
   // §6.2 LBM is split into two channels with different dynamics:
   //   sumLbmGain — anabolic gain (saturating-rate ODE, ceiling-braked)
@@ -175,9 +192,13 @@ export function simulate(profile, stack = [], options = {}) {
   // Both already dose-scaled; gain is sex-modulated below per §6.4.
   let sumLbmGain = 0;
   let sumLbmLoss = 0;
-  let ceilingLiftSum = 0;   // §2.3 LBM_max_effective
-  let recoveryBonus = 0;    // §5.3 R multiplier (Sprint 6 consumer)
-  const androgenTones = []; // §6.4 upper-body bias (drives regional morphs)
+  let ceilingLiftSum = 0;     // §2.3 LBM_max_effective
+  let recoveryBonus = 0;      // §5.3 R multiplier (Sprint 6 consumer)
+  const androgenTones = [];   // §6.4 upper-body bias (drives regional morphs)
+  const ghAxisTones = [];     // §5.2 GH-axis tone — saturating combine
+  const ecwContribs = [];     // §5.2 water states combine saturatingly, NOT additively
+  const icwContribs = [];
+  const estrogenContribs = []; // §3/§7 E flag — aromatizing wet anabolics
   let fitzpatrick = options.fitzpatrick ?? null;
 
   const sexMod = SEX_MODULATION[sex] || SEX_MODULATION.male;
@@ -200,20 +221,49 @@ export function simulate(profile, stack = [], options = {}) {
         } else {
           sumLbmLoss += v; // catabolic/GLP-1 loss — not sex-modulated (§6.4)
         }
+        sumV[k] += v; // sumV.LBM keeps the net for meta/debug readouts
+        continue;
       }
-      sumV[k] += v; // sumV.LBM keeps the net for meta/debug readouts
+
+      // §5.2 — ECW & ICW do NOT stack linearly. Collect each compound's
+      // contribution; saturatingCombine() folds them after the loop so a
+      // GH-axis pile-up can't drive water past the retention ceiling.
+      if (k === "ECW") { ecwContribs.push(v); continue; }
+      if (k === "ICW") { icwContribs.push(v); continue; }
+
+      sumV[k] += v;
     }
     ceilingLiftSum += (compound.ceilingLift || 0) * doseFactor;
     recoveryBonus += (compound.recoveryMultiplier || 0) * doseFactor;
     if (compound.androgenTone) androgenTones.push(compound.androgenTone * doseFactor);
+    if (compound.ghAxisTone)   ghAxisTones.push(compound.ghAxisTone * doseFactor);
+    // §3/§5.6 estrogen-aromatization flag (E): driven by WET ANABOLIC
+    // androgens (testosterone class). GH-axis "wet" peptides already drive
+    // ECW directly via their own vector, so they're excluded here to avoid
+    // double-counting the §7 water terms. No §5.8 E magnitude exists to
+    // pull, so the strength is the dose-normalized presence (dose_factor,
+    // a spec-defined quantity) — flagged as a modeling choice, not a
+    // fabricated number.
+    if (compound.wet && compound.class === "anabolic") {
+      estrogenContribs.push(doseFactor);
+    }
   }
+
+  // §5.2 saturating combine — water compartments + GH-axis tone + E flag.
+  sumV.ECW = saturatingCombine(ecwContribs);
+  sumV.ICW = saturatingCombine(icwContribs);
+  // §5.2 GH-axis tone scalar (MK-677≈0.5, Ipa+CJC≈0.6, CJC-DAC≈0.7;
+  // MK-677+CJC-DAC ≈ 0.85, never 1.0+). Surfaced in meta for the UI + verify.
+  const ghAxisTone = saturatingCombine(ghAxisTones);
+  // §3/§7 estrogen/aromatization flag (0..1) — third term of the water morph.
+  const estrogenFlag = saturatingCombine(estrogenContribs);
 
   // §2.3 dynamically-lifted ceiling — governs the anabolic gain brake below.
   const LBM_max_effective = LBM_max * (1 + ceilingLiftSum);
   // §5.3/§6.2 R multiplier applies to LBM GAIN only (≈1 until Sprint 6 adds BPC/TB).
   const R = 1 + recoveryBonus;
   // §6.4 androgen tone — saturating combine `1 − ∏(1 − tone_i)` (not additive).
-  const androgenTone = 1 - androgenTones.reduce((p, t) => p * (1 - clamp(t, 0, 1)), 1);
+  const androgenTone = saturatingCombine(androgenTones);
   // Vasodilator boost feeds the §7 vascularity formula. Clamp [0,1].
   const vasodilatorBoost = clamp(sumV.Vasc, 0, 1);
 
@@ -328,6 +378,8 @@ export function simulate(profile, stack = [], options = {}) {
       LBM_max_effectiveKg: LBM_max_effective,
       recoveryMultiplier: R,
       androgenTone,
+      ghAxisTone,
+      estrogenFlag,
       vasodilatorBoost,
       // Δ summary for quick UI / verification readouts.
       deltaFM_kg: final.FM - FM0,
