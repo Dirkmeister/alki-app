@@ -52,7 +52,8 @@ const FITZPATRICK_TAN_CAP = { 1: 0.40, 2: 0.55, 3: 0.75, 4: 1.0, 5: 1.0, 6: 1.0 
  * @param {object} ctx
  *   @param {"male"|"female"} ctx.sex
  *   @param {number} ctx.heightCm
- *   @param {number} ctx.LBM_max_effectiveKg
+ *   @param {number} ctx.LBM_max_naturalKg    Natural Casey-Butt ceiling — muscle/vascularity morph reference
+ *   @param {number} [ctx.LBM_max_effectiveKg] Lifted ceiling (gain dynamics; not used by the mapping itself)
  *   @param {number} [ctx.fitzpatrick]  1–6 (Sprint 5)
  * @returns {object} morph keys + material values + engine-native extras
  */
@@ -62,7 +63,17 @@ export function mapState(state, ctx) {
   const BF = state.BF;                 // current fraction
   const BF0 = state.BF0;               // baseline fraction
   const BFpct = BF * 100;
-  const LBM_max_eff = ctx.LBM_max_effectiveKg || state.LBM;
+  // Muscle/vascularity morphs map against the NATURAL Casey-Butt ceiling,
+  // NOT the anabolic-lifted one. §7 writes `LBM / LBM_max_effective`, but
+  // using the lifted ceiling makes a stronger compound (bigger ceiling
+  // lift) render a SMALLER avatar at equal LBM, and deflates the week-0
+  // baseline below the user's actual physique. Anchoring to the natural
+  // ceiling keeps absolute size stable and lets enhanced LBM read as growth
+  // PAST the natural wall (ratio > 1 → the sigmoid saturates toward 1.0).
+  // The lifted ceiling still governs the GAIN DYNAMICS upstream in
+  // simulate.js (§2.3) — that is its proper job. (Deviation from §7
+  // approved 2026-05-27; effective ceiling kept in ctx for callers.)
+  const LBM_max_ref = ctx.LBM_max_naturalKg || ctx.LBM_max_effectiveKg || state.LBM;
   const androgenTone = state.androgenTone || 0;
   const vasodilator = state.vasodilatorBoost || 0;
 
@@ -74,8 +85,9 @@ export function mapState(state, ctx) {
   const bf_high = clamp(BF0 > 0 ? (BF - BF0) / BF0 : 0, 0, 1);
 
   // ── muscle_overall (§7) + regional androgen bias ─────────────
-  // §7: muscle_overall = sigmoid((LBM / LBM_max_effective − 0.7) × 8)
-  const lbmRatio = LBM_max_eff > 0 ? state.LBM / LBM_max_eff : 0;
+  // §7 form: sigmoid((LBM / LBM_max − 0.7) × 8). LBM_max is the NATURAL
+  // ceiling here (see note above); enhanced LBM can push the ratio past 1.
+  const lbmRatio = LBM_max_ref > 0 ? state.LBM / LBM_max_ref : 0;
   const mo = clamp(sigmoid((lbmRatio - 0.7) * 8), 0, 1);
   const muscle_chest     = clamp(mo * (0.95 + 0.10 * androgenTone), 0, 1);
   const muscle_shoulders = clamp(mo * (0.95 + 0.15 * androgenTone), 0, 1);
@@ -175,7 +187,8 @@ export function mapToMorphs(simResult, atWeek) {
   const ctx = {
     sex: simResult.meta.sex,
     heightCm: simResult.derivations.inputs.heightCm,
-    LBM_max_effectiveKg: simResult.meta.LBM_max_effectiveKg,
+    LBM_max_naturalKg: simResult.derivations.caseyButt.lbmMaxKg,  // morph reference
+    LBM_max_effectiveKg: simResult.meta.LBM_max_effectiveKg,      // gain-dynamics ceiling
     fitzpatrick: simResult.meta.fitzpatrick
   };
   let state = simResult.final;
