@@ -15,14 +15,13 @@
 //
 // Pure module: zero React/DOM imports. Ports to React Native untouched.
 //
-// SCOPE NOTE (Sprint 2): the fat-loss class (semaglutide, retatrutide,
-// tesamorelin, fragment176, motsc) is the class wired + verified this
-// sprint. The remaining rows are transcribed now as declarative data
-// (all sourced from §5.8 / §5.6 / §8) so later sprints add only the
-// consuming LOGIC, never new numbers — mirroring how constants.js
-// already declares every reference dose. The state keys those rows
-// touch (ECW/ICW → Sprint 4, Tan/Coll → Sprint 5, ceilingLift/AT →
-// Sprint 3, R → Sprint 6) are inert until their sprint lands.
+// SCOPE NOTE: every §5.8 row was transcribed up front as declarative data
+// (all sourced from §5.8 / §5.6 / §8) so each sprint adds only the
+// consuming LOGIC, never new numbers — mirroring how constants.js already
+// declares every reference dose. Live as of Sprint 5: FM/LBM/VAT (Sprints
+// 2–3), ECW/ICW + GH-axis tone (Sprint 4), and Coll/Tan + the skin
+// metadata below (Sprint 5). Still inert until their sprint: the recovery
+// multiplier R (Sprint 6) and the regression/decay path (Sprint 7).
 
 import { REFERENCE_DOSES_PER_WEEK } from "./constants.js";
 
@@ -170,7 +169,15 @@ export const COMPOUND_VECTORS = {
     label: "GHK-Cu (topical)", class: "skin", evidence: "B",
     refDoseKey: "ghkcu", wet: false,
     vector: vec({ Coll: 0.30 }),
-    ceilingLift: 0, recoveryMultiplier: 0
+    ceilingLift: 0, recoveryMultiplier: 0,
+    // §5.4 + Caveats: topical GHK-Cu has multiple controlled trials
+    // (Pickart 2018; Leyden 2002 → grade B). The +0.30 Coll vector is the
+    // TOPICAL projection. Systemic/injected evidence is much weaker — the
+    // route flag lets the UI down-grade + caveat an injection protocol
+    // instead of promising the topical result.
+    route: "topical",
+    evidenceByRoute: { topical: "B", systemic: "C" },
+    note: "Collagen projection is for TOPICAL use; systemic/SubQ injection evidence is much weaker (C) — do not overpromise."
   },
   epitalon: {
     label: "Epitalon", class: "skin", evidence: "C",
@@ -183,8 +190,16 @@ export const COMPOUND_VECTORS = {
   melanotan2: {
     label: "Melanotan II", class: "appearance", evidence: "A",
     refDoseKey: "melanotan2", wet: false,
-    vector: vec({ FM: -0.05, Tan: 0.80 }), // Tan capped by Fitzpatrick in mapToMorphs
-    ceilingLift: 0, recoveryMultiplier: 0
+    vector: vec({ FM: -0.05, Tan: 0.80 }), // Tan clamped to the Fitzpatrick ceiling in mapToMorphs (§5.5)
+    ceilingLift: 0, recoveryMultiplier: 0,
+    // §8: the A grade is for PIGMENTATION specifically (Dorr 1996), not
+    // body composition — surfaced so the UI can scope the badge.
+    evidenceScope: "pigmentation",
+    // §5.5 side effects. The cosmetic warning is UI copy; the appetite
+    // note explains the −0.05 FM bias above (it IS the ~5% caloric-intake
+    // suppression proxy, not a direct lipolytic effect).
+    warnings: ["Darkens existing freckles and moles; monitor pigmented lesions (§5.5)."],
+    appetiteNote: "Appetite suppression (~5% intake proxy) drives the −0.05 FM bias, not lipolysis (§5.5)."
   },
 
   // ── §5.6 SARMs and anabolics (Sprint 3) ──────────────────────────

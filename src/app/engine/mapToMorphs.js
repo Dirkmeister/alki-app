@@ -7,14 +7,15 @@
 //
 // Pure module: zero React/DOM imports. Ports to React Native untouched.
 //
-// SCOPE (Sprint 4 — GH-axis + water): the `water` morph is now the full
-// §7 expression — 0.5·ECW_delta + 0.3·glycogen(ICW) + 0.2·estrogen_flag —
-// not just the ECW stub from Sprint 2. ECW = "puffy" extracellular
-// retention; the ICW delta supplies the §2.4 glycogen/creatine "fullness"
-// term; the estrogen flag (from sim meta) adds aromatization puffiness.
-// bf_low, waist, abs_def, facial_fullness (Sprint 2) and the muscle_* /
-// vascularity morphs (Sprint 3) are unchanged. Skin material values
-// (Coll/Tan) stay near baseline until Sprint 5 populates them.
+// SCOPE (Sprint 5 — skin material): the skin block is now the live §5.4/
+// §5.5/§7 mapping. Collagen (GHK-Cu, Epitalon) drives `skin_quality` and
+// the §7 roughness/luminosity material curves; Melanotan drives
+// `skin_tone_shift`, clamped at the per-type Fitzpatrick CEILING (decision
+// below). Per-material evidence grades (§8) are surfaced so the UI can
+// render the tan/collagen projections at their own confidence. These are
+// MATERIAL params — no geometry moves. Everything upstream is unchanged:
+// the §7 `water` expression (Sprint 4), bf_low/waist/abs_def/facial
+// (Sprint 2) and the muscle_* / vascularity morphs (Sprint 3).
 
 import { VISIBLE_THRESHOLDS } from "./constants.js";
 import { predictWaistCm } from "./derivations.js";
@@ -57,7 +58,8 @@ const FITZPATRICK_TAN_CAP = { 1: 0.40, 2: 0.55, 3: 0.75, 4: 1.0, 5: 1.0, 6: 1.0 
  *   @param {number} ctx.LBM_max_naturalKg    Natural Casey-Butt ceiling — muscle/vascularity morph reference
  *   @param {number} [ctx.LBM_max_effectiveKg] Lifted ceiling (gain dynamics; not used by the mapping itself)
  *   @param {number} [ctx.estrogenFlag] 0–1 aromatization flag — §7 water 3rd term (Sprint 4)
- *   @param {number} [ctx.fitzpatrick]  1–6 (Sprint 5)
+ *   @param {number} [ctx.fitzpatrick]  1–6 — caps Melanotan tan (Sprint 5)
+ *   @param {{tan:?string, collagen:?string}} [ctx.skinEvidence] §8 per-material grades (Sprint 5)
  * @returns {object} morph keys + material values + engine-native extras
  */
 export function mapState(state, ctx) {
@@ -149,13 +151,41 @@ export function mapState(state, ctx) {
   if (sex === "female") waistDeltaCm *= 0.6; // 40% redirected away from waist (§6.4)
   const waistEffectiveCm = waistCm0 + waistDeltaCm;
 
-  // ── skin material (§5.5 / §7) — Sprints 5 populate Coll/Tan ──
+  // ── skin material (§5.4 / §5.5 / §7) — Sprint 5 ──────────────
+  // Collagen (GHK-Cu, Epitalon) and tan (Melanotan II) move MATERIAL
+  // params only — zero geometry. `state.dColl` / `state.dTan` are the
+  // collagen / eumelanin improvement vs baseline (0 at week 0), already
+  // integrated on their own τ (collagen 12 wk, tan 4 wk) by simulate.js.
   const coll = clamp(state.dColl || 0, 0, 1);
+
+  // Fitzpatrick is a genetic CEILING on tan, not a linear scaler
+  // (decision 2026-05-27, reconciling §7's `melanotan_state × Fp_cap`
+  // shorthand with §5.5's "Fp I caps at ~0.4 / Fp IV caps at 1.0" and the
+  // Sprint-5 verify criteria). The Melanotan tan drive rises toward its
+  // §5.8 max (≈0.80 at the 12-wk horizon) and is clamped at the per-type
+  // cap: a fair Fp I user tops out at 0.40, while Fp IV+ is limited only by
+  // the §5.8 drive. min(), not ×, so a Fp III tans to its own 0.75 wall
+  // rather than to 75% of a Fp IV's tan.
   const fpCap = ctx.fitzpatrick ? (FITZPATRICK_TAN_CAP[ctx.fitzpatrick] ?? 1.0) : 1.0;
-  const skin_tone_shift = clamp((state.dTan || 0) * fpCap, 0, 1);
-  const skin_quality = coll;                       // avatar's single 0..1 key
+  const skin_tone_shift = clamp(Math.min(state.dTan || 0, fpCap), 0, 1);
+
+  // §7 material curves applied to the collagen improvement: roughness
+  // falls linearly (1 − Coll), luminosity "pops" early then plateaus
+  // (√Coll). The renderer owns the absolute baseline — Body3DAvatar lerps
+  // its own 0.7 skin roughness by `skin_quality` — so these two are
+  // improvement-from-baseline readouts for verification / future material
+  // wiring, NOT consumed as absolute material values. (`coll` is the
+  // delta, 0 at baseline; the spec gives no age-baseline collagen to
+  // anchor an absolute level, so we don't invent one.)
+  const skin_quality = coll;                       // avatar's single 0..1 collagen key
   const skin_roughness_material = clamp(1 - coll, 0, 1);
   const skin_luminosity_material = Math.sqrt(coll);
+
+  // §8 per-material evidence — lets the UI render the tan vs collagen
+  // projections at their own confidence (Melanotan A pigment, GHK-Cu B,
+  // Epitalon C). Carried stack-level in ctx from sim meta.
+  const skin_tone_evidence = ctx.skinEvidence?.tan ?? null;
+  const skin_quality_evidence = ctx.skinEvidence?.collagen ?? null;
 
   return {
     // ── Avatar-compatible morph keys (match MORPH_TARGETS) ──
@@ -179,7 +209,9 @@ export function mapState(state, ctx) {
     waistDeltaCm,
     facial_fullness,
     skin_roughness_material,
-    skin_luminosity_material
+    skin_luminosity_material,
+    skin_tone_evidence,
+    skin_quality_evidence
   };
 }
 
@@ -200,7 +232,8 @@ export function mapToMorphs(simResult, atWeek) {
     LBM_max_naturalKg: simResult.derivations.caseyButt.lbmMaxKg,  // morph reference
     LBM_max_effectiveKg: simResult.meta.LBM_max_effectiveKg,      // gain-dynamics ceiling
     estrogenFlag: simResult.meta.estrogenFlag,                    // §7 water estrogen term (Sprint 4)
-    fitzpatrick: simResult.meta.fitzpatrick
+    fitzpatrick: simResult.meta.fitzpatrick,                      // Melanotan tan cap (Sprint 5)
+    skinEvidence: simResult.meta.skinEvidence                     // §8 per-material grades (Sprint 5)
   };
   let state = simResult.final;
   if (typeof atWeek === "number") {

@@ -22,18 +22,16 @@
 //      shorter protocols stop early. This honors §5.8 at its stated
 //      horizon while giving a realistic exponential ramp.
 //
-// SCOPE (Sprint 4 — GH-axis + water): the fat-loss (Sprint 2) and
-// muscle-gain (Sprint 3) paths are unchanged. Sprint 4 wires the
-// PUFFINESS layer: ECW/ICW now combine via the §5.2 saturating function
-// `1 − ∏(1 − vᵢ)` (GH-axis peptides do NOT stack linearly) instead of
-// summing additively; a single GH-axis tone scalar is exposed for the
-// §5.2 ceiling (MK-677 + CJC-DAC ≈ 0.85, never 1.0+); and an
-// estrogen/aromatization flag (E) is derived for the §7 water term.
-// Water rides the FAST τ ≈ 1 wk constant (STATE_TAU.ECW), so a wet stack
-// visibly puffs the Eidolon within the first simulated week — before any
-// fat (τ ≈ 10 wk) or lean (τ ≈ 20 wk) tissue change. The skin/tan
-// (Sprint 5), recovery multiplier (Sprint 6) and regression (Sprint 7)
-// hooks remain present but inert until their sprint.
+// SCOPE (Sprint 5 — skin material): the fat-loss (Sprint 2), muscle-gain
+// (Sprint 3) and GH-axis/water (Sprint 4) paths are unchanged. The Coll
+// and Tan states were already integrated generically by the §6.2 loop;
+// Sprint 5 makes them first-class by surfacing the §8 per-material
+// evidence grades (skinEvidence) and carrying Fitzpatrick through meta so
+// mapToMorphs can clamp the Melanotan tan at its per-type ceiling. Tan
+// rides a fast-ish τ ≈ 4 wk (STATE_TAU.Tan); collagen the slow τ ≈ 12 wk
+// (STATE_TAU.Coll). No geometry — these drive material params only. The
+// recovery multiplier (Sprint 6) and regression (Sprint 7) hooks remain
+// present but inert until their sprint.
 
 import { deriveAll } from "./derivations.js";
 import {
@@ -361,6 +359,18 @@ export function simulate(profile, stack = [], options = {}) {
 
   const final = timeline[timeline.length - 1];
 
+  // §8 per-material evidence — lowest grade among the compounds actually
+  // DRIVING each skin output (nonzero Tan / Coll vector). Lets the UI show
+  // the tan projection at Melanotan's A-grade confidence even when a
+  // C-grade Epitalon is also collagen-driving in the same stack, instead
+  // of collapsing everything to the stack-wide evidenceFloor.
+  const tanDrivers  = resolved.filter(r => (r.compound.vector.Tan  || 0) !== 0);
+  const collDrivers = resolved.filter(r => (r.compound.vector.Coll || 0) !== 0);
+  const skinEvidence = {
+    tan:      tanDrivers.length  ? lowestEvidence(tanDrivers.map(r => r.compound.evidence))  : null,
+    collagen: collDrivers.length ? lowestEvidence(collDrivers.map(r => r.compound.evidence)) : null
+  };
+
   return {
     baseline,
     timeline,
@@ -374,6 +384,8 @@ export function simulate(profile, stack = [], options = {}) {
       stack: resolved.map(r => ({ key: r.key, label: r.compound.label, evidence: r.compound.evidence, doseFactor: r.doseFactor })),
       // Lowest evidence grade in the stack drives the UI confidence overlay (§8).
       evidenceFloor: lowestEvidence(resolved.map(r => r.compound.evidence)),
+      // §8 per-material grades for the skin layer (tan vs collagen).
+      skinEvidence,
       ceilingLiftSum,
       LBM_max_effectiveKg: LBM_max_effective,
       recoveryMultiplier: R,
