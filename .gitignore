@@ -14,6 +14,9 @@
 .DS_Store
 *.pem
 
+# smoke tests (local Playwright suite + screenshots — not committed)
+/tests/
+
 # debug
 npm-debug.log*
 
@@ -22,6 +25,9 @@ npm-debug.log*
 
 # env
 .env*.local
+
+# showcase output (generated screenshots + docs)
+/showcase/
 .claude/worktrees/wizardly-einstein-dd1d40/
 .claude/worktrees/ecstatic-aryabhata-605d85/
 .claude/skills/impeccable/SKILL.md

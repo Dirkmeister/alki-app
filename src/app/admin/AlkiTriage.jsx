@@ -1,11 +1,11 @@
 import { useState } from "react";
 
 // ALKI — Triage board. Source of truth is the Supabase `feedback` table.
-// Snapshot 2026-05-27 · build line v0.1.77.
+// Snapshot 2026-05-28 · build line v0.1.99.
 // The LIST below shows only active work (open + deferred). Shipped items live
 // in the CHANGELOG, not the list. Update SHIPPED + CHANGELOG each session.
 
-const SHIPPED = 49; // resolved-and-recorded count (lives in the changelog)
+const SHIPPED = 65; // resolved-and-recorded count (lives in the changelog)
 
 const CHANGELOG = [
   { date: "2026-05-25/26", session: "Session 1 — Usability Engineering", changes: [
@@ -48,39 +48,48 @@ const CHANGELOG = [
     { rank: 68, title: "Weight tile on projection", desc: "current → projected lbs, lean mass held." },
     { rank: "—", title: "Hotfixes / infra", desc: "validIds crash; v0.1.77 bump; body-fat essential-fat floor; per-eidolon progress logs; PerfHUD + perf_logs table." },
   ]},
+  { date: "2026-05-27/28", session: "Session 3 — Builder, Modeler & Home polish (v0.1.95–0.1.99)", changes: [
+    { rank: 11, title: "Live stat projection on profile card", desc: "v0.1.99: live projected BF/weight/lean-mass on builder card, reactive to stack changes." },
+    { rank: 22, title: "2D SVG avatar polish", desc: "v0.1.99: depth gradient, warmer palette, grounding shadow (fallback path only)." },
+    { rank: 31, title: "BF% note pre-decided the goal", desc: "v0.1.96: reworded to informational, not goal-prescribing." },
+    { rank: 32, title: "Advanced-stats framing", desc: "v0.1.96: reframed as optional/equipment-based prompt." },
+    { rank: 33, title: "Training box didn't save", desc: "v0.1.99: Analytics training inputs now persist across sessions." },
+    { rank: 34, title: "FFMI unexplained; rename Modeler", desc: "v0.1.99: added FFMI explainer; renamed nav to 'Analytics'." },
+    { rank: 35, title: "No cycle start / tracking", desc: "v0.1.99: Cycle Start + day counter; waist added as 3rd measurement." },
+    { rank: 36, title: "Subjective categories undefined", desc: "v0.1.96: intro + per-score definitions on check-in." },
+    { rank: 46, title: "Search for power users", desc: "v0.1.96: free-text compound search across matched + browse-all." },
+    { rank: 60, title: "Generator goal-change update", desc: "Batch 1 / v0.1.95: re-detects phase + re-expands ladder on goal change." },
+    { rank: 64, title: "Screens load at the bottom", desc: "v0.1.95: scroll-to-top on every screen + view change." },
+    { rank: 65, title: "No easy Home button", desc: "v0.1.99: ALKI wordmark home shortcut + fixed top-right home on inner screens." },
+    { rank: "67a", title: "SR-9009 missing reason text", desc: "v0.1.96: catalog-fallback compounds show real role-in-stack text." },
+    { rank: "67b", title: "Safety badge above the fold", desc: "v0.1.96: live score echoed in fixed CTA bar; unified score basis." },
+    { rank: 70, title: "Tadalafil add bounced to builder", desc: "v0.1.95: support compounds add in place on projection view." },
+    { rank: 71, title: "Cycle length editable when locked", desc: "v0.1.97: cycle calculated from stack — read-only when locked, suggested for build-your-own." },
+    { rank: "—", title: "Avatar dose glow + PCT SERMs", desc: "v0.1.97/98: hero glow scales with dose completion; Support Layer offers PCT SERMs (Tamoxifen/Enclomiphene) as add-to-stack." },
+  ]},
 ];
 
 // Active board — open + deferred only. Shipped items are NOT listed here.
+// Synced to Supabase 2026-05-28: 16 builder/Modeler/home items resolved in
+// Session 3 (now in the CHANGELOG); 5 new items added (ranks 72–76).
 const ITEMS = [
   // ── Dashboard / builder ──
-  { id: 11, rank: 11, screen: "Dashboard", cat: "pain_point", sev: "P2", noted: "dallas", status: "open", title: "Live stat projection on profile card", desc: "The app's goal is learning what compounds do — seeing impact means navigating away. A live projection on the profile card that updates as compounds are added would be optimal.", fix: "Core 'learn what each does' feature; #50 dead-zone is a building block. Likely needs the Eidolon simulate() engine." },
-  { id: 22, rank: 22, screen: "Dashboard", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "2D SVG avatar looks bad", desc: "The 2D SVG avatar isn't compelling.", fix: "Rework (tangled with the deferred LOD work)." },
-  { id: 60, rank: 60, screen: "Dashboard", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "Generator doesn't update on goal change", desc: "Stack generator may not reflect a goal change (or gives a 'safe' stack).", fix: "DIAGNOSED: machinery is correct (handleGoalToggle + memo + goal-aware detectPhase); likely a UX gap once a stack is loaded. Awaiting Austin repro." },
-  { id: 64, rank: 64, screen: "Dashboard", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "Screens load at the bottom", desc: "Some screens open scrolled down; all new screen loads should be consistent.", fix: "Normalize scroll-to-top on every screen load." },
-  { id: "67a", rank: 67, screen: "Dashboard", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "SR-9009 missing 'reason in stack' text", desc: "No reason-in-stack text for SR-9009 — looks like missing copy.", fix: "Add the reason text, or a 'not needed' flag. (Rank collides with #67b — renumber one.)" },
-  { id: "67b", rank: 67, screen: "Dashboard", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "Safety badge updates above the fold", desc: "#43 follow-up: the live Stack Safety badge updates correctly but sits above the fold, so after adding a compound lower down you must scroll up to see it.", fix: "Echo the score near the add action, or a sticky mini-indicator. (Rank collides with #67a — renumber one.)" },
-  { id: 70, rank: 70, screen: "Dashboard", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "Tadalafil add bounces to the builder", desc: "Adding Tadalafil bounces back to the builder and forces a 'see projection' step.", fix: "Auto-add + auto-update in place." },
+  { id: "b7ee70fb", rank: 72, screen: "Dashboard", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "Clear filter also clears selected compounds", desc: "Pressing the filter 'Clear' button wipes the user's selected compounds, not just the active filters.", fix: "ROOT CAUSE: clearSelection (AlkiApp.jsx ~L2342) does setSelectedCompounds([]) AND resets goal/cat/search; the 'Clear (N)' filter chip calls it, so it nukes the stack. FIX (<10 lines): split into clearFilters (filters only) and clearSelection (selection only); wire the filter chip to clearFilters." },
   { id: 37, rank: 37, screen: "Dashboard", cat: "idea", sev: "P3", noted: "both", status: "open", title: "New-user tutorial walkthrough", desc: "No first-time guidance — explain what an eidolon is, the goal of the app, how to use it.", fix: "First-run overlay, 4–5 steps." },
   { id: 40, rank: 40, screen: "Dashboard", cat: "idea", sev: "P3", noted: "dallas", status: "open", title: "Dev: date/time simulation", desc: "Simulate timeline/cultivation progression for testing.", fix: "Dev-mode date override to fast-forward state." },
   { id: 44, rank: 44, screen: "Dashboard", cat: "idea", sev: "P2", noted: "dallas", status: "open", title: "ROA changes bioavailability", desc: "Route of administration changes the protocol — BPC-157 oral vs SubQ are almost different compounds. Data-model gap.", fix: "Add an ROA field per compound; ROA selector with per-variant dosing/use-case." },
-  { id: 46, rank: 46, screen: "Dashboard", cat: "idea", sev: "P3", noted: "dallas", status: "open", title: "Search for power users", desc: "Users who know what they want should search by name instead of browsing.", fix: "Search bar above the compound list (name / category / keyword)." },
+  { id: "8c9a0ea1", rank: 74, screen: "Dashboard", cat: "idea", sev: "P3", noted: "austin", status: "open", title: "Make summary boxes clickable to edit", desc: "Each home box (goals, protocol, etc.) should be a clickable button that opens for editing — e.g. tap your goals list to change it in place.", fix: "Make goals/protocol/profile summary cards tappable, opening the existing edit flow inline. Pairs with Plan A home-screen work." },
+  { id: "bb7dd494", rank: 75, screen: "Dashboard", cat: "idea", sev: "P3", noted: "austin", status: "open", title: "Personalized avatar via selfie upload", desc: "Let users personalize the avatar with a facial selfie upload.", fix: "Plan E (photo capture) + Avaturn 'MAKE IT ME' path (currently disabled). Scaffold UI first; needs face→avatar pipeline decision before build." },
+  { id: "d92580fc", rank: 76, screen: "Dashboard", cat: "idea", sev: "P3", noted: "dallas", status: "open", title: "Compound list curation / Popular tag", desc: "Instead of a fixed 'commonly used' default, let the engine rank/optimize; consider a 'Popular' tag + filter chip so users can optionally surface common compounds. (Default-visible/hidden split was declined in favor of optimization.)", fix: "Add a 'Popular' tag to the compound data + an optional filter chip; defer the engine-ranked ordering to the recommendation-engine revamp." },
 
   // ── Onboarding ──
-  { id: 31, rank: 31, screen: "Onboarding", cat: "pain_point", sev: "P2", noted: "dallas", status: "open", title: "BF% note pre-decides the goal", desc: "The body-fat note already tells the user which goal to pursue — unnecessary for a learning app.", fix: "Neutral range label only." },
-  { id: 32, rank: 32, screen: "Onboarding", cat: "pain_point", sev: "P2", noted: "dallas", status: "open", title: "Advanced stats framing", desc: "Most users won't hit 'advanced'; reframe as an equipment-based optional prompt.", fix: "'If you have InBody/DEXA, expand Advanced Stats for an optimal experience.'" },
+  // (all onboarding items shipped in Session 3 — see CHANGELOG)
 
   // ── Modeler ──
-  { id: 33, rank: 33, screen: "Modeler", cat: "bug", sev: "P2", noted: "dallas", status: "open", title: "Training box doesn't save / wrong place", desc: "Training & lifestyle box doesn't save or affect anything, and surfaces after lock-in.", fix: "Wire it in, or move it to onboarding." },
-  { id: 34, rank: 34, screen: "Modeler", cat: "bug", sev: "P2", noted: "dallas", status: "open", title: "FFMI unexplained; 'Modeler' a poor word", desc: "Advanced stats are great but FFMI is unexplained — if the user doesn't know it, they're lost.", fix: "Tooltips; rename 'Modeler.'" },
   { id: 69, rank: 69, screen: "Modeler", cat: "bug", sev: "P2", noted: "austin", status: "deferred", title: "BF% inconsistent with projection screen", desc: "Modeler BF% differs from the projection screen for the same stack — two different projection engines.", fix: "DEFERRED — engine revamp: simulate() becomes the single source of truth (projection screen + avatar morph + Modeler), at a neutral/maintenance default. No interim number patching." },
 
-  // ── Progress ──
-  { id: 35, rank: 35, screen: "Progress", cat: "bug", sev: "P2", noted: "dallas", status: "open", title: "No cycle start / tracking", desc: "When did the cycle start? Nothing tracks it, and only 2 body measurements.", fix: "Set start at lock-in; show Week X of Y; more measurements." },
-  { id: 36, rank: 36, screen: "Progress", cat: "bug", sev: "P2", noted: "dallas", status: "open", title: "Subjective categories undefined", desc: "3 subjective categories, undefined, and shown only here — nowhere else in the app.", fix: "Define each; introduce at onboarding." },
-
   // ── Timeline ──
-  { id: 65, rank: 65, screen: "Timeline", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "No easy Home button", desc: "3 screens deep — there should be an easy Home button.", fix: "Add a Home affordance." },
-  { id: 71, rank: 71, screen: "Timeline", cat: "bug", sev: "P2", noted: "dallas", status: "open", title: "Cycle length editable on locked protocol", desc: "Cycle length shouldn't be editable on a locked protocol. Recommended stacks should have calculated cycles; build-your-own gets suggested timelines.", fix: "Lock cycle on committed; calculated cycles for recommended, suggested for build-your-own." },
+  { id: "73b5170e", rank: 73, screen: "Timeline", cat: "bug", sev: "P2", noted: "austin", status: "open", title: "GHK-Cu cycle too short (4 weeks)", desc: "GHK-Cu is recommended for only 4 weeks — not long enough to see results. Timelines must reflect real researched protocols.", fix: "ROOT CAUSE: data/protocolProtocols.js ghkcu has cycle.onWeeks/standardCycleWeeks = 4, yet its own week-by-week notes results 'mature with repeated 30-day cycles' (wks 5–8). FIX (data, <10 lines): extend ghkcu on-cycle to a researched 8–12 wks and align week-by-week. Part of the broader protocol-data review (credibility-sensitive — verify against literature)." },
 
   // ── Avatar ──
   { id: "lod", rank: "—", screen: "Avatar", cat: "idea", sev: "P3", noted: "dallas", status: "deferred", title: "Adaptive graphics quality (LOD)", desc: "#47 throttled every avatar globally; small 1–2 compound stacks could run full quality.", fix: "DEFERRED — scale fidelity inversely to stack size + device capability." },
@@ -235,7 +244,7 @@ export default function Triage() {
         })}
 
         <div style={{ marginTop: 28, fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center", fontStyle: "italic" }}>
-          Alki · ἀλκή · snapshot 2026-05-27 · source of truth: Supabase feedback table.
+          Alki · ἀλκή · snapshot 2026-05-28 · source of truth: Supabase feedback table.
         </div>
       </div>
     </div>

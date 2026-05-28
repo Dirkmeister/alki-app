@@ -76,7 +76,9 @@ function SupplyListSection({ stackIds }) {
 
 // ── 2. Reconstitution calculator (interactive, per injectable) ───
 function ReconCard({ p }) {
-  const r = p.reconstitution;
+  // Defensive: ReconSection only passes injectables that have `reconstitution`,
+  // but default to {} so this never reads off undefined if that filter changes.
+  const r = p.reconstitution || {};
   const [vialMg, setVialMg] = useState(r.defaultVialMg);
   const [bacWaterMl, setBacWaterMl] = useState(r.defaultBacWaterMl);
   const [doseMcg, setDoseMcg] = useState(r.perDoseMcg);

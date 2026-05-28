@@ -3672,7 +3672,10 @@ export default function AlkiApp() {
     let recoveryFired = false;
 
     // Subscribe FIRST so PASSWORD_RECOVERY can fire before getSession resolves.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    // Capture the whole return and optional-chain it — some supabase-js builds
+    // can hand back an unexpected shape, and a hard destructure here would crash
+    // the entire root render on mount.
+    const authListener = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "PASSWORD_RECOVERY") {
           recoveryFired = true;
@@ -3733,7 +3736,7 @@ export default function AlkiApp() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => authListener?.data?.subscription?.unsubscribe();
   }, []);
 
   // ── Auto-save profile on changes (debounced) ──

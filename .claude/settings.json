@@ -24,5 +24,19 @@
       "Write(.env.local)",
       "Bash(rm:public/*.glb)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/post-build-smoke.mjs",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
   }
 }
