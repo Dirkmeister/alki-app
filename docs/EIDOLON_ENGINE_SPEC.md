@@ -80,11 +80,11 @@
 - **Deurenberg (BMI-based fallback):** `BF% = 1.20 × BMI + 0.23 × age − 10.8 × sex − 5.4` (sex: M = 1, F = 0).
 - Navy method is accurate to ±3–4% vs DEXA (Hodgdon & Beckett 1984, NHRC); Deurenberg is the sanity fallback when no tape measurements exist.
 
-#### 2.3 Maximum-muscular-potential ceilings (Casey Butt, metric)
+#### 2.3 Maximum-muscular-potential ceilings (Casey Butt)
 
 - **Maximum LBM at 10% BF (men):**
-  `LBM_max = h^1.5 × (√Wr/22.6667 + √An/17.0100) × (BF%/224 + 1)` (with `h, Wr, An` in cm).
-- **Maximum regional cold circumferences (~10% BF, men):** use full Butt regressions from *Your Muscular Potential* (4th ed.); good first-order approximations:
+  `LBM_max = h^1.5 × (√Wr/22.6667 + √An/17.0100) × (BF%/224 + 1)` (with `h, Wr, An` in **inches**; output in **pounds**). **Units note (corrected 2026-05-27):** an earlier draft labeled these inputs "cm." The constants 22.6667 and 17.0100 are Casey L. Butt's published *imperial* regression coefficients — with cm inputs the formula returns ~16× too large. The Alki engine (`engine/derivations.js`) keeps state in SI and converts to inches/pounds internally before applying this formula, returning kg.
+- **Maximum regional cold circumferences (~10% BF, men):** use full Butt regressions from *Your Muscular Potential* (4th ed.); good first-order approximations (imperial: `LBM_max` in lb, `h/Wr/An` in inches, output inches):
   - Arm (cold): `C_arm ≈ 1.1 × √(LBM_max × 100 / h)`
   - Forearm: `C_forearm ≈ 1.6 × Wr`
   - Calf: `C_calf ≈ 1.95 × An`
