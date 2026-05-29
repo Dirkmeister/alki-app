@@ -2619,8 +2619,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
       {/* #61 — goal selection is inline while building/modifying (no longer hidden
-          behind a nav toggle); selected goals sort to the front, and the whole card
-          disappears once the protocol is locked in (committed mode). */}
+          behind a nav toggle); the whole card disappears once the protocol is locked
+          in (committed mode). Buttons render in fixed GOALS order — selection is
+          conveyed by active styling, not reordering (#B11: avoids jump-under-finger). */}
       {editing && (
         <div style={{ ...S.card, borderColor: 'rgba(26,232,122,0.2)' }}>
           <div style={{ ...S.label, marginBottom: 12 }}>
@@ -2628,9 +2629,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>· tap to choose</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
-            {[...GOALS]
-              .sort((a, b) => (((profile.goals || []).includes(a.id) ? 0 : 1) - ((profile.goals || []).includes(b.id) ? 0 : 1)))
-              .map(g => {
+            {GOALS.map(g => {
                 const active = (profile.goals || []).includes(g.id);
                 return (
                   <button key={g.id} onClick={() => handleGoalToggle(g.id)} style={{
