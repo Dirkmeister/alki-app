@@ -149,7 +149,7 @@ function ReconSection({ stackIds, onQA }) {
 const SITE_DOTS = {
   abdomen: [{ x: 100, y: 150 }],
   love_handle: [{ x: 76, y: 152 }, { x: 124, y: 152 }],
-  thigh: [{ x: 86, y: 232 }, { x: 114, y: 232 }],
+  thigh: [{ x: 86, y: 188 }, { x: 114, y: 188 }],
   delt: [{ x: 58, y: 96 }, { x: 142, y: 96 }],
   glute: [{ x: 84, y: 196 }, { x: 116, y: 196 }],
 };
