@@ -1,0 +1,19 @@
+
+> alki-app@0.1.0 dev
+> next dev
+
+⚠ Port 3000 is in use by process 24704, using available port 3001 instead.
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.1.97:3001
+- Environments: .env.local
+✓ Ready in 699ms
+⨯ Another next dev server is already running.
+
+- Local:        http://localhost:3000
+- PID:          24704
+- Dir:          D:\1File System\2Projects\alki-app
+- Log:          .next\dev\logs\next-development.log
+
+Run taskkill /PID 24704 /F to stop it.
+[?25h
