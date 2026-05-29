@@ -47,6 +47,7 @@
 
 import bpy
 import os
+import math
 
 # ── EDIT THESE TWO PER RUN ───────────────────────────────────────────
 GENDER = "male"        # "male" | "female"
@@ -68,18 +69,18 @@ OUTPUT_PATH = os.path.join(OUTPUT_DIR, f"alki_humgen_{GENDER}_{BODY_TYPE}.glb")
 # (body_mass / bf_high / bf_low) are genuinely different geometry.
 #   body_mass = the SINGLE broad-adiposity key — the gross whole-body
 #               soft-tissue envelope, from HumGen "overweight" (subcat main).
-#   bf_high   = LOCALIZED fat deposition (regional belly + flank). NOT a
-#               second copy of "overweight"; that is the point. §3.6: confirm
-#               these regional names against list_livekeys.py before trusting.
+#   bf_high   = FLANK deposition (waist + hips). NOT a second copy of
+#               "overweight", and NOT Belly Size (that is visceral's source) —
+#               keeping all three adiposity keys genuinely distinct geometry.
+#   visceral  = belly-FORWARD (Belly Size).
 #   bf_low    = lean direction (skinny), unchanged.
+# The three are instrumented below: the bake prints all three pairwise
+# cosines + max Δ before export so a collision is caught before the GLB.
 ALKI_FROM_LIVEKEYS = {
-    # ▼ broad whole-body adiposity (confirmed HumGen key) ▼
-    "body_mass":        ["overweight"],
-    "bf_low":           ["skinny"],
-    # ▼▼▼ §3.6 CONFIRM names — localized fat, kept DISTINCT from body_mass ▼▼▼
-    "bf_high":          ["Belly Size", "Stomach Size", "Love Handles"],
-    # ▲▲▲ candidates only; replace with confirmed HumGen mass-key names ▲▲▲
-    "visceral":         ["Belly Size"],
+    "body_mass":        ["overweight"],                  # gross envelope ×3
+    "bf_low":           ["skinny"],                      # lean direction
+    "bf_high":          ["Waist Thickness", "Hips Size"],  # flank (confirmed present)
+    "visceral":         ["Belly Size"],                  # belly-forward
     "muscle_overall":   ["muscular"],
     "muscle_chest":     ["Chest Muscles"],
     "muscle_shoulders": ["Shoulder Muscles", "Traps Muscles"],
@@ -111,12 +112,13 @@ MORPH_SCALE = {
     "muscle_overall": _MUSCLE, "muscle_chest": _MUSCLE,
     "muscle_shoulders": _MUSCLE, "muscle_arms": _MUSCLE,
     "muscle_back": _MUSCLE, "muscle_legs": _MUSCLE, "muscle_calves": _MUSCLE,
-    # body_mass now sources from "overweight" (a LARGE whole-body key), not
-    # the small belly candidates it used to — the old 3.5/2.0 would blow far
-    # past the disp band. Start at 1.0 so the FIRST build prints the RAW
-    # overweight max Δ, then set this to (target ÷ raw): target ~0.22 lean /
-    # ~0.12 heavy (check_glb bands 0.15–0.28 / 0.08–0.18).
-    "body_mass": 1.0,
+    # body_mass sources from "overweight", which displaces only ~0.068 raw on
+    # this mesh — far too weak for the gross-mass channel (band 0.15–0.28). ×3
+    # amplifies the baked delta to ~0.20, the SAME post-scale multiply the
+    # muscle keys use. (HEAVY-base caveat: "overweight" is already in the
+    # heavy BACKGROUND, so its marginal delta there is ~0 → body_mass needs a
+    # different source/recipe on the heavy base. Lean is correct at ×3.)
+    "body_mass": 3.0,
 }
 
 # Neck-seam band (spec §1.3/§3.7 #6): no morph should move this band; it is
@@ -261,6 +263,24 @@ def build():
               "matching vertex order).")
         return
 
+    # ── Neck-seam vertex set (spec §1.3/§3.7 #6) ──────────────────────
+    # Lock the head-attach reserve so NO morph disturbs the neck seam. The
+    # seam is defined in the EXPORTED mesh, whose Basis == `neutral` and whose
+    # up-axis becomes glTF +Y. We therefore pick seam verts from `neutral` on
+    # the empirically-detected up-axis (largest extent) — NOT from the raw
+    # pre-rebase Basis on a hardcoded .y. That space/axis mismatch is exactly
+    # why the earlier lock missed the seam. This set is the SAME indices
+    # check_glb step [8] measures, so locking them forces neck Δ == 0 there.
+    nlo, nhi = NECK_SEAM_Y
+    _ext = [max(c[a] for c in neutral) - min(c[a] for c in neutral) for a in range(3)]
+    UP = max(range(3), key=lambda a: _ext[a])
+    seam_idx = {i for i in range(len(neutral)) if nlo <= neutral[i][UP] <= nhi}
+    print(f"[Alki] Neck-seam lock: up-axis '{'xyz'[UP]}', band [{nlo},{nhi}] "
+          f"holds {len(seam_idx)}/{len(neutral)} verts (zeroed in every morph).")
+    if not seam_idx:
+        print("[Alki]   !! WARNING: no verts in the seam band — mesh scale/axis "
+              "differs from the 1.8-unit reference; inspect before trusting.")
+
     created = []
     for alki_key, source_lks in ALKI_FROM_LIVEKEYS.items():
         # Background + only this key's source livekeys active.
@@ -283,18 +303,16 @@ def build():
             kb = body.shape_key_add(name=alki_key, from_mix=False)
 
         # ── ISOLATED, SCALED delta: (deformed − neutral) × scale onto Basis
-        # NECK-SEAM LOCK (spec §1.3/§3.7 #6): any vertex whose BASIS Y sits in
-        # the head-attach reserve band gets ZERO displacement, so no morph can
-        # disturb the neck seam. Done here, relative to basis, so it survives
-        # the later rebase-onto-neutral untouched (old_delta == 0 → new co ==
-        # neutral). Applies to ALL bases (male/female × lean/heavy).
+        # NECK-SEAM LOCK: verts in `seam_idx` (computed above, in exported-Basis
+        # space) get ZERO displacement so no morph disturbs the neck seam. Set
+        # relative to basis, so it survives the rebase-onto-neutral untouched
+        # (old_delta == 0 → new co == neutral). Applies to ALL bases.
         scale = MORPH_SCALE.get(alki_key, 1.0)
-        nlo, nhi = NECK_SEAM_Y
         max_d = 0.0
         sum_d = 0.0
         neck_locked = 0
         for i in range(len(deformed)):
-            if nlo <= basis[i].y <= nhi:
+            if i in seam_idx:
                 kb.data[i].co = basis[i]          # locked: zero displacement
                 neck_locked += 1
                 continue
@@ -327,25 +345,24 @@ def build():
     print(f"[Alki] Created {len(created)} canonical keys: {created}")
 
     # ── Cross-key region signature (legs|torso|upper mean Δ) ──────────
+    # Classify by the SAME up-axis + exported-Basis (neutral) space as the
+    # seam lock, so the neck Δ reported here matches check_glb step [8].
     print("[Alki] Region signature per key (legs|torso|upper mean Δ) + neck-seam Δ:")
-    ys = [c.y for c in basis]
+    ys = [c[UP] for c in neutral]
     ymin, ymax = min(ys), max(ys); H = (ymax - ymin) or 1.0
-    nlo, nhi = NECK_SEAM_Y
 
     def region_means(kb):
-        legs = tor = arm = neck = 0.0
-        nl = nt = na = nn = 0
+        legs = tor = arm = 0.0
+        nl = nt = na = 0
         neck_max = 0.0
         for i in range(len(basis)):
             d = (kb.data[i].co - basis[i]).length
-            y = basis[i].y
-            fy = (y - ymin) / H
+            fy = (neutral[i][UP] - ymin) / H
             if fy < 0.45: legs += d; nl += 1
             elif fy < 0.82: tor += d; nt += 1
             else: arm += d; na += 1
-            if nlo <= y <= nhi:
-                neck += d; nn += 1
-                if d > neck_max: neck_max = d
+            if i in seam_idx and d > neck_max:
+                neck_max = d
         return (legs / max(nl, 1), tor / max(nt, 1),
                 arm / max(na, 1), neck_max)
 
@@ -357,6 +374,37 @@ def build():
         flag = "  << NECK MOVED!" if neck_max > 0.002 else ""
         print(f"[Alki]   {k:<16} legs={lg:.4f} torso={tr:.4f} "
               f"upper={ar:.4f} neckMaxΔ={neck_max:.4f}{flag}")
+
+    # ── Adiposity-trio distinctness (pre-export) ──────────────────────
+    # body_mass / bf_high / visceral MUST be three DIFFERENT shapes. Print the
+    # three max Δ and all three pairwise cosines BEFORE export, so a collision
+    # (two keys ~identical → |cos| near 1) is caught before the GLB is trusted.
+    # Deltas read here (kb.co − basis) are pre-rebase and identical to the
+    # exported deltas. check_glb re-checks body_mass↔bf_high on the file.
+    def _delta(name):
+        kb = body.data.shape_keys.key_blocks.get(name)
+        return [kb.data[i].co - basis[i] for i in range(len(basis))] if kb else None
+
+    def _cos(a, b):
+        if a is None or b is None:
+            return None
+        dot = sum(a[i].dot(b[i]) for i in range(len(a)))
+        na = math.sqrt(sum(v.length_squared for v in a))
+        nb = math.sqrt(sum(v.length_squared for v in b))
+        return dot / (na * nb + 1e-12)
+
+    trio = {k: _delta(k) for k in ("body_mass", "bf_high", "visceral")}
+    print("[Alki] Adiposity trio — max Δ:")
+    for k, d in trio.items():
+        print(f"[Alki]   {k:<10} " +
+              (f"max Δ {max(v.length for v in d):.4f}" if d else "(absent)"))
+    print("[Alki] Adiposity trio — pairwise cosine (want all |cos| < 0.5 = distinct):")
+    for a, b in (("body_mass", "bf_high"), ("body_mass", "visceral"),
+                 ("bf_high", "visceral")):
+        c = _cos(trio[a], trio[b])
+        flag = "  << COLLISION" if (c is not None and abs(c) >= 0.5) else ""
+        print(f"[Alki]   cos({a:<10}, {b:<10}) = " +
+              (f"{c:+.4f}{flag}" if c is not None else "n/a"))
 
     # ── Bake the gender/heavy body into Basis, strip extra shape keys ──
     # The Alki morphs were stored as basis + scaled(deformed − neutral). We
