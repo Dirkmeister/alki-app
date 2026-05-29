@@ -55,6 +55,52 @@ function thresholds(sex) {
 // Melanotan response ceiling by skin type: Fp I caps ~0.4, Fp IV+ → 1.0.
 const FITZPATRICK_TAN_CAP = { 1: 0.40, 2: 0.55, 3: 0.75, 4: 1.0, 5: 1.0, 6: 1.0 };
 
+// ── Muscle sigmoid shape (§4.2b — Avatar Range, Stage 0) ─────
+// mo = sigmoid((lbmRatio − center) × slope). Reshaped from the original
+// (center 0.70, slope 8). The old curve put the whole natural→heavy
+// range inside the saturating shoulder: a fit FFMI-21.8 body already
+// read 0.70, and everything above the natural ceiling pinned to ~1.0, so
+// a 185 lb and a 285 lb male of the same frame and the same 18% BF
+// collapsed into a 0.29 sliver near the top (the avatar-range bug).
+// Re-centering on the natural ceiling (0.85) and roughly halving the
+// slope (4.0) gives the natural band real morph travel and lets enhanced
+// LBM (ratio > 1) keep climbing GRADUALLY instead of slamming to 1.0 —
+// growth past the natural wall now reads as a gradient, not a pin.
+// The engine STATE (LBM, BF, ceilings) is unchanged; this is a LENS
+// change only (deviation #2 in the §-coherence audit — a documented,
+// deliberate evolution, not a fix layered on a bug). Tunable via the
+// debug panel.
+const MUSCLE_SIGMOID_CENTER = 0.85;
+const MUSCLE_SIGMOID_SLOPE  = 4.0;
+
+// ── Mass / adiposity channel (§4.2a — Avatar Range, Stage 0) ─
+// `body_mass` is an INDEPENDENT total-mass signal, computed from absolute
+// adiposity relative to frame — NOT laundered through the muscle sigmoid.
+// It is what was structurally missing: two bodies at the same BF% but very
+// different weight (the 185 vs 285 lb @ 18% reference case) have bf_low =
+// bf_high_rel = 0 (both fat channels are relative to the user's OWN
+// baseline), so before this every distinguishing signal flowed through
+// muscle. Two terms:
+//   • fmiTerm — fat-mass index (FM / height²) vs a population neutral.
+//     THIS is the absolute-fat-burden discriminator that separates two
+//     same-BF% bodies (the 285 lb man simply carries more fat in kg).
+//   • relTerm — BF% above a population neutral (not the user's baseline),
+//     the relative-adiposity contribution that grows with how heavy the
+//     body is for its leanness.
+// Sex-branched neutrals (women carry more essential/storage fat). Output
+// is normalized [0,1] and drives the new `body_mass` shape key once its
+// geometry ships (Stage 3). Until then it also nudges bf_high (the only
+// "heavy" key on the current mesh) so the heavy body reads heavier NOW.
+const BODY_MASS_NEUTRAL = {
+  male:   { fmiNeutral: 4.0, fmiSpan: 13, bfNeutral: 15, bfSpan: 25 },
+  female: { fmiNeutral: 5.5, fmiSpan: 13, bfNeutral: 23, bfSpan: 25 }
+};
+// Stage-0 bridge: fraction of body_mass folded into bf_high so the gross
+// mass channel is visible on the CURRENT mesh (which has no body_mass
+// shape key yet). Revisit when the body_mass geometry ships (Stage 3) —
+// at that point body_mass drives its own geometry and this can shrink/drop.
+const BODY_MASS_TO_BF_HIGH = 0.7;
+
 /**
  * Map a single simulation state snapshot to morph keys.
  *
@@ -91,18 +137,32 @@ export function mapState(state, ctx) {
   const androgenTone = state.androgenTone || 0;
   const vasodilator = state.vasodilatorBoost || 0;
 
+  // ── body_mass (§4.2a): independent mass/adiposity channel ────
+  // Absolute fat burden relative to frame, plus relative adiposity vs a
+  // population neutral. Independent of the muscle sigmoid below.
+  const heightM = (ctx.heightCm || 0) / 100;
+  const fatMassKg = (typeof state.FM === "number" ? state.FM : (state.BF || 0) * (state.BW || 0)) || 0;
+  const bmCfg = BODY_MASS_NEUTRAL[sex];
+  const fmi = heightM > 0 ? fatMassKg / (heightM * heightM) : 0;
+  const fmiTerm = clamp((fmi - bmCfg.fmiNeutral) / bmCfg.fmiSpan, 0, 1);
+  const relTerm = clamp((BFpct - bmCfg.bfNeutral) / bmCfg.bfSpan, 0, 1);
+  const body_mass = clamp(0.6 * fmiTerm + 0.4 * relTerm, 0, 1);
+
   // ── bf_low (§7): leanness gained relative to the user's baseline ──
   const bf_low = clamp(BF0 > 0 ? 1 - BF / BF0 : 0, 0, 1);
   // bf_high — avatar key for ADDED adiposity (BF rose above baseline).
-  // Fat-loss stacks never push this; included so the mapper output is a
-  // complete, avatar-ready vector.
-  const bf_high = clamp(BF0 > 0 ? (BF - BF0) / BF0 : 0, 0, 1);
+  // Fat-loss stacks never push the relative term; the body_mass bridge
+  // (Stage 0) folds in gross mass so the current mesh shows heaviness.
+  const bf_high_rel = clamp(BF0 > 0 ? (BF - BF0) / BF0 : 0, 0, 1);
+  const bf_high = clamp(bf_high_rel + body_mass * BODY_MASS_TO_BF_HIGH, 0, 1);
 
-  // ── muscle_overall (§7) + regional androgen bias ─────────────
-  // §7 form: sigmoid((LBM / LBM_max − 0.7) × 8). LBM_max is the NATURAL
-  // ceiling here (see note above); enhanced LBM can push the ratio past 1.
+  // ── muscle_overall (§4.2b) + regional androgen bias ──────────
+  // sigmoid((LBM / LBM_max − center) × slope). LBM_max is the NATURAL
+  // ceiling (see note above); enhanced LBM can push the ratio past 1.
+  // Center/slope reshaped to give the natural band travel and to stop the
+  // above-ceiling pin (see MUSCLE_SIGMOID_* notes).
   const lbmRatio = LBM_max_ref > 0 ? state.LBM / LBM_max_ref : 0;
-  const mo = clamp(sigmoid((lbmRatio - 0.7) * 8), 0, 1);
+  const mo = clamp(sigmoid((lbmRatio - MUSCLE_SIGMOID_CENTER) * MUSCLE_SIGMOID_SLOPE), 0, 1);
   const muscle_chest     = clamp(mo * (0.95 + 0.10 * androgenTone), 0, 1);
   const muscle_shoulders = clamp(mo * (0.95 + 0.15 * androgenTone), 0, 1);
   const muscle_arms      = clamp(mo * (0.95 + 0.15 * androgenTone), 0, 1);
@@ -203,6 +263,7 @@ export function mapState(state, ctx) {
     // ── Avatar-compatible morph keys (match MORPH_TARGETS) ──
     bf_low,
     bf_high,
+    body_mass,
     visceral,
     water,
     muscle_overall: mo,

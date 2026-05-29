@@ -15,6 +15,7 @@ import ProgressPhotos from "./screens/ProgressPhotos";
 import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
+import { selectBaseMesh } from "./lib/selectBaseMesh";
 import { getStackVectors } from "./lib/compoundMorphVectors";
 import { simulate } from "./engine/simulate";
 import { mapToMorphs } from "./engine/mapToMorphs";
@@ -3654,9 +3655,12 @@ export default function AlkiApp() {
 
   useEffect(() => {
     try {
-      const savedUrl = localStorage.getItem("alki_avatar_url");
+      // NOTE: the `alki_avatar_url` mirror is intentionally NOT read to drive
+      // the base mesh — base selection is derived from the profile via
+      // selectBaseMesh() at the load/onboarding sites (Avatar Range, Stage 1).
+      // A stored URL must not pin or re-break the per-profile selection. The
+      // localStorage key is left in place for the disabled Avaturn path.
       const savedShot = localStorage.getItem("alki_avatar_headshot");
-      if (savedUrl) setAvatarUrl(savedUrl);
       if (savedShot) setAvatarHeadshot(savedShot);
     } catch (_) {}
   }, []);
@@ -3714,8 +3718,10 @@ export default function AlkiApp() {
           if (saved) {
             setProfile(saved.profile);
             setSelectedCompounds(saved.selectedCompounds || []);
-            // 3D default always on; only override if a saved avatar exists.
-            setAvatarUrl(saved.avatarUrl || DEFAULT_AVATAR_URL);
+            // Base mesh is derived from the profile (Avatar Range, Stage 1) —
+            // NOT the stored avatar_url, which is reserved for the future
+            // custom-mesh override and would otherwise pin/re-break selection.
+            setAvatarUrl(selectBaseMesh(saved.profile));
             setActiveProtocol(saved.activeProtocol || null);
             setEidolons(saved.eidolons || []);
             setActiveEidolonId(saved.activeEidolonId || null);
@@ -3743,10 +3749,16 @@ export default function AlkiApp() {
     if (!supabase || !user || !profile) return;
     clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
-      saveProfile(user.id, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId);
+      // Persist NULL for avatar_url (Avatar Range, Stage 1): that column is
+      // reserved for the future custom-mesh override, where a non-null value
+      // means "use the custom mesh instead of the profile-selected base."
+      // The live base is derived from the profile via selectBaseMesh(), so we
+      // must NOT write the selected base path here, or the future override
+      // read would treat it as a custom mesh and re-break selection.
+      saveProfile(user.id, profile, selectedCompounds, null, activeProtocol, eidolons, activeEidolonId);
     }, 1500);
     return () => clearTimeout(saveTimeout.current);
-  }, [user, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId]);
+  }, [user, profile, selectedCompounds, activeProtocol, eidolons, activeEidolonId]);
 
   const cultivationState = useMemo(() => {
     // Filter progress logs to the active eidolon for cultivation state
@@ -3808,8 +3820,9 @@ export default function AlkiApp() {
     if (saved) {
       setProfile(saved.profile);
       setSelectedCompounds(saved.selectedCompounds || []);
-      // 3D default always on; only override if a saved avatar exists.
-      setAvatarUrl(saved.avatarUrl || DEFAULT_AVATAR_URL);
+      // Base mesh derived from the profile (Avatar Range, Stage 1); the
+      // stored avatar_url is reserved for the future custom-mesh override.
+      setAvatarUrl(selectBaseMesh(saved.profile));
       setActiveProtocol(saved.activeProtocol || null);
       setEidolons(saved.eidolons || []);
       setActiveEidolonId(saved.activeEidolonId || null);
@@ -3881,7 +3894,7 @@ export default function AlkiApp() {
             setActiveProtocol(null);
             setEidolons([]);
             setActiveEidolonId(null);
-            setAvatarUrl(DEFAULT_AVATAR_URL);
+            setAvatarUrl(selectBaseMesh(BASELINE_PROFILE));
             setAvatarHeadshot(null);
             setOnboardingStartStep(0);
             setScreen("onboarding");
@@ -3896,7 +3909,7 @@ export default function AlkiApp() {
             setActiveProtocol(null);
             setEidolons([]);
             setActiveEidolonId(null);
-            setAvatarUrl(DEFAULT_AVATAR_URL);
+            setAvatarUrl(selectBaseMesh(CRASH_REPRO_PROFILE));
             setAvatarHeadshot(null);
             setOnboardingStartStep(null);
             setScreen("dashboard");
@@ -3929,6 +3942,10 @@ export default function AlkiApp() {
             setEidolons(prev => [...(prev || []).filter(e => e.id !== eid.id), eid]);
             setActiveEidolonId(eid.id);
             setProfile(p);
+            // Select the base mesh from the just-completed profile so a new
+            // user (incl. female) gets the right body immediately, not only
+            // after a reload (Avatar Range, Stage 1).
+            setAvatarUrl(selectBaseMesh(p));
             setOnboardingStartStep(null);
             setScreen("dashboard");
           }}

@@ -4,18 +4,22 @@
 // material in-code (Body3DAvatar.jsx), so these embedded textures are dead
 // weight (~42MB of HumGen freckle/albedo maps we never use).
 //
-// RUN from repo root:  node blender_scripts/strip_textures.mjs
-// Requires: npx/npm available (uses @gltf-transform/core, auto-installed via npx)
+// RUN from repo root:
+//   node blender_scripts/strip_textures.mjs [src.glb] [out.glb]
+//   default src = public/alki_humgen_male.glb; default out = <src>_slim.glb
+// For the 4-base build, prefer:  node blender_scripts/slim_all_bases.mjs
+// Requires: @gltf-transform/core + functions (already in node_modules).
 //
-// Reads:  public/alki_humgen_male.glb
-// Writes: public/alki_humgen_male_slim.glb   (original left intact)
+// The v5 build script already exports with no materials/textures/vertex
+// colors, so on a freshly-built base this is mostly a prune/no-op safety
+// pass — but it stays the per-file slimmer and guards the morph count.
 
 import { NodeIO } from '@gltf-transform/core';
 import { prune } from '@gltf-transform/functions';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 
-const SRC = 'public/alki_humgen_male.glb';
-const OUT = 'public/alki_humgen_male_slim.glb';
+const SRC = process.argv[2] || 'public/alki_humgen_male.glb';
+const OUT = process.argv[3] || SRC.replace(/\.glb$/i, '_slim.glb');
 
 const io = new NodeIO();
 const doc = await io.read(SRC);

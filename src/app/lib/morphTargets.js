@@ -46,6 +46,13 @@ export const MORPH_TARGETS = [
     notes: "Higher adiposity. Soft tissue distribution thickens at the waist (male) or hips/thighs (female). Face fuller. Limb circumference larger."
   },
   {
+    key: "body_mass",
+    range: [0, 1],
+    default: 0,
+    category: "adiposity",
+    notes: "Gross total-mass / soft-tissue envelope, driven by ABSOLUTE adiposity relative to frame (fat-mass index + relative BF), independent of the muscle channel. Real soft-tissue distribution — abdomen low+forward, flank fullness, soft chest pad, proximal limb girth, mild facial fullness — NOT uniform inflation. The honest 'heavy body' key the single bf_high morph could not carry. Sculpted on all four bases (Stage 3); the new 14th geometry key."
+  },
+  {
     key: "visceral",
     range: [0, 1],
     default: 0,
@@ -225,22 +232,32 @@ export function baselineMorphState(profile) {
     }
   }
 
-  // ── Muscle baseline (frame-aware via FFMI) ───────────────────────
+  // ── Muscle baseline (frame-aware, natural-ceiling sigmoid) ───────
   // A 140lb / 5'7" lean male and a 210lb / 6'2" lean male must NOT get
-  // the same muscle weight. We estimate fat-free mass index (FFMI)
-  // from weight + height + BF and map it onto HumGen's muscular morph.
+  // the same muscle weight. We estimate FFMI from weight + height + BF.
   //
-  // HumGen's "muscular" shape key at 1.0 is an extreme/enhanced
-  // physique, so we deliberately keep natural FFMIs (~17–25) in the
-  // lower half of the range, leaving headroom for compound projections
-  // to push the morph higher.
+  // This MIRRORS the live engine driver (engine/mapToMorphs.js §4.2b):
+  // map FFMI onto a natural-ceiling RATIO (FFMI / 25 M, / 22 F), then run
+  // it through the reshaped sigmoid so the natural band gets real travel
+  // and very high FFMI no longer hard-pins to 1.0. The OLD linear map
+  // ((FFMI − 16.5)/16) pinned every body above FFMI ≈ 32.5 to 1.0 — the
+  // fallback half of the avatar-range bug. This path runs only when the
+  // engine can't (incomplete profile); the live path is the engine.
   //
-  // FFMI reference: ~18 untrained, ~20 fit, ~22–23 very muscular
-  // natural, ~25 natural limit, >25 enhanced territory.
-  // TUNING: if the baseline body still looks too big/small, adjust the
-  // offsets below (raise offset = leaner baseline).
-  const M_OFFSET = sex === "female" ? 13.5 : 16.5;
-  const M_SPAN   = sex === "female" ? 15 : 16;
+  // FFMI reference: ~18 untrained, ~20 fit, ~22–23 very muscular natural,
+  // ~25 natural limit, >25 enhanced territory.
+  const FFMI_CEILING = sex === "female" ? 22 : 25;
+  const MUSCLE_SIGMOID_CENTER = 0.85;
+  const MUSCLE_SIGMOID_SLOPE  = 4.0;
+  const sigmoid = x => 1 / (1 + Math.exp(-x));
+
+  // body_mass (mirror of engine §4.2a): gross mass channel from absolute
+  // adiposity relative to frame, independent of the muscle channel.
+  // Sex-branched neutrals; bridges into bf_high until body_mass geometry
+  // ships (Stage 3). BM_TO_BF_HIGH matches the engine bridge constant.
+  const bmFmiNeutral = sex === "female" ? 5.5 : 4.0;
+  const bmBfNeutral  = sex === "female" ? 23 : 15;
+  const BM_FMI_SPAN = 13, BM_BF_SPAN = 25, BM_TO_BF_HIGH = 0.7;
 
   const weight = parseFloat(profile.weight); // lbs
   const hFt = parseFloat(profile.heightFt);
@@ -251,11 +268,19 @@ export function baselineMorphState(profile) {
 
   let muscleBaseline = sex === "male" ? 0.22 : 0.16; // fallback if frame unknown
   if (!isNaN(weight) && !isNaN(heightInches) && heightInches > 0) {
-    const lbmLb = weight * (1 - bf / 100);   // lean body mass (lb)
-    const lbmKg = lbmLb / 2.2046;
     const hM = heightInches * 0.0254;
+    const lbmKg = (weight * (1 - bf / 100)) / 2.2046;
     const ffmi = lbmKg / (hM * hM);
-    muscleBaseline = (ffmi - M_OFFSET) / M_SPAN;
+    const lbmRatio = ffmi / FFMI_CEILING;
+    muscleBaseline = sigmoid((lbmRatio - MUSCLE_SIGMOID_CENTER) * MUSCLE_SIGMOID_SLOPE);
+
+    // Gross mass channel from absolute fat-mass index + relative BF.
+    const fatKg = (weight * (bf / 100)) / 2.2046;
+    const fmi = fatKg / (hM * hM);
+    const fmiTerm = Math.max(0, Math.min(1, (fmi - bmFmiNeutral) / BM_FMI_SPAN));
+    const relTerm = Math.max(0, Math.min(1, (bf - bmBfNeutral) / BM_BF_SPAN));
+    state.body_mass = Math.max(0, Math.min(1, 0.6 * fmiTerm + 0.4 * relTerm));
+    state.bf_high = Math.max(0, Math.min(1, state.bf_high + state.body_mass * BM_TO_BF_HIGH));
   }
   state.muscle_overall = Math.max(0, Math.min(1, muscleBaseline));
 
