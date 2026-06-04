@@ -113,17 +113,16 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
     cloned.position.set(0, 0, 0);
     cloned.scale.set(1, 1, 1);
 
+    // ── SCALE basis: the morph-UNION box ─────────────────────────────
+    // THREE.computeBoundingBox expands the box by EVERY morph target at full
+    // influence, so this box (and `modelHeight`) is the union of all morph
+    // extents — constant across the current morph state. We deliberately use it
+    // for SCALE only: tying scale to a fixed unit keeps it jitter-free as
+    // body_mass animates (a morph never changes this box, so the height anchor
+    // never wobbles). It is the WRONG box to center on, though — see below.
     const box = new THREE.Box3().setFromObject(cloned);
     const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
     box.getSize(size);
-    box.getCenter(center);
-
-    // NOTE: THREE.computeBoundingBox expands the box by EVERY morph target at
-    // full influence, so `box`/`center`/`modelHeight` are the union of all morph
-    // extents — stable across the current morph state. That's why the old
-    // `1.7 / modelHeight` could never grow with a morph (the box never changes),
-    // and why centering on this box is jitter-free as body_mass animates.
     const modelHeight = Math.max(size.y, 0.001);
 
     // (1) Base unit — normalize the authored height to a known unit. This sets
@@ -140,16 +139,43 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
 
     const scale = baseUnit * heightFactor * massFactor;
 
-    // Recenter on the (scaled) bounds — fixes "avatar not centered".
+    // ── CENTERING basis: the ACTUAL current-morph bounds ─────────────
+    // The union box above is biased away from the displayed body — HumGen
+    // morphs push asymmetrically (belly forward in +Z, traps/shoulders up in
+    // +Y), so the union center sits off the real centroid by a fixed model-space
+    // bias B. Centering on it pins the BIASED center to the anchor, leaving the
+    // real body at `anchor − B·scale`; since S4 grows `scale` with mass, that
+    // drift grows too — a heavy body lands further off-center than a lean one.
+    // Measuring with precise:true walks the real vertices through
+    // Mesh.getVertexPosition (applies the CURRENT morph influences + skinning),
+    // so we center on what's actually on screen. No bias term ⇒ the body sits
+    // centered identically at every size, lean→heavy. (Apply influences first so
+    // this measurement reflects the live morph state on the very first render,
+    // not just after the morph effect below has run.)
+    if (useShapeKeys && morphState) {
+      for (const { mesh, keyMap } of morphInventory) {
+        if (!mesh.morphTargetInfluences) continue;
+        for (const [canonical, morphIndex] of Object.entries(keyMap)) {
+          const weight = morphState[canonical];
+          if (typeof weight === "number" && !isNaN(weight)) {
+            mesh.morphTargetInfluences[morphIndex] = weight;
+          }
+        }
+      }
+    }
+    const liveBox = new THREE.Box3().setFromObject(cloned, true);
+    const center = new THREE.Vector3();
+    liveBox.getCenter(center);
+
     const offsetX = -center.x * scale;
     const offsetZ = -center.z * scale;
-    // Vertical: large/full-body view centers the bbox midpoint on the camera
-    // anchor, so lean & heavy both sit centered and growth expands symmetrically
-    // (no clipping to one end). Small/cropped view keeps feet on the floor to
-    // preserve its existing high crop.
+    // Vertical: large/full-body view centers the current bounds' midpoint on the
+    // camera anchor, so lean & heavy both sit centered and growth expands
+    // symmetrically (no clipping to one end). Small/cropped view keeps feet on
+    // the floor to preserve its existing high crop.
     const offsetY = centerVertically
       ? anchorY - center.y * scale
-      : -box.min.y * scale;
+      : -liveBox.min.y * scale;
 
     if (typeof window !== "undefined") {
       // eslint-disable-next-line no-console
@@ -163,12 +189,13 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
         massFactor: massFactor.toFixed(3),
         scaleFactor: scale.toFixed(3),
         scaledHeight: (modelHeight * scale).toFixed(3),
+        liveCenter: center.toArray().map(n => n.toFixed(3)),
         appliedOffset: [offsetX.toFixed(3), offsetY.toFixed(3), offsetZ.toFixed(3)],
         morphMode: useShapeKeys ? "shape_keys" : "legacy_scale"
       });
     }
     return { scale, offsetX, offsetY, offsetZ };
-  }, [cloned, useShapeKeys, heightCm, sizeBodyMass, sizeMuscle, centerVertically, anchorY]);
+  }, [cloned, useShapeKeys, morphState, morphInventory, heightCm, sizeBodyMass, sizeMuscle, centerVertically, anchorY]);
 
   // ── Apply morph state to shape keys (SHAPE-KEY MODE) ─────────────
   useEffect(() => {
