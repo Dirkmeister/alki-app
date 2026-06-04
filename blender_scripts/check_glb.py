@@ -36,7 +36,7 @@ MUSCLE_KEYS = ["muscle_overall", "muscle_chest", "muscle_shoulders",
 PLACEHOLDERS = ["water", "abs_def", "vascularity"]
 
 # §3.7 acceptance bands.
-BODY_MASS_DISP = {"lean": (0.15, 0.28), "heavy": (0.08, 0.18)}  # spec 0.18-0.25 / 0.10-0.15 + tolerance
+BODY_MASS_DISP = {"lean": (0.15, 0.28), "heavy": (0.15, 0.28)}  # Composition C is independent of the heavy neutral (not derived from overweight), so both bases use the same band
 MUSCLE_OVERALL_DISP = (0.035, 0.075)   # spec target ~0.05
 # Adiposity-trio CLONE gate. This threshold's real job is catching SCALED-CLONE
 # keys (cosine ~0.85–1.0 — e.g. the body_mass==visceral collision we hit when two

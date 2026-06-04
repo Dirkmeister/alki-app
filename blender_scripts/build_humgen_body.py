@@ -99,7 +99,21 @@ def get_content_root():
 # body_mass (overweight); bf_high is flank deposition (waist+hips), visceral
 # is belly-forward — three genuinely distinct adiposity shapes.
 ALKI_FROM_NPZ = {
-    "body_mass":        ["livekeys/body_proportions/main/{g}_overweight.npz"],
+    # Composition C — distributed adiposity from individual levers, NOT the
+    # overweight macro (which inflates spherically). Each tuple is (path, weight);
+    # bare strings are ×1.0. The Torso/Legs/Arms/face files are SHARED (not
+    # gendered), so this composition is identical for male and female — only
+    # the final MORPH_SCALE differs. cos vs bf_high = 0.55, vs visceral = 0.54.
+    "body_mass":        [
+        ("livekeys/body_proportions/Torso/Belly Size.npz", 0.7),      # abdomen forward
+        ("livekeys/body_proportions/Torso/Hips Size.npz", 0.3),       # pelvis/flank (low — bf_high carries the primary)
+        ("livekeys/body_proportions/Legs/Thigh Thickness.npz", 1.2),  # proximal limb — the unique distribution signal
+        ("livekeys/body_proportions/Arms/Upper Arm Thickness.npz", 1.0),
+        ("livekeys/body_proportions/Arms/Forearm Thickness.npz", 0.5),
+        ("livekeys/body_proportions/Legs/Shin Thickness.npz", 0.6),
+        ("livekeys/face_proportions/cheeks/cheek_fullness.npz", 0.6), # facial fullness
+        ("livekeys/face_proportions/jaw/jaw_width.npz", 0.4),         # facial width
+    ],
     "bf_low":           ["livekeys/body_proportions/main/{g}_skinny.npz"],
     "bf_high":          ["livekeys/body_proportions/Torso/Waist Thickness.npz",
                          "livekeys/body_proportions/Torso/Hips Size.npz"],
@@ -144,7 +158,7 @@ HEAVY_OVERWEIGHT_FRAC = 1.0
 # check_glb: the shared −ow term makes cos(body_mass, visceral) = −0.93
 # (clone gate), cos(muscle_chest, muscle_legs) = +0.93, and pushes
 # muscle_overall to 0.088 — out of its 0.035–0.075 band.)
-HEAVY_RELATIVE_KEYS = {"body_mass", "bf_low"}
+HEAVY_RELATIVE_KEYS = {"bf_low"}
 
 # §3.3 muscle re-sculpt + §3.2 body_mass magnitude — per-key delta scale.
 # EXACT vectorized multiply on the summed npz deltas:
@@ -159,12 +173,12 @@ HEAVY_RELATIVE_KEYS = {"body_mass", "bf_low"}
 #                      weaker (raw max 0.0405 vs male 0.0681): ×3.5 only
 #                      reached 0.142 (failed the lean band). ×3.75 → 0.152.
 _MUSCLE = 1.8
-_BODY_MASS_SCALE = {"male": 3.5, "female": 3.75}
+_BODY_MASS_SCALE = 5.3  # Composition C raw max ~0.038; ×5.3 → ~0.20 (lean band 0.15–0.28)
 MORPH_SCALE = {
     "muscle_overall": _MUSCLE, "muscle_chest": _MUSCLE,
     "muscle_shoulders": _MUSCLE, "muscle_arms": _MUSCLE,
     "muscle_back": _MUSCLE, "muscle_legs": _MUSCLE, "muscle_calves": _MUSCLE,
-    "body_mass": _BODY_MASS_SCALE[GENDER],
+    "body_mass": _BODY_MASS_SCALE,
 }
 
 # ── body_mass CHEST TAPER (male gynecomastia fix, 2026-06-03) ────────
@@ -375,15 +389,17 @@ def build():
     created = []
     np_deltas = {}  # alki key -> final (nverts,3) delta, in basis space
     for alki_key, sources in ALKI_FROM_NPZ.items():
-        rel_paths = [s.format(g=GENDER) for s in sources]
         total = np.zeros((nverts, 3), dtype=np.float64)
-        for rel in rel_paths:
-            total += load_npz_delta(content_root, rel, nverts)
+        for src in sources:
+            if isinstance(src, tuple):
+                rel, weight = src[0].format(g=GENDER), src[1]
+            else:
+                rel, weight = src.format(g=GENDER), 1.0
+            total += load_npz_delta(content_root, rel, nverts) * weight
 
-        # Gyno fix: attenuate the chest region of body_mass's overweight
-        # source BEFORE the scale (belly/hips stay full strength).
-        if alki_key == "body_mass":
-            total = total * taper_w[:, None]
+        # (Chest taper removed — Composition C does not use overweight, so the
+        # male gyno issue that motivated the taper does not arise. The taper
+        # infrastructure is kept above for potential future use.)
 
         scale = MORPH_SCALE.get(alki_key, 1.0)
         delta = total * scale
@@ -412,20 +428,24 @@ def build():
         sc = f" ×{scale}" if scale != 1.0 else ""
         rel_note = " (rel. to heavy neutral)" if (
             ow_in_neutral is not None and alki_key in HEAVY_RELATIVE_KEYS) else ""
-        names = [os.path.basename(p) for p in rel_paths]
-        print(f"[Alki] Baked {alki_key!r} from {names}{sc}{rel_note}  "
+        src_names = [os.path.basename(s[0] if isinstance(s, tuple) else s) for s in sources]
+        weights_str = ", ".join(f"{os.path.basename(s[0])}@{s[1]}" if isinstance(s, tuple) else os.path.basename(s) for s in sources)
+        print(f"[Alki] Baked {alki_key!r} from [{weights_str}]{sc}{rel_note}  "
               f"(max Δ {float(lens.max()):.4f}, mean Δ {float(lens.mean()):.5f}, "
               f"neck-locked {n_seam})")
         if alki_key == "body_mass":
-            # Gyno check: track the vertex where RAW overweight peaks (the
-            # chest/breast vertex, height-frac ~0.63 on the male mesh) and
-            # report its tapered displacement. Untapered ×3.0 read ~0.204.
-            raw_ow = sum(load_npz_delta(content_root, p, nverts) for p in rel_paths)
-            gyno_i = int(np.argmax(np.linalg.norm(raw_ow, axis=1)))
-            print(f"[Alki]   body_mass gyno check: raw-overweight peak vertex "
-                  f"(frac {height_frac[gyno_i]:.3f}, taper w "
-                  f"{taper_w[gyno_i]:.3f}) now displaces "
-                  f"{float(lens[gyno_i]):.4f} (untapered ×3.0 was ~0.204)")
+            # Distribution check: report per-region mean Δ to confirm the
+            # composition is distributed (legs ≈ torso), not belly-only.
+            up_co = neutral[:, UP]
+            h_lo, h_hi = float(up_co.min()), float(up_co.max())
+            h_span = (h_hi - h_lo) or 1.0
+            hf = (up_co - h_lo) / h_span
+            bm_legs = float(lens[hf < 0.45].mean()) if (hf < 0.45).any() else 0
+            bm_torso = float(lens[(hf >= 0.45) & (hf < 0.82)].mean()) if ((hf >= 0.45) & (hf < 0.82)).any() else 0
+            bm_upper = float(lens[hf >= 0.82].mean()) if (hf >= 0.82).any() else 0
+            print(f"[Alki]   body_mass distribution: legs={bm_legs:.5f} "
+                  f"torso={bm_torso:.5f} upper={bm_upper:.5f} "
+                  f"(want legs ≈ torso, not belly-only)")
         if lens.max() < 1e-4:
             print(f"[Alki]   !! WARNING: {alki_key!r} barely moved — its npz "
                   f"source(s) may be empty/wrong.")

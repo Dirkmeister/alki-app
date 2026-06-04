@@ -3795,15 +3795,15 @@ export default function AlkiApp() {
   }, []);
 
   const handleResetAvatar = useCallback(() => {
-    // 3D body is always on, so "reset" returns to the default parametric
-    // body (not null, which would drop to the 2D SVG with no way back).
-    setAvatarUrl(DEFAULT_AVATAR_URL);
+    // 3D body is always on, so "reset" returns to the profile-derived base
+    // (respects sex + lean/heavy selection), not a hardcoded male default.
+    setAvatarUrl(profile ? selectBaseMesh(profile) : DEFAULT_AVATAR_URL);
     setAvatarHeadshot(null);
     try {
       localStorage.removeItem("alki_avatar_url");
       localStorage.removeItem("alki_avatar_headshot");
     } catch (_) {}
-  }, []);
+  }, [profile]);
 
   const handleSignOut = async () => {
     if (supabase) await supabase.auth.signOut();
