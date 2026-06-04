@@ -337,9 +337,14 @@ export default function Body3DAvatar({
   const effectiveParams =
     debugPanel && override ? { ...params, morphState: override } : params;
 
+  // `margin: 0 auto` is load-bearing: this is a block element with a maxWidth
+  // smaller than its container (e.g. the 280px hero slot in AlkiApp). The parent
+  // uses `textAlign: center`, which only centers INLINE content — a block child
+  // ignores it and pins left, shifting the whole canvas (and the x=0-centered
+  // body inside it) off to the left. Auto side-margins center the block itself.
   const wrapStyle = isSmall
-    ? { width: "100%", aspectRatio: "1 / 1.2", maxWidth: 110 }
-    : { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 200 };
+    ? { width: "100%", aspectRatio: "1 / 1.2", maxWidth: 110, margin: "0 auto" }
+    : { width: "100%", aspectRatio: "1 / 1.6", maxWidth: 200, margin: "0 auto" };
 
   const setKey = (k, v) =>
     setOverride(prev => ({ ...(prev || {}), [k]: v }));
