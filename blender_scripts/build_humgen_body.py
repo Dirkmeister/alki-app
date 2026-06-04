@@ -324,16 +324,45 @@ def build():
     bpy.context.view_layer.objects.active = body
 
     # ── Basis + neutral ────────────────────────────────────────────────
-    # basis   = Basis shape key coords (the lean rest pose, raw mesh space —
-    #           the SAME space the npz deltas are authored in).
+    # The sex-specific body shape lives in the Male shape key (value 1.0 for
+    # male, 0.0 for female). Reading only the Basis key produces byte-identical
+    # male/female exports. We fold in the Male key for male presets, then
+    # uniformly scale to HEIGHT_CM so the seam band and npz deltas stay valid.
     # neutral = THIS base's rest pose (becomes the exported Basis via rebase):
-    #             lean  -> basis
+    #             lean  -> basis (sex-specific, height-normalized)
     #             heavy -> basis + FRAC × overweight npz delta
     nverts = len(body.data.vertices)
     if body.data.shape_keys is None:
         body.shape_key_add(name="Basis")
-    ref_kb = body.data.shape_keys.reference_key or body.data.shape_keys.key_blocks[0]
-    basis = read_coords(ref_kb.data, nverts)
+    sk = body.data.shape_keys.key_blocks
+    ref_kb = body.data.shape_keys.reference_key or sk[0]
+
+    # Start from the Basis key (sex-neutral, ~180 cm from preset generation).
+    basis_raw = read_coords(ref_kb.data, nverts)
+
+    # For male: use the Male shape key coords (which encode the male-specific
+    # proportions: wider shoulders, narrower hips, flatter chest). For female:
+    # keep the Basis (female base IS the Basis since Male.value = 0).
+    male_kb = sk.get("Male")
+    if male_kb and GENDER == "male":
+        basis = read_coords(male_kb.data, nverts)  # Male.co = fully male shape
+        print(f"[Alki] Folded Male shape key into basis (male-specific proportions).")
+    else:
+        basis = basis_raw
+
+    # Uniform-scale to HEIGHT_CM. The Male key may change the Z extent
+    # (e.g., 1.657 vs 1.800 for Basis). Scaling preserves proportions and
+    # keeps the [1.51, 1.53] neck-seam band valid for both sexes.
+    UP_TMP = int(np.argmax(basis.max(axis=0) - basis.min(axis=0)))
+    z_extent = float(basis[:, UP_TMP].max() - basis[:, UP_TMP].min())
+    target_extent = HEIGHT_CM / 100.0  # 178 cm -> 1.78 m
+    if z_extent > 0.01:
+        scale_factor = target_extent / z_extent
+        centroid = basis.mean(axis=0)
+        basis = centroid + (basis - centroid) * scale_factor
+        if abs(scale_factor - 1.0) > 0.005:
+            print(f"[Alki] Height-normalized: {z_extent:.3f} → {target_extent:.3f} "
+                  f"(uniform scale {scale_factor:.4f})")
     print(f"[Alki] body verts: {nverts}")
 
     ow_in_neutral = None  # the overweight delta baked into the heavy neutral
