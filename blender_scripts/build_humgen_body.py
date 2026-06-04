@@ -1,138 +1,206 @@
 # ═══════════════════════════════════════════════════════════
-# ALKI — HumGen3D Base Body Generator  (v5 — multi-base + body_mass)
+# ALKI — HumGen3D Base Body Generator  (v6.1 — npz-direct + chest taper)
 # ═══════════════════════════════════════════════════════════
+# v6.1 (2026-06-03): body_mass chest taper (gyno fix) + scale 3.0 → 3.5; see
+# the CHEST_TAPER_* block. CLI override:  ... -- <gender> <body_type>
+# v6.2 (2026-06-03): chest taper is MALE-only; female bases keep full chest.
 # Generates ONE Alki base mesh per run and exports a GLB the browser drives
-# in real time via morphTargetInfluences. v5 builds the FOUR-base matrix
+# in real time via morphTargetInfluences. v6 builds the FOUR-base matrix
 # (Avatar Range, Stages 2-3): {male,female} × {lean,heavy}, each exposing
-# the SAME 14 canonical shape-key names (the 13 originals + the new
-# `body_mass`), with the muscle keys re-sculpted larger.
+# the SAME 14 canonical shape-key names (the 13 originals + `body_mass`).
 #
-# ─── WHAT'S NEW IN v5 vs v4 ──────────────────────────────────────────
-#   • BODY_TYPE = "lean" | "heavy" (alongside GENDER). Output filename is
-#     alki_humgen_<gender>_<type>.glb — the 4 names selectBaseMesh.js wires.
-#   • HEAVY base: a configurable set of HumGen mass LiveKeys is baked into
-#     the NEUTRAL (rest pose) BEFORE the Alki morphs (spec §3.5). The base
-#     body IS heavy; bf_low then carries it DOWN toward lean and body_mass
-#     pushes UP — each morph travels half the distance (MakeHuman's
-#     bidirectional-extreme principle at the base-mesh level).
-#   • NEW `body_mass` key (spec §3.2): the gross soft-tissue envelope,
-#     sourced from HumGen mass LiveKeys that MUST be DISTINCT from bf_high's
-#     source (check_glb.py enforces a LOW body_mass↔bf_high cosine — that is
-#     the proof it is new geometry, not a re-inflated bf_high).
-#   • Per-key MORPH_SCALE post-multiplies each baked delta — an EXACT,
-#     trivial vectorized scale (spec §3.3). Muscle keys ×~1.8 so a fully
-#     driven body looks built; body_mass scaled to its target disp band.
-#   • COLOR_0 (vertex colors) stripped and export_skins=False — the mesh is
-#     static and the app drives its own material (spec §3.5).
+# ─── WHAT'S NEW IN v6 vs v5: NO MORE LIVEKEY .value API ─────────────────
+# ROOT CAUSE of every recent failure: on Blender 5.1 + HumGen 4.0.x, setting
+# livekey.value never commits (LIVE_KEY_PERMANENT is unresolvable on a
+# scripted human), so every key read back the SAME residual deformation —
+# that's why all muscle keys and all fat keys came out byte-identical with
+# cosine 1.0.
 #
-# ─── THE v4 ISOLATION FIX (still the core of the bake) ───────────────
-# Each Alki key stores  kb.co = basis + (deformed − neutral) × scale, so the
-# delta the app applies (kb.co − Basis.co) is the ISOLATED effect of that
-# key's source LiveKeys ON TOP of this base's neutral — gender/preset/heavy
-# components cancel out. (v3 stored absolute coords → every muscle key ≈ the
-# whole body, cosine 0.99; v4/v5 fix that.)
+# THE FIX: HumGen morphs are static .npz files on disk under the addon's
+# content root (<root>/livekeys/...). v6 reads them DIRECTLY — no slider,
+# no commit, no depsgraph evaluation. Each .npz holds:
+#   indices              int64 (1, M) — indices into a flattened (nverts×3) array
+#   relative_coordinates float64 (M,) — the per-component offsets
+# Decoding them to a dense (nverts, 3) delta reproduces the morph exactly
+# (verified: overweight max Δ 0.0681 / 23748 nonzero verts, belly grows on
+# the depth axis — identical to what to_shapekey() produced).
 #
-# RUN: Scripting workspace, Alt+P (open the system console first).
-# Run it FOUR times, editing GENDER + BODY_TYPE each time. After each run,
-# verify with:  blender --background --python ... NO — check_glb.py is plain
-# Python:  python blender_scripts/check_glb.py public/alki_humgen_<g>_<t>.glb <type>
-# Then slim:  node blender_scripts/slim_all_bases.mjs
+# Each Alki key stores  kb.co = basis + Σ(npz deltas) × scale, with the
+# neck-seam band zeroed, then everything is rebased onto this base's neutral
+# (heavy bases bake 1.0×overweight into the neutral). The deltas are exact,
+# isolated, and version-proof.
 #
-# ─── §3.6 BEFORE YOU BUILD THE HEAVY / body_mass RECIPE ──────────────
-# Run blender_scripts/list_livekeys.py FIRST and confirm the real HumGen
-# names for the mass keys below (HumGen naming varies by version). The
-# defaults are best-guess candidates — replace them with the confirmed
-# names, then build. Anywhere a name is wrong the bake prints
-# "WARN: livekey ... not found" and that key simply won't contribute.
+# RUN (either way):
+#   • Scripting workspace, Alt+P (open the system console first), OR
+#   • headless:  blender --background --python blender_scripts/build_humgen_body.py
+# Run it FOUR times, editing GENDER + BODY_TYPE each time. After each run:
+#   python blender_scripts/check_glb.py public/alki_humgen_<g>_<t>.glb <type>
 
 import bpy
 import os
-import math
+import sys
+import numpy as np
 
 # ── EDIT THESE TWO PER RUN ───────────────────────────────────────────
 GENDER = "male"        # "male" | "female"
 BODY_TYPE = "heavy"    # "lean" | "heavy"
+
+# Optional headless override (no file editing needed between runs):
+#   blender --background --python blender_scripts/build_humgen_body.py -- <gender> <body_type>
+if "--" in sys.argv:
+    _cli = sys.argv[sys.argv.index("--") + 1:]
+    if len(_cli) >= 1 and _cli[0] in ("male", "female"):
+        GENDER = _cli[0]
+    if len(_cli) >= 2 and _cli[1] in ("lean", "heavy"):
+        BODY_TYPE = _cli[1]
 
 # Keep these CONSTANT across all four builds so the bases share proportions
 # (spec §3.4: all ~1.8 units tall; in-pair vertex order must match).
 HEIGHT_CM = 178
 PRESET_INDEX = 0
 
-OUTPUT_DIR = os.path.dirname(bpy.data.filepath) or os.path.expanduser("~")
+# Output: prefer <repo>/public next to this script (works headless), else the
+# .blend's folder (works from the Scripting workspace), else home.
+def _resolve_output_dir():
+    try:
+        repo_public = os.path.normpath(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public"))
+        if os.path.isdir(repo_public):
+            return repo_public
+    except NameError:
+        pass  # __file__ undefined in an unsaved Text Editor block
+    return os.path.dirname(bpy.data.filepath) or os.path.expanduser("~")
+
+OUTPUT_DIR = _resolve_output_dir()
 OUTPUT_PATH = os.path.join(OUTPUT_DIR, f"alki_humgen_{GENDER}_{BODY_TYPE}.glb")
 
-# Alki canonical key -> list of HumGen LiveKey names summed into it.
-# body_mass MUST be distinct from bf_high (verifier checks the cosine).
-# Redundancy collapse (2026-05-29): the gross-mass envelope now lives in ONE
-# key, body_mass, sourced from "overweight"; bf_high is RE-TASKED off
-# "overweight" onto a distinct localized shape so all three adiposity keys
-# (body_mass / bf_high / bf_low) are genuinely different geometry.
-#   body_mass = the SINGLE broad-adiposity key — the gross whole-body
-#               soft-tissue envelope, from HumGen "overweight" (subcat main).
-#   bf_high   = FLANK deposition (waist + hips). NOT a second copy of
-#               "overweight", and NOT Belly Size (that is visceral's source) —
-#               keeping all three adiposity keys genuinely distinct geometry.
-#   visceral  = belly-FORWARD (Belly Size).
-#   bf_low    = lean direction (skinny), unchanged.
-# The three are instrumented below: the bake prints all three pairwise
-# cosines + max Δ before export so a collision is caught before the GLB.
-ALKI_FROM_LIVEKEYS = {
-    "body_mass":        ["overweight"],                  # gross envelope ×3
-    "bf_low":           ["skinny"],                      # lean direction
-    "bf_high":          ["Waist Thickness", "Hips Size"],  # flank (confirmed present)
-    "visceral":         ["Belly Size"],                  # belly-forward
-    "muscle_overall":   ["muscular"],
-    "muscle_chest":     ["Chest Muscles"],
-    "muscle_shoulders": ["Shoulder Muscles", "Traps Muscles"],
-    "muscle_arms":      ["Biceps", "Triceps", "Forearm Muscles"],
-    "muscle_back":      ["Back Muscles"],
-    "muscle_legs":      ["Quad Muscles", "Hamstring Muscles",
-                         "Upper Butt Muscles", "Lower Butt Muscles"],
-    "muscle_calves":    ["Calves Muscles"],
+# ── HumGen content root (where the .npz livekey files live) ─────────
+# Read from the addon preference; fall back to the known install path.
+# Do NOT hardcode the pref value — it is machine-specific.
+HUMGEN_CONTENT_FALLBACK = r"D:\Blender-HumGen-Paid"
+
+def get_content_root():
+    root = None
+    try:
+        prefs = bpy.context.preferences.addons["HumGen3D"].preferences
+        root = getattr(prefs, "filepath", None) or None
+    except Exception:
+        pass
+    if not root or not os.path.isdir(root):
+        print(f"[Alki] NOTE: HumGen filepath pref unavailable/invalid ({root!r}); "
+              f"falling back to {HUMGEN_CONTENT_FALLBACK!r}")
+        root = HUMGEN_CONTENT_FALLBACK
+    return root
+
+# ── Alki canonical key -> list of HumGen .npz morphs summed into it ──
+# {g} expands to GENDER. Only the main/ files are gendered; Torso/ and
+# Muscles/ morphs are shared (no gender prefix).
+# Redundancy collapse (2026-05-29): the gross-mass envelope lives in ONE key,
+# body_mass (overweight); bf_high is flank deposition (waist+hips), visceral
+# is belly-forward — three genuinely distinct adiposity shapes.
+ALKI_FROM_NPZ = {
+    "body_mass":        ["livekeys/body_proportions/main/{g}_overweight.npz"],
+    "bf_low":           ["livekeys/body_proportions/main/{g}_skinny.npz"],
+    "bf_high":          ["livekeys/body_proportions/Torso/Waist Thickness.npz",
+                         "livekeys/body_proportions/Torso/Hips Size.npz"],
+    "visceral":         ["livekeys/body_proportions/Torso/Belly Size.npz"],
+    "muscle_overall":   ["livekeys/body_proportions/main/{g}_muscular.npz"],
+    "muscle_chest":     ["livekeys/body_proportions/Muscles/Chest Muscles.npz"],
+    "muscle_shoulders": ["livekeys/body_proportions/Muscles/Shoulder Muscles.npz",
+                         "livekeys/body_proportions/Muscles/Traps Muscles.npz"],
+    "muscle_arms":      ["livekeys/body_proportions/Muscles/Biceps.npz",
+                         "livekeys/body_proportions/Muscles/Triceps.npz",
+                         "livekeys/body_proportions/Muscles/Forearm Muscles.npz"],
+    "muscle_back":      ["livekeys/body_proportions/Muscles/Back Muscles.npz"],
+    "muscle_legs":      ["livekeys/body_proportions/Muscles/Quad Muscles.npz",
+                         "livekeys/body_proportions/Muscles/Hamstring Muscles.npz",
+                         "livekeys/body_proportions/Muscles/Upper Butt Muscles.npz",
+                         "livekeys/body_proportions/Muscles/Lower Butt Muscles.npz"],
+    "muscle_calves":    ["livekeys/body_proportions/Muscles/Calves Muscles.npz"],
 }
 
 # Canonical keys with no HumGen source — created as flat placeholders
 # (material/normal-map pass is out of scope; spec §1.1).
 ALKI_CUSTOM_PLACEHOLDERS = ["water", "abs_def", "vascularity"]
 
-# §3.5 — HEAVY base: the heavy rest pose is built as GEOMETRY, not via a
-# runtime slider. We extract the "overweight" morph delta (set value + evaluate
-# — the SAME mechanism the Alki morphs use) and add HEAVY_OVERWEIGHT_FRAC of it
-# directly to the lean rest pose to form the heavy Basis.
-#
-# WHY NOT a background slider: HumGen's live-key COMMIT
-# (human.keys.update_human_from_key_change) raises KeyError 'LIVE_KEY_PERMANENT'
-# on a scripted/baked human — that buffer key only exists during interactive
-# generation. So NO .value/commit call can persist a background on this mesh;
-# overweight=0.5 would silently never bake in. Reading the morph delta works
-# fine (it's how body_mass is made from overweight), so we do the rest-pose
-# math ourselves: heavy Basis = lean_rest + 0.5 × overweight_delta. The heavy
-# base then covers overweight ~0.5→beyond; the lean base covers 0→1.
-HEAVY_OVERWEIGHT_KEY = "overweight"
-HEAVY_OVERWEIGHT_FRAC = 0.5    # heavy Basis = lean_rest + 0.5 × overweight_delta
+# §3.5 — HEAVY base: the heavy rest pose is built as GEOMETRY:
+#     heavy neutral = lean basis + HEAVY_OVERWEIGHT_FRAC × overweight_npz_delta
+# FRAC = 1.0 (verified: 0.5× grows torso depth only +0.011, too subtle; full
+# overweight grows it ~+0.022 for a genuinely heavy base).
+HEAVY_OVERWEIGHT_NPZ = "livekeys/body_proportions/main/{g}_overweight.npz"
+HEAVY_OVERWEIGHT_FRAC = 1.0
 
-# §3.3 muscle re-sculpt + §3.2 body_mass magnitude — post-bake delta scale.
-# EXACT vectorized multiply on the stored offsets. Tune after the first
-# build prints each key's max Δ:
-#   • muscle_overall target max ~0.05 (regional keys proportional).
-#   • body_mass target max: lean 0.18–0.25, heavy 0.10–0.15 (shorter push
-#     from an already-heavy neutral → smaller scale on the heavy base).
+# On the HEAVY base, keys are extracted relative to neutral — meaning each key
+# subtracts the part of its OWN target shape already baked into neutral (the
+# overweight delta). Only the whole-body adiposity-DIRECTION keys overlap with
+# the heavy neutral:
+#   • body_mass targets lean + scale×tapered_overweight → delta = scale×tap_ow − FRAC×ow
+#     (the marginal push UP from an already-heavy rest pose)
+#   • bf_low    targets lean + skinny         → delta = skinny − FRAC×ow
+#     (carries DOWN: removes the heavy fat AND continues to skinny)
+# The localized keys (bf_high/visceral/muscles) contain NO overweight in their
+# sources, so nothing is subtracted — they stay pure npz × scale.
+# (Subtracting ow from EVERY key was tested offline 2026-06-02 and fails
+# check_glb: the shared −ow term makes cos(body_mass, visceral) = −0.93
+# (clone gate), cos(muscle_chest, muscle_legs) = +0.93, and pushes
+# muscle_overall to 0.088 — out of its 0.035–0.075 band.)
+HEAVY_RELATIVE_KEYS = {"body_mass", "bf_low"}
+
+# §3.3 muscle re-sculpt + §3.2 body_mass magnitude — per-key delta scale.
+# EXACT vectorized multiply on the summed npz deltas:
+#   • muscle keys ×1.8 → muscle_overall max ~0.051 (band 0.035–0.075).
+#   • body_mass scale is GENDER-SPECIFIC (both land just above the lean band
+#     floor of 0.15):
+#       male   ×3.5  — the chest TAPER (see below) removes the peak that used
+#                      to set max-disp, so the scale is raised from 3.0 to keep
+#                      the BELLY-driven max in band: lean 0.152, heavy 0.102.
+#                      Chest still drops 0.204 → 0.072 (−65%); gyno fix holds.
+#       female ×3.75 — no taper, but female_overweight.npz is intrinsically
+#                      weaker (raw max 0.0405 vs male 0.0681): ×3.5 only
+#                      reached 0.142 (failed the lean band). ×3.75 → 0.152.
 _MUSCLE = 1.8
+_BODY_MASS_SCALE = {"male": 3.5, "female": 3.75}
 MORPH_SCALE = {
     "muscle_overall": _MUSCLE, "muscle_chest": _MUSCLE,
     "muscle_shoulders": _MUSCLE, "muscle_arms": _MUSCLE,
     "muscle_back": _MUSCLE, "muscle_legs": _MUSCLE, "muscle_calves": _MUSCLE,
-    # body_mass sources from "overweight" (raw ~0.068 on lean, 0→1) — far too
-    # weak unscaled for the gross-mass channel. ×3 → ~0.20, the SAME post-scale
-    # multiply the muscle keys use. The same ×3 works on the heavy base: there
-    # the raw delta is overweight 0.5→1.0 (~half, ~0.034), so ×3 → ~0.10, which
-    # lands in the heavy band 0.08–0.18. One flat scale, both bands hit.
-    "body_mass": 3.0,
+    "body_mass": _BODY_MASS_SCALE[GENDER],
 }
 
-# Neck-seam band (spec §1.3/§3.7 #6): no morph should move this band; it is
-# the head-attach reserve. Printed per key so you can SEE it stays ~0.
-NECK_SEAM_Y = (1.51, 1.53)
+# ── body_mass CHEST TAPER (male gynecomastia fix, 2026-06-03) ────────
+# Root cause: male_overweight's largest displacement is on the CHEST (the
+# global-max vertex sits at height-fraction 0.629), so amplifying it ×3+
+# turned chest fat into breasts. Fix: a vertical smoothstep falloff applied to
+# the overweight delta BEFORE the body_mass scale — belly/hips keep full
+# strength, the chest keeps only CHEST_TAPER_FLOOR of its displacement.
+# Applies ONLY to body_mass's overweight source: muscle keys, bf_low, bf_high,
+# visceral, and the heavy NEUTRAL (rest pose) are untouched.
+# MALE ONLY (2026-06-03): on female bases the taper is skipped entirely —
+# full chest volume is anatomically correct there. If female heavy reads as
+# excessive after the visual A/B, add a gentler female taper (e.g. floor 0.5).
+# Height fraction is computed from the BASIS positions on the detected UP axis.
+CHEST_TAPER_LO = 0.52      # full strength at/below this height fraction
+CHEST_TAPER_HI = 0.66      # taper floor reached at/above this
+CHEST_TAPER_FLOOR = 0.20   # fraction of displacement surviving in the chest
+
+
+def chest_taper_weights(height_frac):
+    """Per-vertex taper weight (1.0 below the chest, smoothstep down to
+    CHEST_TAPER_FLOOR across the chest band). Vectorized over (nverts,)."""
+    t = np.clip((height_frac - CHEST_TAPER_LO)
+                / (CHEST_TAPER_HI - CHEST_TAPER_LO), 0.0, 1.0)
+    s = t * t * (3.0 - 2.0 * t)          # smoothstep
+    return 1.0 - s * (1.0 - CHEST_TAPER_FLOOR)
+
+# Neck-seam band (spec §1.3/§3.7 #6): no morph may move this band; it is the
+# head-attach reserve. The band is measured on the detected UP axis (largest
+# extent — raw HumGen mesh is Z-up, ~1.8 units; glTF export turns that into +Y).
+NECK_SEAM_BAND = (1.51, 1.53)
+
+# Heavy gate: the exported heavy base must grow the torso band on the DEPTH
+# axis by more than this vs lean. At FRAC=1.0 overweight grows depth ~+0.022,
+# so gate at +0.01 (the old +0.02 failed even a correct bake).
+HEAVY_GATE_MIN_DEPTH_GAIN = 0.01
 
 
 def import_humgen():
@@ -170,66 +238,38 @@ def find_body(human):
     return None
 
 
-def livekey_by_name(human, name):
-    """Find a livekey by name, tolerant of '.trial' suffix and whitespace."""
-    target = name.strip().lower().replace(".trial", "")
-    for lk in human.keys.all_livekeys:
-        clean = lk.name.strip().lower().replace(".trial", "")
-        if clean == target:
-            return lk
-    return None
+def load_npz_delta(content_root, rel_path, nverts):
+    """Decode one HumGen livekey .npz into a dense (nverts, 3) float64 delta.
+
+    indices index into a FLATTENED (nverts × 3) coordinate array, so the
+    decode is: scatter relative_coordinates into a flat zero array, reshape.
+    Raises with a clear message if the file is missing or the mesh is too
+    small for the stored indices (vertex-order mismatch)."""
+    path = os.path.join(content_root, rel_path)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"npz morph not found: {path}")
+    d = np.load(path)
+    idx = d["indices"].reshape(-1)
+    rel = d["relative_coordinates"].reshape(-1)
+    if idx.max() >= nverts * 3:
+        raise ValueError(
+            f"{rel_path}: max flat index {int(idx.max())} exceeds mesh size "
+            f"{nverts}×3={nverts * 3} — wrong mesh / vertex-order mismatch.")
+    flat = np.zeros(nverts * 3, dtype=np.float64)
+    flat[idx] = rel
+    return flat.reshape(nverts, 3)
 
 
-def set_livekeys(human, mapping):
-    """Zero every livekey, then apply mapping {name: value}, then commit.
-    Returns the list of names that were actually found + applied."""
-    for lk in human.keys.all_livekeys:
-        try:
-            lk.value = 0.0
-        except Exception:
-            pass
-    applied = []
-    for name, val in mapping.items():
-        lk = livekey_by_name(human, name)
-        if lk is None:
-            print(f"[Alki] WARN: livekey {name!r} not found")
-            continue
-        try:
-            lk.value = float(val)
-            applied.append(name)
-        except Exception as e:
-            print(f"[Alki] WARN: could not set {name!r}: {e}")
-    # Best-effort PERMANENT commit. On a scripted/baked human this raises
-    # KeyError 'LIVE_KEY_PERMANENT' (that buffer key only exists during
-    # interactive generation) — but it is NOT needed: setting the value and
-    # reading the EVALUATED mesh already reflects the deformation, which is all
-    # the extraction below uses. So we attempt it, note the absence ONCE, and
-    # carry on. (The heavy rest pose is built by geometry arithmetic on the
-    # extracted overweight delta, never by persisting a slider through this.)
-    try:
-        call_flexible(human.keys.update_human_from_key_change, (bpy.context,), ())
-    except Exception as e:
-        if not getattr(set_livekeys, "_warned", False):
-            print(f"[Alki] NOTE: update_human_from_key_change unavailable ({e}); "
-                  f"not needed — extraction uses evaluated deltas directly.")
-            set_livekeys._warned = True
-    return applied
+def read_coords(collection, n):
+    """foreach_get 'co' from a vertex/shape-key-point collection -> (n,3) float64."""
+    buf = np.empty(n * 3, dtype=np.float32)
+    collection.foreach_get("co", buf)
+    return buf.reshape(n, 3).astype(np.float64)
 
 
-def bake_basis(body):
-    """Snapshot Basis (base-space) vertex positions of the body mesh."""
-    return [v.co.copy() for v in body.data.vertices]
-
-
-def evaluate_mesh_positions(body):
-    """Read evaluated vertex positions after livekey application.
-    Re-acquire the depsgraph every call so we read the CURRENT deformation."""
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    eval_obj = body.evaluated_get(depsgraph)
-    eval_mesh = eval_obj.to_mesh()
-    coords = [v.co.copy() for v in eval_mesh.vertices]
-    eval_obj.to_mesh_clear()
-    return coords
+def write_coords(collection, coords):
+    """foreach_set 'co' on a vertex/shape-key-point collection from (n,3) array."""
+    collection.foreach_set("co", coords.astype(np.float32).ravel())
 
 
 def strip_vertex_colors(mesh):
@@ -251,10 +291,11 @@ def strip_vertex_colors(mesh):
 
 
 def build():
-    print(f"\n[Alki] HumGen build v5 — GENDER={GENDER} BODY_TYPE={BODY_TYPE}")
-    if BODY_TYPE == "heavy":
-        print(f"[Alki] Heavy rest pose = lean + {HEAVY_OVERWEIGHT_FRAC}×"
-              f"{HEAVY_OVERWEIGHT_KEY!r} delta (geometry offset, no live-key commit).")
+    print(f"\n[Alki] HumGen build v6.2 (npz-direct + male chest taper) — "
+          f"GENDER={GENDER} BODY_TYPE={BODY_TYPE}")
+    content_root = get_content_root()
+    print(f"[Alki] HumGen content root: {content_root}")
+
     Human = import_humgen()
     human = generate_human(Human, GENDER, PRESET_INDEX)
     call_flexible(human.height.set, (HEIGHT_CM,), (HEIGHT_CM, bpy.context))
@@ -268,236 +309,197 @@ def build():
     body.select_set(True)
     bpy.context.view_layer.objects.active = body
 
-    # ── Rest pose: lean evaluated body, + arithmetic overweight for heavy ──
-    # basis     = Basis shape key coords (base space) — livekey-VALUE-independent.
-    # lean_ref  = evaluated body with NO livekeys = the lean rest pose.
-    # neutral   = THIS base's rest pose (becomes the exported Basis via rebase):
-    #               lean  -> lean_ref
-    #               heavy -> lean_ref + FRAC × overweight_delta, computed by
-    #                        ARITHMETIC (extract the overweight morph the same
-    #                        way the Alki keys are extracted, then add a
-    #                        fraction of it). No live-key commit involved, so
-    #                        the LIVE_KEY_PERMANENT KeyError can't no-op it.
-    set_livekeys(human, {})
-    basis = bake_basis(body)
-    lean_ref = evaluate_mesh_positions(body)
-    print(f"[Alki] basis verts: {len(basis)} | lean_ref eval verts: {len(lean_ref)}")
-    if len(lean_ref) != len(basis):
-        print("[Alki] ERROR: lean_ref vert count != basis. Aborting "
-              "(a modifier is changing topology; the isolation math needs "
-              "matching vertex order).")
-        return
+    # ── Basis + neutral ────────────────────────────────────────────────
+    # basis   = Basis shape key coords (the lean rest pose, raw mesh space —
+    #           the SAME space the npz deltas are authored in).
+    # neutral = THIS base's rest pose (becomes the exported Basis via rebase):
+    #             lean  -> basis
+    #             heavy -> basis + FRAC × overweight npz delta
+    nverts = len(body.data.vertices)
+    if body.data.shape_keys is None:
+        body.shape_key_add(name="Basis")
+    ref_kb = body.data.shape_keys.reference_key or body.data.shape_keys.key_blocks[0]
+    basis = read_coords(ref_kb.data, nverts)
+    print(f"[Alki] body verts: {nverts}")
 
+    ow_in_neutral = None  # the overweight delta baked into the heavy neutral
     if BODY_TYPE == "heavy":
-        applied = set_livekeys(human, {HEAVY_OVERWEIGHT_KEY: 1.0})
-        ow_full = evaluate_mesh_positions(body)
-        set_livekeys(human, {})                       # back to the lean body
-        if HEAVY_OVERWEIGHT_KEY not in applied or len(ow_full) != len(lean_ref):
-            print(f"[Alki] ERROR: could not read {HEAVY_OVERWEIGHT_KEY!r} delta "
-                  f"(applied={applied}, verts={len(ow_full)}); cannot build the "
-                  f"heavy rest pose. Aborting.")
-            return
-        neutral = [lean_ref[i] + (ow_full[i] - lean_ref[i]) * HEAVY_OVERWEIGHT_FRAC
-                   for i in range(len(lean_ref))]
-        ow_max = max((ow_full[i] - lean_ref[i]).length for i in range(len(lean_ref)))
-        print(f"[Alki] Built heavy rest pose: lean + {HEAVY_OVERWEIGHT_FRAC}×"
-              f"overweight (overweight morph max Δ {ow_max:.4f}).")
+        ow_rel = HEAVY_OVERWEIGHT_NPZ.format(g=GENDER)
+        ow_delta = load_npz_delta(content_root, ow_rel, nverts)
+        ow_in_neutral = ow_delta * HEAVY_OVERWEIGHT_FRAC
+        neutral = basis + ow_in_neutral
+        ow_max = float(np.linalg.norm(ow_delta, axis=1).max())
+        ow_nonzero = int((np.linalg.norm(ow_delta, axis=1) > 1e-12).sum())
+        print(f"[Alki] Heavy neutral = basis + {HEAVY_OVERWEIGHT_FRAC}×overweight "
+              f"({ow_rel}: max Δ {ow_max:.4f}, {ow_nonzero}/{nverts} nonzero verts).")
     else:
-        neutral = lean_ref
+        neutral = basis.copy()
 
-    # Rest-pose extents (informational; the hard gate before export enforces).
-    def _extents(coords):
-        return tuple(max(c[a] for c in coords) - min(c[a] for c in coords)
-                     for a in range(3))
-    lref, ncur = _extents(lean_ref), _extents(neutral)
-    print(f"[Alki] Rest extents (X,Y,Z)  lean_ref="
-          f"{tuple(round(v, 3) for v in lref)}  neutral="
-          f"{tuple(round(v, 3) for v in ncur)}")
+    # Rest-pose extents + axis detection. UP = largest extent (raw HumGen mesh
+    # is Z-up ~1.8); DEPTH = smallest extent (front-to-back, ~0.39 — the axis
+    # overweight thickens); the remaining axis is width (~1.19).
+    ext = neutral.max(axis=0) - neutral.min(axis=0)
+    UP = int(np.argmax(ext))
+    DEPTH = int(np.argmin(ext))
+    print(f"[Alki] Rest extents (X,Y,Z): basis="
+          f"{tuple(round(float(v), 3) for v in (basis.max(axis=0) - basis.min(axis=0)))}  "
+          f"neutral={tuple(round(float(v), 3) for v in ext)}  "
+          f"-> UP='{'xyz'[UP]}', DEPTH='{'xyz'[DEPTH]}'")
 
     # ── Neck-seam vertex set (spec §1.3/§3.7 #6) ──────────────────────
-    # Lock the head-attach reserve so NO morph disturbs the neck seam. The
-    # seam is defined in the EXPORTED mesh, whose Basis == `neutral` and whose
-    # up-axis becomes glTF +Y. We therefore pick seam verts from `neutral` on
-    # the empirically-detected up-axis (largest extent) — NOT from the raw
-    # pre-rebase Basis on a hardcoded .y. That space/axis mismatch is exactly
-    # why the earlier lock missed the seam. This set is the SAME indices
-    # check_glb step [8] measures, so locking them forces neck Δ == 0 there.
-    nlo, nhi = NECK_SEAM_Y
-    _ext = [max(c[a] for c in neutral) - min(c[a] for c in neutral) for a in range(3)]
-    UP = max(range(3), key=lambda a: _ext[a])
-    seam_idx = {i for i in range(len(neutral)) if nlo <= neutral[i][UP] <= nhi}
+    # Lock the head-attach reserve so NO morph disturbs the neck seam. Picked
+    # from `neutral` (the exported Basis) on the detected UP axis — the same
+    # band check_glb step [8] measures on the exported file.
+    nlo, nhi = NECK_SEAM_BAND
+    seam_mask = (neutral[:, UP] >= nlo) & (neutral[:, UP] <= nhi)
+    n_seam = int(seam_mask.sum())
     print(f"[Alki] Neck-seam lock: up-axis '{'xyz'[UP]}', band [{nlo},{nhi}] "
-          f"holds {len(seam_idx)}/{len(neutral)} verts (zeroed in every morph).")
-    if not seam_idx:
+          f"holds {n_seam}/{nverts} verts (zeroed in every morph).")
+    if n_seam == 0:
         print("[Alki]   !! WARNING: no verts in the seam band — mesh scale/axis "
               "differs from the 1.8-unit reference; inspect before trusting.")
 
+    # ── Chest-taper weights (MALE body_mass only — see CHEST_TAPER_* note) ──
+    up_b = basis[:, UP]
+    height_frac = (up_b - up_b.min()) / ((up_b.max() - up_b.min()) or 1.0)
+    if GENDER == "male":
+        taper_w = chest_taper_weights(height_frac)
+        n_tapered = int((taper_w < 0.999).sum())
+        print(f"[Alki] Chest taper for body_mass: frac [{CHEST_TAPER_LO},{CHEST_TAPER_HI}] "
+              f"-> floor {CHEST_TAPER_FLOOR}; {n_tapered}/{nverts} verts attenuated.")
+    else:
+        taper_w = np.ones(nverts, dtype=np.float64)
+        print("[Alki] Chest taper SKIPPED (female base keeps full chest volume).")
+
+    # ── Extract each Alki key directly from its npz file(s) ──────────
     created = []
-    for alki_key, source_lks in ALKI_FROM_LIVEKEYS.items():
-        # Only this key's source livekeys active (extracted on the LEAN body).
-        # The morph delta is taken against `neutral` below, so on the heavy base
-        # each key is automatically the marginal push/pull FROM the heavy rest
-        # pose — e.g. body_mass = (overweight − heavy_rest) = the 0.5→1.0 push,
-        # bf_low = (skinny − heavy_rest) = the full slim-down toward lean.
-        mapping = {}
-        for lk_name in source_lks:
-            mapping[lk_name] = 1.0
-        applied = set_livekeys(human, mapping)
-        source_applied = applied
+    np_deltas = {}  # alki key -> final (nverts,3) delta, in basis space
+    for alki_key, sources in ALKI_FROM_NPZ.items():
+        rel_paths = [s.format(g=GENDER) for s in sources]
+        total = np.zeros((nverts, 3), dtype=np.float64)
+        for rel in rel_paths:
+            total += load_npz_delta(content_root, rel, nverts)
 
-        deformed = evaluate_mesh_positions(body)
-        if len(deformed) != len(basis):
-            print(f"[Alki] WARN: vert count mismatch on {alki_key!r} "
-                  f"({len(deformed)} vs {len(basis)}); skipping")
-            continue
+        # Gyno fix: attenuate the chest region of body_mass's overweight
+        # source BEFORE the scale (belly/hips stay full strength).
+        if alki_key == "body_mass":
+            total = total * taper_w[:, None]
 
+        scale = MORPH_SCALE.get(alki_key, 1.0)
+        delta = total * scale
+
+        # Heavy base: adiposity-direction keys are marginal relative to the
+        # overweight content already in neutral (see HEAVY_RELATIVE_KEYS note).
+        if ow_in_neutral is not None and alki_key in HEAVY_RELATIVE_KEYS:
+            delta = delta - ow_in_neutral
+
+        # Neck-seam lock: zero displacement in the head-attach band.
+        delta[seam_mask] = 0.0
+
+        # Shape key stores basis + delta (rebased onto neutral before export).
         if body.data.shape_keys is None:
             body.shape_key_add(name="Basis")
         kb = body.data.shape_keys.key_blocks.get(alki_key)
         if kb is None:
             kb = body.shape_key_add(name=alki_key, from_mix=False)
-
-        # ── ISOLATED, SCALED delta: (deformed − neutral) × scale onto Basis
-        # NECK-SEAM LOCK: verts in `seam_idx` (computed above, in exported-Basis
-        # space) get ZERO displacement so no morph disturbs the neck seam. Set
-        # relative to basis, so it survives the rebase-onto-neutral untouched
-        # (old_delta == 0 → new co == neutral). Applies to ALL bases.
-        scale = MORPH_SCALE.get(alki_key, 1.0)
-        max_d = 0.0
-        sum_d = 0.0
-        neck_locked = 0
-        for i in range(len(deformed)):
-            if i in seam_idx:
-                kb.data[i].co = basis[i]          # locked: zero displacement
-                neck_locked += 1
-                continue
-            delta = (deformed[i] - neutral[i]) * scale
-            kb.data[i].co = basis[i] + delta
-            dl = delta.length
-            sum_d += dl
-            if dl > max_d:
-                max_d = dl
+        write_coords(kb.data, basis + delta)
         kb.value = 0.0
-        mean_d = sum_d / len(deformed) if deformed else 0.0
-        created.append(alki_key)
-        sc = f" ×{scale}" if scale != 1.0 else ""
-        print(f"[Alki] Baked {alki_key!r} from {source_applied}{sc}  "
-              f"(max Δ {max_d:.4f}, mean Δ {mean_d:.5f}, neck-locked {neck_locked})")
-        if max_d < 1e-4:
-            print(f"[Alki]   !! WARNING: {alki_key!r} barely moved — its "
-                  f"source livekey(s) may not have applied (check §3.6 names).")
 
-    # Reset livekeys to zero; the rest pose is set by the rebase onto `neutral`
-    # (which already encodes the heavy offset for heavy bases), not by sliders.
-    set_livekeys(human, {})
+        np_deltas[alki_key] = delta
+        created.append(alki_key)
+
+        lens = np.linalg.norm(delta, axis=1)
+        sc = f" ×{scale}" if scale != 1.0 else ""
+        rel_note = " (rel. to heavy neutral)" if (
+            ow_in_neutral is not None and alki_key in HEAVY_RELATIVE_KEYS) else ""
+        names = [os.path.basename(p) for p in rel_paths]
+        print(f"[Alki] Baked {alki_key!r} from {names}{sc}{rel_note}  "
+              f"(max Δ {float(lens.max()):.4f}, mean Δ {float(lens.mean()):.5f}, "
+              f"neck-locked {n_seam})")
+        if alki_key == "body_mass":
+            # Gyno check: track the vertex where RAW overweight peaks (the
+            # chest/breast vertex, height-frac ~0.63 on the male mesh) and
+            # report its tapered displacement. Untapered ×3.0 read ~0.204.
+            raw_ow = sum(load_npz_delta(content_root, p, nverts) for p in rel_paths)
+            gyno_i = int(np.argmax(np.linalg.norm(raw_ow, axis=1)))
+            print(f"[Alki]   body_mass gyno check: raw-overweight peak vertex "
+                  f"(frac {height_frac[gyno_i]:.3f}, taper w "
+                  f"{taper_w[gyno_i]:.3f}) now displaces "
+                  f"{float(lens[gyno_i]):.4f} (untapered ×3.0 was ~0.204)")
+        if lens.max() < 1e-4:
+            print(f"[Alki]   !! WARNING: {alki_key!r} barely moved — its npz "
+                  f"source(s) may be empty/wrong.")
 
     # Flat placeholders for keys with no HumGen source (sculpt later).
     for key in ALKI_CUSTOM_PLACEHOLDERS:
         if body.data.shape_keys.key_blocks.get(key) is None:
-            body.shape_key_add(name=key, from_mix=False)
+            kb = body.shape_key_add(name=key, from_mix=False)
+            write_coords(kb.data, basis)  # flat: zero delta
             print(f"[Alki] Added placeholder {key!r} (flat; sculpt later)")
-            created.append(key)
+        np_deltas[key] = np.zeros((nverts, 3), dtype=np.float64)
+        created.append(key)
 
     print(f"[Alki] Created {len(created)} canonical keys: {created}")
 
     # ── Cross-key region signature (legs|torso|upper mean Δ) ──────────
-    # Classify by the SAME up-axis + exported-Basis (neutral) space as the
-    # seam lock, so the neck Δ reported here matches check_glb step [8].
     print("[Alki] Region signature per key (legs|torso|upper mean Δ) + neck-seam Δ:")
-    ys = [c[UP] for c in neutral]
-    ymin, ymax = min(ys), max(ys); H = (ymax - ymin) or 1.0
-
-    def region_means(kb):
-        legs = tor = arm = 0.0
-        nl = nt = na = 0
-        neck_max = 0.0
-        for i in range(len(basis)):
-            d = (kb.data[i].co - basis[i]).length
-            fy = (neutral[i][UP] - ymin) / H
-            if fy < 0.45: legs += d; nl += 1
-            elif fy < 0.82: tor += d; nt += 1
-            else: arm += d; na += 1
-            if i in seam_idx and d > neck_max:
-                neck_max = d
-        return (legs / max(nl, 1), tor / max(nt, 1),
-                arm / max(na, 1), neck_max)
-
+    up_co = neutral[:, UP]
+    ymin, ymax = float(up_co.min()), float(up_co.max())
+    H = (ymax - ymin) or 1.0
+    frac = (up_co - ymin) / H
+    legs_m, torso_m, upper_m = frac < 0.45, (frac >= 0.45) & (frac < 0.82), frac >= 0.82
     for k in created:
-        kb = body.data.shape_keys.key_blocks.get(k)
-        if kb is None:
-            continue
-        lg, tr, ar, neck_max = region_means(kb)
+        lens = np.linalg.norm(np_deltas[k], axis=1)
+        lg = float(lens[legs_m].mean()) if legs_m.any() else 0.0
+        tr = float(lens[torso_m].mean()) if torso_m.any() else 0.0
+        ar = float(lens[upper_m].mean()) if upper_m.any() else 0.0
+        neck_max = float(lens[seam_mask].max()) if n_seam else 0.0
         flag = "  << NECK MOVED!" if neck_max > 0.002 else ""
         print(f"[Alki]   {k:<16} legs={lg:.4f} torso={tr:.4f} "
               f"upper={ar:.4f} neckMaxΔ={neck_max:.4f}{flag}")
 
     # ── Adiposity-trio distinctness (pre-export) ──────────────────────
-    # body_mass / bf_high / visceral MUST be three DIFFERENT shapes. Print the
-    # three max Δ and all three pairwise cosines BEFORE export, so a collision
-    # (two keys ~identical → |cos| near 1) is caught before the GLB is trusted.
-    # Deltas read here (kb.co − basis) are pre-rebase and identical to the
-    # exported deltas. check_glb re-checks body_mass↔bf_high on the file.
-    def _delta(name):
-        kb = body.data.shape_keys.key_blocks.get(name)
-        return [kb.data[i].co - basis[i] for i in range(len(basis))] if kb else None
-
+    # body_mass / bf_high / visceral MUST be three DIFFERENT shapes. Print all
+    # three max Δ and pairwise cosines BEFORE export so a collision (two keys
+    # ~identical → |cos| near 1) is caught before the GLB is trusted.
     def _cos(a, b):
-        if a is None or b is None:
-            return None
-        dot = sum(a[i].dot(b[i]) for i in range(len(a)))
-        na = math.sqrt(sum(v.length_squared for v in a))
-        nb = math.sqrt(sum(v.length_squared for v in b))
-        return dot / (na * nb + 1e-12)
+        fa, fb = np_deltas[a].ravel(), np_deltas[b].ravel()
+        denom = np.linalg.norm(fa) * np.linalg.norm(fb) + 1e-12
+        return float(fa @ fb / denom)
 
-    trio = {k: _delta(k) for k in ("body_mass", "bf_high", "visceral")}
     print("[Alki] Adiposity trio — max Δ:")
-    for k, d in trio.items():
-        print(f"[Alki]   {k:<10} " +
-              (f"max Δ {max(v.length for v in d):.4f}" if d else "(absent)"))
+    for k in ("body_mass", "bf_high", "visceral"):
+        print(f"[Alki]   {k:<10} max Δ {float(np.linalg.norm(np_deltas[k], axis=1).max()):.4f}")
     # Gate at 0.85 (clone detection), NOT 0.5: gross mass and flank honestly
     # co-thicken the midsection, so a moderate cosine is correct anatomy — only
     # a near-clone (≥0.85, two keys sharing a source) is a real defect.
     print("[Alki] Adiposity trio — pairwise cosine (clone if |cos| ≥ 0.85):")
     for a, b in (("body_mass", "bf_high"), ("body_mass", "visceral"),
                  ("bf_high", "visceral")):
-        c = _cos(trio[a], trio[b])
-        flag = "  << CLONE" if (c is not None and abs(c) >= 0.85) else ""
-        print(f"[Alki]   cos({a:<10}, {b:<10}) = " +
-              (f"{c:+.4f}{flag}" if c is not None else "n/a"))
+        c = _cos(a, b)
+        flag = "  << CLONE" if abs(c) >= 0.85 else ""
+        print(f"[Alki]   cos({a:<10}, {b:<10}) = {c:+.4f}{flag}")
 
-    # ── Bake the gender/heavy body into Basis, strip extra shape keys ──
-    # The Alki morphs were stored as basis + scaled(deformed − neutral). We
-    # REBASE them onto `neutral` (the gender body, + heavy mass if heavy), so
-    # their deltas are unchanged relative to the new rest pose:
-    #     new_morph_co = neutral[i] + (old_morph_co − basis[i])
-    # then move `neutral` into Basis. Male/heavy/correctives drop out safely.
+    # ── Rebase onto neutral, bake neutral into Basis ──────────────────
+    # Morphs were stored as basis + delta. Rebase them onto `neutral` (the
+    # heavy rest pose for heavy bases) so their deltas are unchanged relative
+    # to the new rest pose, then move `neutral` into the Basis key AND the
+    # mesh vertices (the exporter writes mesh positions as base POSITION).
     sk = body.data.shape_keys.key_blocks
-    # The TRUE relative-basis key — what every morph is relative to AND what the
-    # exporter writes as the base POSITION. Do NOT look it up by the name
-    # "Basis": HumGen's reference key may be named otherwise, and updating the
-    # wrong block leaves the EXPORTED base lean (morphs rebase onto neutral, but
-    # the real base never moves — the exact lean-clone symptom we hit).
     basis_kb = body.data.shape_keys.reference_key or sk[0]
 
     for k in created:
         kb = sk.get(k)
-        if kb is None:
-            continue
-        for i in range(len(neutral)):
-            old_delta = kb.data[i].co - basis[i]
-            kb.data[i].co = neutral[i] + old_delta
-
-    if basis_kb is not None:
-        for i in range(len(neutral)):
-            basis_kb.data[i].co = neutral[i]
-    for i in range(len(neutral)):
-        body.data.vertices[i].co = neutral[i]
+        if kb is not None:
+            write_coords(kb.data, neutral + np_deltas[k])
+    write_coords(basis_kb.data, neutral)
+    write_coords(body.data.vertices, neutral)
     # Flush the edits into the mesh + depsgraph so the EXPORT and the gate's
-    # re-evaluation below see the new base, not a stale pre-write copy.
+    # read-back below see the new base, not a stale pre-write copy.
     body.data.update()
 
     # Strip everything except Basis + the 14 canonical Alki keys.
-    keep = set(created) | {"Basis"}
+    keep = set(created) | {"Basis", basis_kb.name}
     to_remove = [kb.name for kb in sk if kb.name not in keep]
     print(f"[Alki] Stripping {len(to_remove)} unused shape keys: {to_remove}")
     for name in to_remove:
@@ -517,24 +519,33 @@ def build():
           f"stripped {n_col} vertex-color layer(s).")
 
     # ── HARD GATE: heavy base must actually be heavy (no silent no-op) ──
-    # Measure the RE-EVALUATED mesh — with all morphs at 0 this IS the exported
-    # base geometry, so it reflects what truly committed, NOT the Python-side
-    # key block we wrote (which always reads back correct even if the write
-    # never reached the exported base — the bug that hid the last failure).
-    # RAISE if a heavy base didn't widen vs its own lean rest pose (relative
-    # threshold ⇒ correct for the female pair too; for male, lean ≈ 1.19).
+    # Read the mesh vertices BACK after the write + update — this is the
+    # geometry the exporter writes as base POSITION. Measure the torso band's
+    # extent on the DEPTH axis (overweight thickens front-to-back, NOT
+    # side-to-side) and require it to exceed the lean basis by the gate margin.
     if BODY_TYPE == "heavy":
-        final = evaluate_mesh_positions(body)
-        final_xw = max(c[0] for c in final) - min(c[0] for c in final)
-        lean_xw = max(c[0] for c in lean_ref) - min(c[0] for c in lean_ref)
-        print(f"[Alki] FINAL evaluated base X-width = {final_xw:.3f} "
-              f"(lean rest = {lean_xw:.3f})")
-        if final_xw <= lean_xw + 0.005:
+        def torso_band_depth(coords):
+            up = coords[:, UP]
+            lo, hi = float(up.min()), float(up.max())
+            span = (hi - lo) or 1.0
+            band = ((up - lo) / span >= 0.45) & ((up - lo) / span < 0.82)
+            if not band.any():
+                return 0.0
+            d = coords[band, DEPTH]
+            return float(d.max() - d.min())
+
+        final = read_coords(body.data.vertices, nverts)
+        final_d = torso_band_depth(final)
+        lean_d = torso_band_depth(basis)
+        print(f"[Alki] FINAL torso-band depth ('{'xyz'[DEPTH]}'-extent) = {final_d:.3f} "
+              f"(lean basis = {lean_d:.3f}, gate = lean + {HEAVY_GATE_MIN_DEPTH_GAIN})")
+        if final_d <= lean_d + HEAVY_GATE_MIN_DEPTH_GAIN:
             raise RuntimeError(
-                f"Heavy bake produced a NON-heavy exported base (X-width "
-                f"{final_xw:.3f} ≤ lean {lean_xw:.3f} + tol). The 0.5×overweight "
-                f"offset did not commit to the base mesh the exporter reads. "
-                f"Refusing to export a lean clone.")
+                f"Heavy bake produced a NON-heavy exported base (torso-band "
+                f"depth {final_d:.3f} ≤ lean {lean_d:.3f} + "
+                f"{HEAVY_GATE_MIN_DEPTH_GAIN}). The overweight offset did not "
+                f"reach the base mesh the exporter reads. Refusing to export "
+                f"a lean clone.")
 
     # ── Export (static mesh: export_skins=False) ─────────────────────
     bpy.ops.object.select_all(action="DESELECT")
@@ -556,7 +567,7 @@ def build():
 
     print(f"[Alki] Exported → {OUTPUT_PATH}")
     print("[Alki] DONE. Now run: "
-          f"python blender_scripts/check_glb.py {OUTPUT_PATH} {BODY_TYPE}")
+          f"python blender_scripts/check_glb.py \"{OUTPUT_PATH}\" {BODY_TYPE}")
 
 
 if __name__ == "__main__":
