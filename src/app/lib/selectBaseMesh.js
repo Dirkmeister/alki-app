@@ -21,7 +21,10 @@ import { deriveAll } from "../engine/derivations.js";
 // The shipped fallback mesh (mirrors AlkiApp's DEFAULT_AVATAR_URL). Used
 // when the profile is too incomplete to derive, OR when the honestly
 // selected base hasn't been built yet (see AVAILABLE_BASES). Never null.
-export const DEFAULT_BASE_MESH = "/alki_humgen_male.glb";
+// Points at the 14-key male_lean base (NOT the legacy /alki_humgen_male.glb,
+// which is missing the body_mass key — an incomplete-profile fallback to it
+// would silently no-op the Stage-0 mass channel).
+export const DEFAULT_BASE_MESH = "/alki_humgen_male_lean.glb";
 
 // ── The lean↔heavy band (THE knob) ───────────────────────────
 // Heavy base when the starting body is genuinely large *as fat* — by
@@ -46,14 +49,18 @@ const HEAVY_BAND = {
 // deploys it — anything not listed resolves gracefully to the default
 // shipped mesh (logged), so the app never requests a 404 GLB and never
 // blanks the avatar (the core engagement mechanic).
-//   male_lean  = the currently-shipped mesh (spec §3.1: male_lean origin
-//                is the current male GLB). Wired to the existing file
-//                until its clean re-export.
+//
+// All four bases landed (Stage 2/3 Blender output) and each passed the
+// §3.7 byte-level gate (check_glb.py — 11/11: 14 keys present, body_mass
+// in-band & not a clone, muscle re-sculpt, placeholders flat, neck seam
+// stable, in-pair vertex identity at 26,575). Wired 2026-06-04.
+//   male_lean  = the clean 14-key re-export (spec §3.1). NOT the legacy
+//                /alki_humgen_male.glb, which lacks body_mass.
 const AVAILABLE_BASES = {
-  male_lean: "/alki_humgen_male.glb",
-  // male_heavy:   "/alki_humgen_male_heavy.glb",     // Stage 3
-  // female_lean:  "/alki_humgen_female_lean.glb",    // Stage 2
-  // female_heavy: "/alki_humgen_female_heavy.glb",   // Stage 3
+  male_lean:    "/alki_humgen_male_lean.glb",
+  male_heavy:   "/alki_humgen_male_heavy.glb",
+  female_lean:  "/alki_humgen_female_lean.glb",
+  female_heavy: "/alki_humgen_female_heavy.glb",
 };
 
 function normalizeSex(sex) {

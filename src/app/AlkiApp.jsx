@@ -23,10 +23,13 @@ import FeedbackFAB from "./components/utilities/FeedbackFAB";
 import PerfHUD from "./components/utilities/PerfHUD";
 
 // ─────────────────────────────────────────────────────────────
-// Default 3D parametric body. This is the always-on avatar. "Reset"
-// returns to this (not null). Female mesh TBD (Phase 3) — same shape-key
-// vocabulary, will branch on profile.sex when available.
-const DEFAULT_AVATAR_URL = "/alki_humgen_male.glb";
+// Default 3D parametric body. This is the always-on avatar fallback for an
+// incomplete profile / "Reset" (not null). Points at the 14-key male_lean
+// base so the body_mass channel and re-sculpted muscle are always available;
+// per-profile base selection (male/female × lean/heavy) is resolved by
+// selectBaseMesh() at the load/onboarding sites. The legacy
+// /alki_humgen_male.glb (13 keys, no body_mass) is superseded.
+const DEFAULT_AVATAR_URL = "/alki_humgen_male_lean.glb";
 // ─────────────────────────────────────────────────────────────
 // Public site URL — used for auth redirect links (password reset) so the
 // email ALWAYS points at the deployed app, never localhost. Set
