@@ -105,8 +105,9 @@ ALKI_FROM_NPZ = {
     # gendered), so this composition is identical for male and female — only
     # the final MORPH_SCALE differs. cos vs bf_high = 0.55, vs visceral = 0.54.
     "body_mass":        [
-        ("livekeys/body_proportions/Torso/Belly Size.npz", 0.7),      # abdomen forward
-        ("livekeys/body_proportions/Torso/Hips Size.npz", 0.3),       # pelvis/flank (low — bf_high carries the primary)
+        ("livekeys/body_proportions/Torso/Belly Size.npz", 0.3),      # abdomen forward (low — prevents pregnancy poke at high weights)
+        ("livekeys/body_proportions/Torso/Hips Size.npz", 0.7),       # pelvis/flank lateral spread (primary torso widening)
+        ("livekeys/body_proportions/Torso/Waist Thickness.npz", 0.3), # ribcage breadth/depth
         ("livekeys/body_proportions/Legs/Thigh Thickness.npz", 1.2),  # proximal limb — the unique distribution signal
         ("livekeys/body_proportions/Arms/Upper Arm Thickness.npz", 1.0),
         ("livekeys/body_proportions/Arms/Forearm Thickness.npz", 0.5),
