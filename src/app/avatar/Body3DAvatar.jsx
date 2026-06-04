@@ -36,8 +36,30 @@ import { MORPH_KEYS, MORPH_TARGETS } from "../lib/morphTargets";
  * applied as material adjustments, regardless of mode.
  */
 
-function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) {
-  const { fat = 0, muscle = 0, morphState = null } = params || {};
+// ── Size model (Stage 4 — AVATAR_RANGE_ARCHITECTURE §1.4 / §4.6) ──────
+// The old fit did `scale = 1.7 / modelHeight`, normalizing EVERY body to a
+// fixed 1.7-unit height. That cancelled the mass signal: a heavier morph (and
+// the heavy base mesh) was scaled back into the lean vertical envelope, so all
+// the Stage-0 mass math + Stage-3 `body_mass` geometry could only read as
+// "wider," never as "a bigger person." We decouple apparent size from the
+// height-normalization:
+//   • the base mesh's authored height only sets a consistent UNIT (so meshes
+//     authored at slightly different scales line up) — it is no longer the
+//     final size,
+//   • the avatar's frame is anchored to the user's REAL (engine) height, so a
+//     taller user renders taller, and
+//   • a heavier body (body_mass + muscle) genuinely occupies MORE frame
+//     end-to-end, not just wider.
+// REF_HEIGHT_CM is the frame the base mesh's 1.7-unit norm represents; the two
+// gains are the tunable "how much bigger does mass read" knobs (sign-off).
+const REF_HEIGHT_CM = 178;
+const BODY_MASS_SIZE_GAIN = 0.20; // body_mass 0→1 grows the whole silhouette ~+20%
+const MUSCLE_SIZE_GAIN = 0.07;    // a fully-built frame reads a touch larger too
+const HEIGHT_FACTOR_MIN = 0.88;   // ~157 cm floor on the height anchor
+const HEIGHT_FACTOR_MAX = 1.12;   // ~199 cm ceiling on the height anchor
+
+function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anchorY = 1.0 }) {
+  const { fat = 0, muscle = 0, morphState = null, heightCm = null } = params || {};
   const invalidate = useThree((s) => s.invalidate);
   const groupRef = useRef();
   const { scene } = useGLTF(url);
@@ -78,7 +100,14 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
   const hasMorphTargets = morphInventory.length > 0;
   const useShapeKeys = hasMorphTargets && !!morphState;
 
-  // ── Auto-fit (unchanged) ─────────────────────────────────────────
+  // ── Mass signal that drives apparent size ─────────────────────────
+  // In shape-key mode this is the engine's independent `body_mass` channel
+  // (+ muscle_overall); in legacy mode it's the 2-dim fat/muscle props. Either
+  // way, a heavier body grows the silhouette (see Size model notes above).
+  const sizeBodyMass = morphState ? (morphState.body_mass ?? 0) : fat;
+  const sizeMuscle = morphState ? (morphState.muscle_overall ?? 0) : muscle;
+
+  // ── Auto-fit: height-anchored scale + mass amplification + recenter ──
   const fit = useMemo(() => {
     if (!cloned) return { scale: 1, offsetX: 0, offsetY: 0, offsetZ: 0 };
     cloned.position.set(0, 0, 0);
@@ -86,29 +115,60 @@ function GLBAvatar({ url, params, glow, autoRotate, rotateAround = [0, 0, 0] }) 
 
     const box = new THREE.Box3().setFromObject(cloned);
     const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
     box.getSize(size);
+    box.getCenter(center);
 
+    // NOTE: THREE.computeBoundingBox expands the box by EVERY morph target at
+    // full influence, so `box`/`center`/`modelHeight` are the union of all morph
+    // extents — stable across the current morph state. That's why the old
+    // `1.7 / modelHeight` could never grow with a morph (the box never changes),
+    // and why centering on this box is jitter-free as body_mass animates.
     const modelHeight = Math.max(size.y, 0.001);
-    const scale = 1.7 / modelHeight;
-    const offsetY = -box.min.y * scale;
-    const offsetX = -((box.min.x + box.max.x) / 2) * scale;
-    const offsetZ = -((box.min.z + box.max.z) / 2) * scale;
+
+    // (1) Base unit — normalize the authored height to a known unit. This sets
+    //     the unit only; it is NOT the final on-screen size.
+    const baseUnit = 1.7 / modelHeight;
+    // (2) Height anchor — real engine frame, clamped to a human band so a bad
+    //     profile can't produce a giant/tiny avatar.
+    const hCm = (typeof heightCm === "number" && heightCm > 0) ? heightCm : REF_HEIGHT_CM;
+    const heightFactor = Math.max(HEIGHT_FACTOR_MIN, Math.min(HEIGHT_FACTOR_MAX, hCm / REF_HEIGHT_CM));
+    // (3) Mass amplifier — a heavier body occupies more frame end-to-end.
+    const bm = Math.max(0, Math.min(1, sizeBodyMass));
+    const mus = Math.max(0, Math.min(1, sizeMuscle));
+    const massFactor = 1 + BODY_MASS_SIZE_GAIN * bm + MUSCLE_SIZE_GAIN * mus;
+
+    const scale = baseUnit * heightFactor * massFactor;
+
+    // Recenter on the (scaled) bounds — fixes "avatar not centered".
+    const offsetX = -center.x * scale;
+    const offsetZ = -center.z * scale;
+    // Vertical: large/full-body view centers the bbox midpoint on the camera
+    // anchor, so lean & heavy both sit centered and growth expands symmetrically
+    // (no clipping to one end). Small/cropped view keeps feet on the floor to
+    // preserve its existing high crop.
+    const offsetY = centerVertically
+      ? anchorY - center.y * scale
+      : -box.min.y * scale;
 
     if (typeof window !== "undefined") {
       // eslint-disable-next-line no-console
       console.log("[Alki GLB fit]", {
-        rawMin: box.min.toArray().map(n => n.toFixed(3)),
-        rawMax: box.max.toArray().map(n => n.toFixed(3)),
         rawSize: size.toArray().map(n => n.toFixed(3)),
+        baseUnit: baseUnit.toFixed(3),
+        heightCm: hCm,
+        heightFactor: heightFactor.toFixed(3),
+        bodyMass: bm.toFixed(3),
+        muscle: mus.toFixed(3),
+        massFactor: massFactor.toFixed(3),
         scaleFactor: scale.toFixed(3),
+        scaledHeight: (modelHeight * scale).toFixed(3),
         appliedOffset: [offsetX.toFixed(3), offsetY.toFixed(3), offsetZ.toFixed(3)],
-        afterFitFeetY: 0,
-        afterFitHeadY: 1.7,
         morphMode: useShapeKeys ? "shape_keys" : "legacy_scale"
       });
     }
     return { scale, offsetX, offsetY, offsetZ };
-  }, [cloned, useShapeKeys]);
+  }, [cloned, useShapeKeys, heightCm, sizeBodyMass, sizeMuscle, centerVertically, anchorY]);
 
   // ── Apply morph state to shape keys (SHAPE-KEY MODE) ─────────────
   useEffect(() => {
@@ -251,9 +311,17 @@ export default function Body3DAvatar({
   debugPanel = false,   // TEMP: show live morph-weight sliders for calibration
 }) {
   const isSmall = size === "small";
-  const camPos = isSmall ? [0, 1.55, 3.0] : [0, 0.95, 3.6];
-  const camFov = isSmall ? 15 : 30;
-  const targetY = isSmall ? 1.55 : 0.95;
+  // Large/full-body view: center the body on `anchorY` and frame it wide enough
+  // that the LARGEST avatar in the honest size range (Stage 4 — heavy + tall)
+  // fits without head/feet clipping. The trade is intentional: a lean body now
+  // reads genuinely SMALLER in frame than a heavy one, instead of every body
+  // being normalized to fill the same envelope. Small view keeps its tight high
+  // crop (feet-floored), which the range gate doesn't touch.
+  const anchorY = isSmall ? 0 : 1.0;
+  const centerVertically = !isSmall;
+  const camPos = isSmall ? [0, 1.55, 3.0] : [0, 1.0, 4.3];
+  const camFov = isSmall ? 15 : 32;
+  const targetY = isSmall ? 1.55 : 1.0;
 
   // ── Live calibration override (debug panel only) ────────────────
   // When the panel is on, we seed a local copy of the incoming
@@ -299,7 +367,14 @@ export default function Body3DAvatar({
           )}
 
           <Suspense fallback={null}>
-            <GLBAvatar url={avatarUrl} params={effectiveParams} glow={glow} autoRotate={autoRotate} />
+            <GLBAvatar
+              url={avatarUrl}
+              params={effectiveParams}
+              glow={glow}
+              autoRotate={autoRotate}
+              centerVertically={centerVertically}
+              anchorY={anchorY}
+            />
           </Suspense>
 
           {interactive && (

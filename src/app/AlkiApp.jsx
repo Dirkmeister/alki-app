@@ -473,12 +473,18 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
       const currentMorph = mapToMorphs(sim, 0);     // baseline snapshot
       const projectedMorph = mapToMorphs(sim);       // final (12-wk) snapshot
       const toFat = bfFrac => Math.max(0, Math.min(1, (bfFrac * 100 - 6) / 34));
+      // Real (engine) frame height — the renderer anchors the avatar's vertical
+      // envelope to this instead of normalizing every body to a fixed height,
+      // so a taller user reads taller and the mass channel isn't cancelled
+      // (Stage 4 fit fix, AVATAR_RANGE_ARCHITECTURE §4.6).
+      const heightCm = sim.derivations?.inputs?.heightCm ?? null;
       return {
         current: {
           fat: toFat(sim.baseline.BF),
           muscle: Math.max(0, Math.min(1, currentMorph.muscle_overall)),
           skin: 0,
           isMale,
+          heightCm,
           morphState: currentMorph
         },
         projected: {
@@ -486,6 +492,7 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
           muscle: Math.max(0, Math.min(1, projectedMorph.muscle_overall)),
           skin: projectedMorph.skin_tone_shift || 0,
           isMale,
+          heightCm,
           morphState: projectedMorph
         }
       };
@@ -500,6 +507,16 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
   // Used only when the engine can't run (e.g. an incomplete profile
   // missing weight/height, which makes deriveAll return null). Unchanged.
   const bf = profile.bodyFat;
+
+  // Best-effort frame height for the renderer's height anchor (mirrors
+  // toSIProfile's ft+in → cm conversion). Null when absent → renderer uses
+  // its reference height.
+  const _ft = parseFloat(profile.heightFt);
+  const _in = parseFloat(profile.heightIn);
+  const heightCm =
+    (!Number.isNaN(_ft) || !Number.isNaN(_in))
+      ? ((Number.isNaN(_ft) ? 0 : _ft * 12) + (Number.isNaN(_in) ? 0 : _in)) / 0.3937007874
+      : (typeof profile.heightCm === "number" ? profile.heightCm : null);
 
   // Legacy 2-dim params (still used by SVG BodyAvatar + legacy GLB path)
   const baseFat = Math.max(0, Math.min(1, (bf - 6) / 34));
@@ -552,6 +569,7 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
       muscle: baseMuscle,
       skin: 0,
       isMale,
+      heightCm,
       morphState: morphStates.current
     },
     projected: {
@@ -559,6 +577,7 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
       muscle: Math.max(0, Math.min(1, baseMuscle + muscleMod * MORPH_GAIN)),
       skin: skinMod * MORPH_GAIN,
       isMale,
+      heightCm,
       morphState: morphStates.projected
     }
   };
