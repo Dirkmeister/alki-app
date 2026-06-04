@@ -105,15 +105,18 @@ ALKI_FROM_NPZ = {
     # gendered), so this composition is identical for male and female — only
     # the final MORPH_SCALE differs. cos vs bf_high = 0.55, vs visceral = 0.54.
     "body_mass":        [
-        ("livekeys/body_proportions/Torso/Belly Size.npz", 0.3),      # abdomen forward (low — prevents pregnancy poke at high weights)
-        ("livekeys/body_proportions/Torso/Hips Size.npz", 0.7),       # pelvis/flank lateral spread (primary torso widening)
-        ("livekeys/body_proportions/Torso/Waist Thickness.npz", 0.3), # ribcage breadth/depth
-        ("livekeys/body_proportions/Legs/Thigh Thickness.npz", 1.2),  # proximal limb — the unique distribution signal
-        ("livekeys/body_proportions/Arms/Upper Arm Thickness.npz", 1.0),
-        ("livekeys/body_proportions/Arms/Forearm Thickness.npz", 0.5),
-        ("livekeys/body_proportions/Legs/Shin Thickness.npz", 0.6),
-        ("livekeys/face_proportions/cheeks/cheek_fullness.npz", 0.6), # facial fullness
-        ("livekeys/face_proportions/jaw/jaw_width.npz", 0.4),         # facial width
+        ("livekeys/body_proportions/Torso/Belly Size.npz", 0.15),
+        ("livekeys/body_proportions/Torso/Hips Size.npz", 0.5),
+        ("livekeys/body_proportions/Torso/Waist Thickness.npz", 0.8),
+        ("livekeys/body_proportions/Torso/Chest Width.npz", 0.7),
+        ("livekeys/body_proportions/Torso/Breast Size.npz", 0.4),
+        ("livekeys/body_proportions/Torso/Shoulder Width.npz", 0.2),
+        ("livekeys/body_proportions/Legs/Thigh Thickness.npz", 1.0),
+        ("livekeys/body_proportions/Arms/Upper Arm Thickness.npz", 0.8),
+        ("livekeys/body_proportions/Arms/Forearm Thickness.npz", 0.4),
+        ("livekeys/body_proportions/Legs/Shin Thickness.npz", 0.5),
+        ("livekeys/face_proportions/cheeks/cheek_fullness.npz", 0.8),
+        ("livekeys/face_proportions/jaw/jaw_width.npz", 0.4),
     ],
     "bf_low":           ["livekeys/body_proportions/main/{g}_skinny.npz"],
     "bf_high":          ["livekeys/body_proportions/Torso/Waist Thickness.npz",
