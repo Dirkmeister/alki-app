@@ -97,11 +97,19 @@ alki-app/
 │   │   ├── compounds-expanded.js ← Extended 63-compound data
 │   │   └── protocolProtocols.js ← Plan C: per-compound protocol data (all 71; needs_review flags)
 │   │
+│   ├── engine/                ← Live Eidolon engine (pure JS, firewall-clean — core IP)
+│   │   ├── simulate.js        ← Top-level simulate() entry point
+│   │   ├── mapToMorphs.js     ← State → morph-weight mapping (body_mass, muscle sigmoid)
+│   │   ├── derivations.js     ← Profile → physiological state (LBM, FFMI, ceilings)
+│   │   ├── compoundVectors.js ← Per-compound effect vectors (NEVER modify without evidence)
+│   │   └── constants.js       ← Anthropometric constants, sigmoid params
+│   │
 │   ├── lib/                   ← Pure logic (no render imports allowed)
+│   │   ├── selectBaseMesh.js  ← 4-base GLB selector (profile → bodyUrl via BF%/FMI band)
 │   │   ├── peptideEngine.js   ← Morph/effect helpers (NOTE: the LIVE recommendation
 │   │   │                         engine is the INLINE getRecommendations in AlkiApp.jsx)
 │   │   ├── stackGenerator.js  ← Stack generation logic
-│   │   ├── morphTargets.js    ← Canonical 13-key morph system + baseline driver
+│   │   ├── morphTargets.js    ← Canonical 14-key morph system + baseline driver
 │   │   ├── compoundMorphVectors.js ← Per-compound effect vectors (core IP)
 │   │   ├── protocolGuide.js   ← Plan C: supply/reconstitution/schedule/timeline helpers
 │   │   ├── cultivation.js     ← Cultivation system (progressing/stagnant/regressing)
@@ -110,8 +118,12 @@ alki-app/
 │   └── error.jsx              ← Error boundary
 │
 ├── public/
-│   ├── alki_humgen_male.glb       ← Trimmed HumGen male body (4.5MB, production)
-│   └── alki_humgen_male_slim.glb  ← Stale intermediate (18MB — candidate for deletion)
+│   ├── alki_humgen_male_lean.glb    ← 14-key male lean base (2.3MB, 26575 verts)
+│   ├── alki_humgen_male_heavy.glb   ← 14-key male heavy base (2.3MB, 26575 verts)
+│   ├── alki_humgen_female_lean.glb  ← 14-key female lean base (2.0MB, 26575 verts)
+│   ├── alki_humgen_female_heavy.glb ← 14-key female heavy base (2.1MB, 26575 verts)
+│   ├── alki_humgen_male.glb         ← RETIRED legacy 13-key male (4.5MB — delete when ready)
+│   └── alki_humgen_male_slim.glb    ← RETIRED stale intermediate (18MB — delete when ready)
 │
 ├── blender_scripts/           ← Blender Python scripts for GLB pipeline
 │   ├── build_base_body.py
@@ -121,8 +133,12 @@ alki-app/
 │   └── strip_textures.mjs
 │
 ├── docs/
-│   ├── AVATAR_3D_ARCHITECTURE.md  ← 3D avatar architecture + build plan
-│   └── plans/                     ← Coding plans (from May 17 session)
+│   ├── AVATAR_3D_ARCHITECTURE.md       ← 3D avatar architecture + build plan
+│   ├── AVATAR_RANGE_ARCHITECTURE.md    ← 4-base mesh design (Option C) + driver fix spec
+│   ├── HUMGEN_PHASE_A_FINDINGS.md      ← HumGen source investigation (LiveKey mechanics)
+│   ├── HUMGEN_PHASE_B_REPORT.md        ← HumGen live measurement (lever calibration tables)
+│   ├── EIDOLON_ENGINE_SPEC.md          ← Full mathematical/physiological reference
+│   └── plans/                          ← Coding plans (from May 17 session)
 │       ├── PLAN_A_HOME_SCREEN.md
 │       ├── PLAN_B_AVATAR_CLOTHING.md
 │       ├── PLAN_C_PROTOCOL_GUIDE.md
@@ -139,11 +155,13 @@ alki-app/
 
 ## Architecture Rules
 
-1. **`lib/` and `data/` import nothing from React or any renderer.** They are pure logic. This is the "portability firewall" — everything in these folders ports to React Native untouched.
+1. **`lib/`, `data/`, and `engine/` import nothing from React or any renderer.** They are pure logic. This is the "portability firewall" — everything in these folders ports to React Native untouched.
 2. **`screens/` are full-page views.** Each manages its own layout. They receive props from AlkiApp.jsx.
 3. **AlkiApp.jsx is the state root.** All top-level state (profile, eidolons, screen routing, auth) lives here and flows down as props. This is intentional — not a refactor target until complexity demands it.
 4. **The recommendation engine is deterministic.** Rule-based matching, not LLM-powered. Claude API integration for conversational Q&A is a future layer.
-5. **Compound effect vectors in `compoundMorphVectors.js` are the core IP.** These are research-grounded numbers anchored to published clinical data. Don't modify without understanding the evidence basis (see the Eidolon Engine spec).
+5. **Compound effect vectors in `compoundMorphVectors.js` and `engine/compoundVectors.js` are the core IP.** These are research-grounded numbers anchored to published clinical data. Don't modify without understanding the evidence basis (see the Eidolon Engine spec).
+6. **14 canonical geometry morph keys** (`bf_low`, `bf_high`, `body_mass`, `visceral`, `water`, `muscle_overall`, `muscle_chest`, `muscle_shoulders`, `muscle_arms`, `muscle_back`, `muscle_legs`, `muscle_calves`, `abs_def`, `vascularity`) + 2 material-only (`skin_tone_shift`, `skin_quality`). Every base GLB must expose all 14 geometry keys by name. `water`/`abs_def`/`vascularity` are flat placeholders (future material pass).
+7. **4-base mesh system** — {male,female} × {lean,heavy}, each 26,575 verts. `selectBaseMesh.js` routes profiles to the honest base via BF%/FMI band. Old legacy `alki_humgen_male.glb` (13-key) is retired.
 
 ## Coding Style
 
@@ -214,10 +232,13 @@ A comprehensive mathematical/physiological reference document exists covering:
 
 - `AVATAR_PLATFORM_PLAN.md` — Avatar web-to-native strategy
 - `docs/AVATAR_3D_ARCHITECTURE.md` — 3D morph system architecture
+- `docs/AVATAR_RANGE_ARCHITECTURE.md` — 4-base mesh design (Option C), driver-math fix, per-base gate spec
+- `docs/HUMGEN_PHASE_A_FINDINGS.md` — HumGen source investigation (LiveKey write/export mechanism)
+- `docs/HUMGEN_PHASE_B_REPORT.md` — HumGen live measurement (lever calibration: overweight, muscular, per-region muscle)
+- `docs/EIDOLON_ENGINE_SPEC.md` — Full mathematical/physiological reference for the simulation engine
 - `docs/plans/PLAN_A_HOME_SCREEN.md` — Home screen redesign + eidolon crash fix
 - `docs/plans/PLAN_B_AVATAR_CLOTHING.md` — Athletic wear + muscle definition lines
 - `docs/plans/PLAN_C_PROTOCOL_GUIDE.md` — Personalized protocol implementation guide
 - `docs/plans/PLAN_D_COMPOUND_REVIEW.md` — Compound classification audit
 - `docs/plans/PLAN_E_PHOTO_CAPTURE.md` — Progress photo UI scaffolding
 - `ALKI_BUG_THREAD_SEED.md` — Bug triage session template
-- Eidolon Engine spec: `docs/EIDOLON_ENGINE_SPEC.md` — the full mathematical/physiological reference for the simulation engine
