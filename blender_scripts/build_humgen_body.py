@@ -394,17 +394,18 @@ def build():
           f"-> UP='{'xyz'[UP]}', DEPTH='{'xyz'[DEPTH]}'")
 
     # ── Neck-seam vertex set (spec §1.3/§3.7 #6) ──────────────────────
-    # Lock the head-attach reserve so NO morph disturbs the neck seam. Picked
-    # from `neutral` (the exported Basis) on the detected UP axis — the same
-    # band check_glb step [8] measures on the exported file.
+    # DISABLED (2026-06-04): the hard lockout created a visible step where
+    # muscle_shoulders (traps) pushes outward at ~0.86·H but the seam band
+    # verts stayed frozen. No separate head mesh exists yet, so the seam
+    # insurance is costing a real visual bug. Re-enable when a head-attach
+    # mesh ships (Avaturn "MAKE IT ME" or equivalent) — the band and mask
+    # logic below is kept intact for that future pass.
     nlo, nhi = NECK_SEAM_BAND
-    seam_mask = (neutral[:, UP] >= nlo) & (neutral[:, UP] <= nhi)
-    n_seam = int(seam_mask.sum())
-    print(f"[Alki] Neck-seam lock: up-axis '{'xyz'[UP]}', band [{nlo},{nhi}] "
-          f"holds {n_seam}/{nverts} verts (zeroed in every morph).")
-    if n_seam == 0:
-        print("[Alki]   !! WARNING: no verts in the seam band — mesh scale/axis "
-              "differs from the 1.8-unit reference; inspect before trusting.")
+    seam_mask = np.zeros(nverts, dtype=bool)  # was: (neutral[:, UP] >= nlo) & (neutral[:, UP] <= nhi)
+    n_seam = 0
+    print(f"[Alki] Neck-seam lock: DISABLED (no head mesh yet). "
+          f"Band [{nlo},{nhi}] would hold "
+          f"{int(((neutral[:, UP] >= nlo) & (neutral[:, UP] <= nhi)).sum())}/{nverts} verts.")
 
     # ── Chest-taper weights (MALE body_mass only — see CHEST_TAPER_* note) ──
     up_b = basis[:, UP]
