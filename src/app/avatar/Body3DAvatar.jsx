@@ -226,17 +226,8 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
     cloned.traverse((obj) => {
       if (!obj.isMesh || !obj.material) return;
       const lower = (obj.name || "").toLowerCase();
-      // Skin vs clothing/eyes is classified by the UNION of mesh name +
-      // material name. The body and its joined garment export as a single mesh
-      // (sharing one mesh name), so the garment can only be told apart by its
-      // material (Alki_Cloth_Boxers); skin keeps Alki_Skin and stays skin; eyes
-      // carry "eye". Without the material-name check the garment would be
-      // recolored to skin tone and lose its fabric look.
-      const matName = (obj.material?.name || "").toLowerCase();
-      const tag = lower + " " + matName;
-      const isSkin = !["hair", "eye", "teeth", "tongue", "cloth", "shirt", "pant",
-        "short", "boxer", "brief", "bra", "underwear", "garment", "sock", "shoe"]
-        .some(k => tag.includes(k));
+      const isSkin = !["hair", "eye", "teeth", "tongue", "cloth", "shirt", "pant", "short"]
+        .some(k => lower.includes(k));
 
       // One-time: neutralize HumGen's broken material channels on skin.
       // Null out every map slot (PBR + Physical extensions) and disable
