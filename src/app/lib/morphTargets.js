@@ -172,16 +172,6 @@ export const MORPH_BY_KEY = Object.fromEntries(MORPH_TARGETS.map(m => [m.key, m]
 export function baselineMorphState(profile) {
   const state = Object.fromEntries(MORPH_TARGETS.map(m => [m.key, m.default]));
 
-  // DEBUG: force a pure-neutral body (every morph at 0). Confirmed the
-  // app-neutral matches the Blender neutral, so the pipeline is correct
-  // and all shaping comes from the weights below. Left here (off) as a
-  // quick A/B switch for future calibration.
-  const DEBUG_NEUTRAL = false;
-  if (DEBUG_NEUTRAL) {
-    for (const k of MORPH_KEYS) state[k] = 0;
-    return state;
-  }
-
   if (!profile) return state;
 
   const bf = parseFloat(profile.bodyFat) || 18;

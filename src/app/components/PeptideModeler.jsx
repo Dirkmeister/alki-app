@@ -273,13 +273,10 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
 
   return (
     <div style={containerStyle}>
-      {/* Header */}
-      <div style={{ padding: "16px 0 8px" }}>
-        {onBack && (
-          <button onClick={onBack} style={{ background: "none", border: "none", color: C.textDim, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: FONT, marginBottom: 16 }}>
-            ← Back
-          </button>
-        )}
+      {/* Header — top padding reserves the global nav band (persistent HOME +
+          contextual BACK at the app root); the in-flow back button was removed
+          in favor of that single nav chrome. Sprint 4, item 4.1. */}
+      <div style={{ padding: "60px 0 8px" }}>
         <div style={{ ...label, color: C.accent, letterSpacing: "0.18em", marginBottom: 4 }}>Analytics</div>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15 }}>
           Body Composition Projections

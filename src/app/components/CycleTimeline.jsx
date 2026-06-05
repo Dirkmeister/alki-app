@@ -1140,31 +1140,11 @@ function StepBtn({ children, onClick, disabled }) {
   );
 }
 
-function Header({ onBack }) {
+function Header() {
+  // Back/Home navigation is provided globally by AlkiApp's nav chrome
+  // (persistent HOME + contextual BACK at the app root). Sprint 4, item 4.1.
   return (
     <div>
-      {onBack && (
-        <button
-          onClick={onBack}
-          style={{
-            background: TOKENS.surface,
-            border: `1px solid ${TOKENS.borderStrong}`,
-            color: TOKENS.textPrimary,
-            fontSize: 14,
-            fontWeight: 600,
-            padding: "8px 14px",
-            borderRadius: 10,
-            cursor: "pointer",
-            fontFamily: FONT_STACK,
-            marginBottom: 16,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          ← Back
-        </button>
-      )}
       <div style={{
         fontSize: 10,
         fontFamily: MONO_STACK,
@@ -1254,7 +1234,8 @@ export default function CycleTimeline({
   const containerStyle = {
     maxWidth: 480,
     margin: "0 auto",
-    padding: "20px 20px 48px 20px",
+    // Top padding reserves the global nav band (HOME + BACK at the app root, 4.1).
+    padding: "60px 20px 48px 20px",
     minHeight: "100vh",
     boxSizing: "border-box",
     color: TOKENS.textPrimary,
@@ -1266,7 +1247,7 @@ export default function CycleTimeline({
   if (normalizedStack.length === 0) {
     return (
       <div style={containerStyle}>
-        <Header onBack={onBack} />
+        <Header />
         <div style={{
           marginTop: 60,
           padding: 40,

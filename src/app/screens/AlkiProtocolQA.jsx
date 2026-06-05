@@ -914,11 +914,11 @@ export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, con
 
   return (
     <div style={S.root}>
-      {/* Screen header */}
+      {/* Screen header — back button + the redundant ALKI wordmark were removed:
+          navigation (persistent HOME + contextual BACK) is now the single global
+          chrome at the app root, and screenHeader reserves its band. Sprint 4 (4.1). */}
       <div style={S.screenHeader}>
-        <button style={S.backBtn} onClick={onBack}>← Back</button>
         <span style={S.screenTitle}>Protocol Q&A</span>
-        <span style={S.wordmark}>ALKI</span>
       </div>
 
       {/* Search */}
@@ -1186,7 +1186,8 @@ const S = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "16px 20px 12px",
+    // Top padding reserves the global nav band (HOME + BACK at the app root, 4.1).
+    padding: "60px 20px 12px",
     borderBottom: "1px solid #1a1a1a",
     flexShrink: 0,
   },

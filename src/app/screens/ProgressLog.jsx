@@ -201,11 +201,11 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
 
   return (
     <div style={S.inner}>
-      {/* Header */}
-      <div style={{ padding: "16px 0 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 14, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-          ← Back to Research
-        </button>
+      {/* Header — top padding reserves the global nav band (persistent HOME +
+          contextual BACK at the app root). The old in-flow back button and the
+          right-aligned label (which collided with the fixed HOME control) were
+          removed in favor of that single nav chrome. Sprint 4, item 4.1. */}
+      <div style={{ padding: "60px 0 8px" }}>
         <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)" }}>
           εἰδωλον · Progress
         </div>

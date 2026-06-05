@@ -70,7 +70,6 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
   // dictionary, and remember which Alki canonical keys are available.
   const morphInventory = useMemo(() => {
     const inventory = []; // [{ mesh, keyMap: { canonical_key: morph_index } }]
-    let totalKeysFound = 0;
     cloned.traverse(obj => {
       if (!obj.isMesh) return;
       const dict = obj.morphTargetDictionary;
@@ -83,17 +82,8 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
       }
       if (Object.keys(keyMap).length > 0) {
         inventory.push({ mesh: obj, keyMap });
-        totalKeysFound += Object.keys(keyMap).length;
       }
     });
-    if (typeof window !== "undefined") {
-      // eslint-disable-next-line no-console
-      console.log("[Alki morph inventory]", {
-        meshesWithMorphs: inventory.length,
-        totalKeysFound,
-        availableKeys: [...new Set(inventory.flatMap(i => Object.keys(i.keyMap)))]
-      });
-    }
     return inventory;
   }, [cloned]);
 
@@ -113,18 +103,39 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
     cloned.position.set(0, 0, 0);
     cloned.scale.set(1, 1, 1);
 
+    cloned.updateMatrixWorld(true);
+
+    // SIZE comes from the morph-UNION box: THREE.computeBoundingBox (used by
+    // setFromObject) expands by EVERY morph target at full influence, so this
+    // box is the union of all morph extents — stable regardless of the current
+    // morph state. That stability is what the Stage-4 size model relies on (the
+    // `1.7 / modelHeight` unit can't grow with a morph, so mass amplification
+    // isn't double-counted). Keep using it for the vertical extent only.
     const box = new THREE.Box3().setFromObject(cloned);
     const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
     box.getSize(size);
-    box.getCenter(center);
-
-    // NOTE: THREE.computeBoundingBox expands the box by EVERY morph target at
-    // full influence, so `box`/`center`/`modelHeight` are the union of all morph
-    // extents — stable across the current morph state. That's why the old
-    // `1.7 / modelHeight` could never grow with a morph (the box never changes),
-    // and why centering on this box is jitter-free as body_mass animates.
     const modelHeight = Math.max(size.y, 0.001);
+
+    // CENTER comes from the NEUTRAL (un-morphed) body box instead of the union.
+    // The union's center is pulled off the body that's actually on screen: the
+    // displayed avatar sits at partial morph weights, but the union box bulges
+    // to every morph's full extent (e.g. muscle/mass channels add reach at the
+    // top and the belly), so its midpoint floats above the real torso — which
+    // reads as "avatar not centered in its container" (4.4). setFromBufferAttribute
+    // measures the base position attribute only (no morph expansion), giving the
+    // symmetric base body's true center. It's still fully stable across morph
+    // state (base positions never change), so recentering stays jitter-free.
+    const center = new THREE.Vector3();
+    const neutralBox = new THREE.Box3();
+    cloned.traverse((obj) => {
+      const posAttr = obj.isMesh && obj.geometry?.attributes?.position;
+      if (!posAttr) return;
+      const meshBox = new THREE.Box3().setFromBufferAttribute(posAttr);
+      meshBox.applyMatrix4(obj.matrixWorld);
+      neutralBox.union(meshBox);
+    });
+    if (neutralBox.isEmpty()) box.getCenter(center);
+    else neutralBox.getCenter(center);
 
     // (1) Base unit — normalize the authored height to a known unit. This sets
     //     the unit only; it is NOT the final on-screen size.
@@ -151,22 +162,6 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
       ? anchorY - center.y * scale
       : -box.min.y * scale;
 
-    if (typeof window !== "undefined") {
-      // eslint-disable-next-line no-console
-      console.log("[Alki GLB fit]", {
-        rawSize: size.toArray().map(n => n.toFixed(3)),
-        baseUnit: baseUnit.toFixed(3),
-        heightCm: hCm,
-        heightFactor: heightFactor.toFixed(3),
-        bodyMass: bm.toFixed(3),
-        muscle: mus.toFixed(3),
-        massFactor: massFactor.toFixed(3),
-        scaleFactor: scale.toFixed(3),
-        scaledHeight: (modelHeight * scale).toFixed(3),
-        appliedOffset: [offsetX.toFixed(3), offsetY.toFixed(3), offsetZ.toFixed(3)],
-        morphMode: useShapeKeys ? "shape_keys" : "legacy_scale"
-      });
-    }
     return { scale, offsetX, offsetY, offsetZ };
   }, [cloned, useShapeKeys, heightCm, sizeBodyMass, sizeMuscle, centerVertically, anchorY]);
 

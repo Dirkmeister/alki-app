@@ -61,6 +61,14 @@ const APP_VERSION = "0.1.99";
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
 
+// Routed inner screens — everything reachable from the dashboard via navTo().
+// Drives the single global navigation chrome (persistent HOME + contextual
+// BACK) rendered at the app root. The dashboard itself is "home" and is NOT
+// listed here, so it shows no chrome. Each of these screens reserves a top
+// nav band (≈60px top padding) and no longer renders its own back button —
+// the root chrome is the one consistent nav surface (Sprint 4, item 4.1).
+const INNER_SCREENS = ["modeler", "progress", "qa", "timeline", "protocol_guide", "photos"];
+
 // Baseline test profile — average male, useful neutral starting point
 // for evaluating stacks and testing the new-user flow without creating
 // an account. Triggered from the auth screen.
@@ -74,22 +82,6 @@ const BASELINE_PROFILE = {
   goals: ["fat_loss", "muscle", "recovery"],
   adv: { skelMuscle: "39.4", fatFreeMass: "148", subFat: "16.2", visceralFat: "8", bodyWater: "55.8", muscleMass: "73", boneMass: "7.4", bmr: "1810" }
 };
-
-// #47 repro — lean user + the 10-compound "banger" stack that crashed the
-// committed home. Loads straight into the dashboard builder so the crash
-// flow (project → lock in → main) can be reproduced in a couple of taps.
-const CRASH_REPRO_PROFILE = {
-  sex: "male",
-  age: 28,
-  heightFt: 5,
-  heightIn: 7,
-  weight: 138,
-  bodyFat: 7.5,
-  goals: ["muscle", "fat_loss", "recovery"],
-  adv: { skelMuscle: "59.8", fatFreeMass: "128.9", subFat: "7.1", visceralFat: "3", bodyWater: "66.7", muscleMass: "122.7", boneMass: "6.2", bmr: "1633" }
-};
-const CRASH_REPRO_STACK = ["rad140", "lgd4033", "mk677", "fragment176", "sr9009", "bpc157", "cjc1295_nodac", "ipamorelin", "tb500", "tadalafil"];
-// ─────────────────────────────────────────────────────────────
 
 // ── COMPOUND DATABASE ──────────────────────────────────────
 const COMPOUNDS = [
@@ -1760,7 +1752,7 @@ function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose, on
 function EidolonHero({
   profile, avatarUrl, avatarParams, eidolonName,
   editingName, nameInput, setNameInput, onStartEditName, onCommitName, onCancelName,
-  onCaptureAvatar, onResetAvatar, showAvatarDebug, setShowAvatarDebug,
+  onCaptureAvatar, onResetAvatar, showAvatarDebug,
   avatarResetSignal = 0,
   pulse = false, glowLevel = 0, projection = null,
 }) {
@@ -1831,7 +1823,7 @@ function EidolonHero({
         </div>
       </div>
 
-      {/* Avatar customization chip + debug toggle */}
+      {/* Avatar customization chip */}
       <div style={{ textAlign: "center", marginBottom: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
         {avatarUrl ? (
           <button onClick={onResetAvatar} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
@@ -1842,13 +1834,6 @@ function EidolonHero({
             {AVATURN_ENABLED ? "✦ Make it me" : "Make it me · setup"}
           </button>
         )}
-        <button
-          onClick={() => setShowAvatarDebug(v => !v)}
-          title="Toggle morph debug panel"
-          style={{ background: showAvatarDebug ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${showAvatarDebug ? "rgba(26,232,122,0.25)" : "rgba(255,255,255,0.07)"}`, color: showAvatarDebug ? S.accent : "rgba(255,255,255,0.3)", fontSize: 13, padding: "4px 10px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", lineHeight: 1, transition: "all 0.15s ease" }}
-        >
-          ⚙
-        </button>
       </div>
 
       {/* Stat pills */}
@@ -1911,7 +1896,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [editing, setEditing] = useState(!activeProtocol);
   const [showManageMenu, setShowManageMenu] = useState(false); // #62 — committed-home Manage dropdown
   const [showEidolonSwitcher, setShowEidolonSwitcher] = useState(false);
-  const [showAvatarDebug, setShowAvatarDebug] = useState(false);
+  // Morph calibration panel stays available for future calibration sessions:
+  // flip this default to true (or set via devtools) to surface the slider panel.
+  // The in-app ⚙ toggle was removed for deployment hygiene (Sprint 1, item 1.2).
+  const [showAvatarDebug] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [dosePulse, setDosePulse] = useState(false); // #16 — daily-dose completion pulse
@@ -2020,6 +2008,17 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setEditing(false);
     setShowTransform(false);
   }, [activeEidolon]);
+
+  // 4.3 — re-enter the builder on the committed stack to adjust it. Surfaced on
+  // the committed home as a visible "Edit Protocol" button AND tappable Active
+  // Stack / Goals cards, so users no longer have to dig through the Manage ▾ menu
+  // to modify. The commit/lock logic is unchanged — this just flips back into the
+  // existing edit flow with the locked compounds loaded.
+  const startModify = useCallback(() => {
+    setSelectedCompounds(activeProtocol?.compounds || []);
+    setShowTransform(false);
+    setEditing(true);
+  }, [activeProtocol, setSelectedCompounds]);
 
   const recommendations = useMemo(() => {
     try { return getRecommendations(profile); }
@@ -2534,7 +2533,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               gap: 8
             }}
           >
-            {isModifying ? 'Confirm Changes →' : 'Lock In This Protocol →'}
+            {isModifying ? 'Confirm Changes →' : 'Start Protocol →'}
           </button>
         )}
 
@@ -2585,7 +2584,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                   <div onClick={() => setShowManageMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
                   <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 91, background: "#141414", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: 6, minWidth: 168, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
                     {[
-                      ["Modify protocol", () => { setSelectedCompounds(activeProtocol.compounds || []); setEditing(true); }],
+                      ["Modify protocol", startModify],
                       ["Switch eidolon", () => setShowEidolonSwitcher(true)],
                       ["+ New eidolon", createNewEidolon],
                     ].map(([mLabel, fn]) => (
@@ -2637,7 +2636,6 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         onResetAvatar={() => { onResetAvatar?.(); setAvatarResetSignal(n => n + 1); }}
         avatarResetSignal={avatarResetSignal}
         showAvatarDebug={showAvatarDebug}
-        setShowAvatarDebug={setShowAvatarDebug}
         pulse={dosePulse}
         glowLevel={doseProgress}
         projection={editing && selectedCompounds.length > 0 ? projectedChanges : null}
@@ -2784,9 +2782,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             );
           })()}
 
-          {/* 5. Active stack — equipped badges */}
-          <div style={S.card}>
-            <div style={{ ...S.label, marginBottom: 10 }}>Active Stack</div>
+          {/* 5. Active stack — equipped badges. 4.3 — the whole card is now
+              tap-to-edit (re-enters the builder on this stack). */}
+          <div onClick={startModify} title="Edit protocol" style={{ ...S.card, cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ ...S.label, marginBottom: 0 }}>Active Stack</div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: S.accent, letterSpacing: "0.04em" }}>Edit ✎</span>
+            </div>
             {(activeProtocol.compounds || []).length > 0 ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {(activeProtocol.compounds || []).map(id => {
@@ -2822,9 +2824,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             )}
           </div>
 
-          {/* 6. Goals */}
-          <div style={S.card}>
-            <div style={{ ...S.label, marginBottom: 10 }}>Goals</div>
+          {/* 6. Goals. 4.3 — tap-to-edit; goals become editable again inside the
+              builder (they lock only while committed). */}
+          <div onClick={startModify} title="Edit goals & protocol" style={{ ...S.card, cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ ...S.label, marginBottom: 0 }}>Goals</div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: S.accent, letterSpacing: "0.04em" }}>Edit ✎</span>
+            </div>
             {(profile.goals || []).length > 0 ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {(profile.goals || []).map(gid => {
@@ -2847,7 +2853,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               </div>
             ) : (
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-                No goals set. Tap <span style={{ color: S.accent, fontWeight: 600 }}>Manage ▾ → Modify</span> to change goals — they lock while a protocol is active.
+                No goals set. Tap <span style={{ color: S.accent, fontWeight: 600 }}>Edit ✎</span> to choose goals — they lock while a protocol is active.
               </div>
             )}
           </div>
@@ -2876,10 +2882,16 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               Protocol Timeline
             </button>
           </div>
-          {/* Plan E — progress photos entry */}
-          <button onClick={onPhotos} style={{ ...S.btnOutline, marginBottom: 10 }}>
-            📷 Progress Photos
-          </button>
+          {/* 4.3 — visible Edit Protocol entry (no longer Manage-menu-only) +
+              Plan E progress photos, two-up. */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <button onClick={startModify} style={S.btnOutline}>
+              ✎ Edit Protocol
+            </button>
+            <button onClick={onPhotos} style={S.btnOutline}>
+              📷 Progress Photos
+            </button>
+          </div>
         </>
       )}
 
@@ -2997,12 +3009,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 </div>
               </div>
 
-              {/* Timeline CTA */}
-              {!stackAnalysis.isBlocked && (
-                <button onClick={onTimeline} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  Protocol Timeline
-                </button>
-              )}
+              {/* 4.2 — the Protocol Timeline CTA moved out of the mid-page stack
+                  block and into the always-visible sticky footer below, alongside
+                  View Projection and the primary Start Protocol action, so the key
+                  actions are no longer buried under the stack analysis. */}
 
               {/* Stack Intelligence — compact */}
               <StackIntelligence
@@ -3201,43 +3211,70 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             </>
           )}
 
-          {/* Fixed bottom CTA bar — always visible once a stack exists */}
+          {/* Fixed bottom CTA bar — always visible once a stack exists.
+              4.2 — this is now the single home for the builder's key actions, which
+              were previously buried at the bottom of the stack: a prominent primary
+              "Start Protocol" (the lock-in, clearer label than "Lock in Protocol"),
+              with "View Projection" and "Protocol Timeline" as clear secondary
+              buttons. The commit logic (handleLockIn) is unchanged — only its
+              surfacing moved up here so testers actually see it. */}
           {builderView !== null && selectedCompounds.length > 0 && (
             <>
-              {/* Spacer so content isn't hidden behind the fixed bar */}
-              <div style={{ height: 80 }} />
+              {/* Spacer so content isn't hidden behind the fixed bar (taller now
+                  that the bar carries the primary CTA + a secondary action row). */}
+              <div style={{ height: 156 }} />
               <div style={{
                 position: "fixed", bottom: 0, left: 0, right: 0,
-                padding: "12px 20px 20px", zIndex: 100,
-                background: "linear-gradient(to top, #0a0a0a 85%, transparent)",
+                padding: "12px 20px 18px", zIndex: 100,
+                background: "linear-gradient(to top, #0a0a0a 82%, transparent)",
               }}>
-                {/* #67 — echo the live Stack Safety score in the always-visible CTA
-                    bar so its change is seen without scrolling back up to the analysis. */}
-                {(() => {
-                  const sc = stackAnalysis.safetyScore?.overall ?? 100;
-                  const col = sc >= 85 ? "#22d68a" : sc >= 65 ? "#a3e635" : sc >= 45 ? "#f59e0b" : "#ef4444";
-                  return (
-                    <div style={{ maxWidth: 480, margin: "0 auto 8px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                      <span style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: 10, fontWeight: 700 }}>Stack Safety</span>
-                      <span style={{ color: col, fontSize: 12, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stackAnalysis.summary?.risk || "—"} · {sc}/100</span>
-                    </div>
-                  );
-                })()}
-                <button
-                  onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-                  disabled={stackAnalysis.isBlocked}
-                  style={{
-                    ...S.btn,
-                    ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    maxWidth: 480, margin: "0 auto",
-                    boxShadow: "0 -4px 24px rgba(0,0,0,0.6)",
-                  }}
-                >
-                  {stackAnalysis.isBlocked
-                    ? "Resolve Contraindications"
-                    : `View Eidolon Projection (${selectedCompounds.length}) →`}
-                </button>
+                <div style={{ maxWidth: 480, margin: "0 auto" }}>
+                  {/* #67 — echo the live Stack Safety score so its change is seen
+                      without scrolling back up to the analysis. */}
+                  {(() => {
+                    const sc = stackAnalysis.safetyScore?.overall ?? 100;
+                    const col = sc >= 85 ? "#22d68a" : sc >= 65 ? "#a3e635" : sc >= 45 ? "#f59e0b" : "#ef4444";
+                    return (
+                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                        <span style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: 10, fontWeight: 700 }}>Stack Safety</span>
+                        <span style={{ color: col, fontSize: 12, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stackAnalysis.summary?.risk || "—"} · {sc}/100</span>
+                      </div>
+                    );
+                  })()}
+                  {/* Secondary actions — Projection (the avatar before/after) +
+                      Timeline, two-up so both are reachable in one tap. */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                    <button
+                      onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+                      disabled={stackAnalysis.isBlocked}
+                      style={{ ...S.btnOutline, padding: "13px 12px", ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}
+                    >
+                      View Projection
+                    </button>
+                    <button onClick={onTimeline} style={{ ...S.btnOutline, padding: "13px 12px" }}>
+                      Protocol Timeline
+                    </button>
+                  </div>
+                  {/* Primary — Start Protocol (or Confirm Changes when modifying a
+                      locked stack). Locks in directly via the unchanged handleLockIn. */}
+                  <button
+                    onClick={() => !stackAnalysis.isBlocked && handleLockIn(selectedCompounds)}
+                    disabled={stackAnalysis.isBlocked}
+                    style={{
+                      ...S.btn,
+                      ...(stackAnalysis.isBlocked ? S.btnDisabled : {}),
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      width: "100%",
+                      boxShadow: "0 -4px 24px rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    {stackAnalysis.isBlocked
+                      ? "Resolve Contraindications"
+                      : isModifying
+                        ? `Confirm Changes (${selectedCompounds.length}) →`
+                        : `Start Protocol (${selectedCompounds.length}) →`}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -3327,7 +3364,7 @@ async function saveProfile(userId, profile, selectedCompounds, avatarUrl, active
 }
 
 // ── AUTH SCREEN ────────────────────────────────────────────
-function AuthScreen({ onAuth, onBack, onSkip, onBaseline, onCrashRepro }) {
+function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
   const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -3549,23 +3586,6 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline, onCrashRepro }) {
           </div>
         )}
 
-        {onCrashRepro && (
-          <div style={{ textAlign: "center", marginTop: 8 }}>
-            <button onClick={onCrashRepro} style={{
-              background: "none",
-              border: "1px solid rgba(255,77,77,0.25)",
-              color: "rgba(255,77,77,0.6)",
-              fontSize: 11,
-              cursor: "pointer",
-              fontFamily: "'JetBrains Mono', monospace",
-              padding: "8px 16px",
-              borderRadius: 8,
-              letterSpacing: "0.04em",
-            }}>
-              ⚠ Crash Repro · 10-stack (Dev)
-            </button>
-          </div>
-        )}
       </div>
 
       <p style={{ ...S.disclaimer, paddingBottom: 20 }}>
@@ -3933,21 +3953,6 @@ export default function AlkiApp() {
             setOnboardingStartStep(0);
             setScreen("onboarding");
           }}
-          onCrashRepro={() => {
-            // #47 repro — load the lean profile + 10-compound stack straight
-            // into the dashboard builder. No Supabase user; nothing persisted.
-            setUser(null);
-            setProfile({ ...CRASH_REPRO_PROFILE });
-            setSelectedCompounds([...CRASH_REPRO_STACK]);
-            setShowTransform(false);
-            setActiveProtocol(null);
-            setEidolons([]);
-            setActiveEidolonId(null);
-            setAvatarUrl(selectBaseMesh(CRASH_REPRO_PROFILE));
-            setAvatarHeadshot(null);
-            setOnboardingStartStep(null);
-            setScreen("dashboard");
-          }}
         />
       )}
       {screen === "reset_password" && (
@@ -4090,28 +4095,54 @@ export default function AlkiApp() {
         />
       )}
 
-      {/* #65/#3F — persistent ALKI home control on every inner screen: the
-          wordmark is the brand touchpoint AND a one-tap return to the dashboard
-          from anywhere (per-screen "← Back" still steps one level). Top-right so
-          it clears each screen's top-left back button. */}
-      {["modeler", "progress", "qa", "timeline", "protocol_guide", "photos"].includes(screen) && (
-        <button
-          onClick={goHome}
-          title="Home"
-          style={{
-            position: "fixed", top: 12, right: 14, zIndex: 901,
-            display: "flex", alignItems: "center", gap: 7,
-            padding: "7px 13px", borderRadius: 100,
-            background: "rgba(10,10,12,0.82)", border: "1px solid rgba(255,255,255,0.1)",
-            cursor: "pointer", fontFamily: "'Syne', 'DM Sans', sans-serif",
-            boxShadow: "0 2px 12px rgba(0,0,0,0.5)", backdropFilter: "blur(6px)",
-          }}
-        >
-          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
-          </span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1 }}>⌂</span>
-        </button>
+      {/* #65/#3F/Sprint4-4.1 — ONE consistent navigation chrome on every inner
+          screen. HOME (top-right): the ALKI wordmark is the brand touchpoint AND
+          a one-tap return to the dashboard from anywhere — ALWAYS present.
+          BACK (top-left): a contextual arrow that appears ONLY when there's a
+          real previous screen to step back to (navHistory deeper than the
+          dashboard root); when you arrived straight from home, HOME already
+          covers the return so BACK stays hidden. Screens no longer render their
+          own back buttons — this is the single source of nav truth. */}
+      {INNER_SCREENS.includes(screen) && (
+        <>
+          {navHistory.length > 1 && (
+            <button
+              onClick={navBack}
+              title="Back"
+              aria-label="Back"
+              style={{
+                position: "fixed", top: 12, left: 14, zIndex: 901,
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "7px 14px", borderRadius: 100,
+                background: "rgba(10,10,12,0.82)", border: "1px solid rgba(255,255,255,0.1)",
+                cursor: "pointer", fontFamily: "'Syne', 'DM Sans', sans-serif",
+                color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: 600,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.5)", backdropFilter: "blur(6px)",
+              }}
+            >
+              <span style={{ fontSize: 16, lineHeight: 1 }}>←</span>
+              <span>Back</span>
+            </button>
+          )}
+          <button
+            onClick={goHome}
+            title="Home"
+            aria-label="Home"
+            style={{
+              position: "fixed", top: 12, right: 14, zIndex: 901,
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "7px 13px", borderRadius: 100,
+              background: "rgba(10,10,12,0.82)", border: "1px solid rgba(255,255,255,0.1)",
+              cursor: "pointer", fontFamily: "'Syne', 'DM Sans', sans-serif",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.5)", backdropFilter: "blur(6px)",
+            }}
+          >
+            <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+            </span>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1 }}>⌂</span>
+          </button>
+        </>
       )}
 
       {/* Dev/testing feedback button — visible on all screens past splash */}

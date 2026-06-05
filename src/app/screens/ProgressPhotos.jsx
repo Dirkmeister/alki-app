@@ -48,14 +48,15 @@ export default function ProgressPhotos({ photos = [], eidolonName = "Eidolon", o
   };
 
   const container = {
-    maxWidth: 480, margin: "0 auto", padding: "20px 20px 48px", minHeight: "100vh",
+    // Top padding reserves the global nav band (persistent HOME + contextual
+    // BACK live at the app root, fixed at top:12). Sprint 4, item 4.1.
+    maxWidth: 480, margin: "0 auto", padding: "60px 20px 48px", minHeight: "100vh",
     boxSizing: "border-box", color: T.text, fontFamily: FONT,
   };
 
   return (
     <div style={container}>
-      <button onClick={onBack} style={{ background: T.surface, border: `1px solid ${T.borderStrong}`, color: T.text, fontSize: 14, fontWeight: 600, padding: "8px 14px", borderRadius: 10, cursor: "pointer", fontFamily: FONT, marginBottom: 16 }}>← Back</button>
-
+      {/* Back/Home navigation provided globally by AlkiApp's nav chrome (4.1). */}
       <div style={{ fontSize: 10, fontFamily: MONO, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: T.accent, marginBottom: 4 }}>Progress Photos</div>
       <h1 style={{ margin: "0 0 4px", fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", color: T.text, fontFamily: FONT, lineHeight: 1.15 }}>
         {eidolonName}

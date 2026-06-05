@@ -349,13 +349,15 @@ export default function ProtocolGuideView({ stackIds = [], profile, onBack, onQA
   const ids = Array.isArray(stackIds) ? stackIds.filter(Boolean) : [];
 
   const container = {
-    maxWidth: 480, margin: "0 auto", padding: "20px 20px 48px", minHeight: "100vh",
+    // Top padding reserves the global nav band (persistent HOME + contextual
+    // BACK live at the app root, fixed at top:12). Sprint 4, item 4.1.
+    maxWidth: 480, margin: "0 auto", padding: "60px 20px 48px", minHeight: "100vh",
     boxSizing: "border-box", color: T.text, fontFamily: FONT,
   };
 
-  const back = onBack && (
-    <button onClick={onBack} style={{ background: T.surface, border: `1px solid ${T.borderStrong}`, color: T.text, fontSize: 14, fontWeight: 600, padding: "8px 14px", borderRadius: 10, cursor: "pointer", fontFamily: FONT, marginBottom: 16 }}>← Back</button>
-  );
+  // Back/Home navigation is provided globally by AlkiApp's nav chrome, so this
+  // screen no longer renders its own back button (Sprint 4, item 4.1).
+  const back = null;
 
   if (ids.length === 0) {
     return (
