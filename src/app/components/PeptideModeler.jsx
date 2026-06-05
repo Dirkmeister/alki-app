@@ -2,6 +2,10 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { buildProfile, simulate, estimateMonthlyCost, kgToLbs, lbsToKg, calcFFMI, feetInchesToCm } from "../lib/peptideEngine";
+// Canonical BF% display helpers — shared with the dashboard so the headline
+// body-fat numbers are cohesive app-wide (#47dc1758 / #86132d26). The
+// week-by-week charts below stay on peptideEngine (deferred engine reconciliation).
+import { projectBodyFat, projectWeight, bfCategory } from "../lib/bodyComposition";
 
 /**
  * ============================================================
@@ -226,6 +230,19 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
   // ── Cost estimate ──
   const cost = useMemo(() => estimateMonthlyCost(selectedCompounds), [selectedCompounds]);
 
+  // ── Canonical headline projection (#47dc1758/#86132d26) ──
+  // The big "Projected BF / Projected Wt" tiles read from the SAME shared helper
+  // the dashboard uses, so this page is cohesive with the rest of the app. The
+  // peptideEngine week-by-week charts below remain the deeper trajectory model.
+  const headlineBF = useMemo(
+    () => projectBodyFat(profile, selectedCompounds, compoundCatalog),
+    [profile, selectedCompounds, compoundCatalog]
+  );
+  const headlineWeight = useMemo(
+    () => projectWeight(profile, selectedCompounds, compoundCatalog),
+    [profile, selectedCompounds, compoundCatalog]
+  );
+
   // ── Merged chart data ──
   const chartData = useMemo(() => {
     if (!simResult) return null;
@@ -284,7 +301,7 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
             <Stat value={enrichedProfile.ffmi.toFixed(1)} label="FFMI" sub={enrichedProfile.ffmiCategory} color={enrichedProfile.ffmi > 25 ? C.yellow : "#fff"} />
             <Stat value={`${enrichedProfile.leanMassLbs.toFixed(0)}`} label="Lean Mass" sub="lbs" />
             <Stat value={`${enrichedProfile.fatMassLbs.toFixed(0)}`} label="Fat Mass" sub="lbs" />
-            <Stat value={`${enrichedProfile.bodyFat}%`} label="Body Fat" sub={enrichedProfile.bfCategory} color={enrichedProfile.bodyFat > 25 ? C.yellow : enrichedProfile.bodyFat < 15 ? C.accent : "#fff"} />
+            <Stat value={`${enrichedProfile.bodyFat}%`} label="Body Fat" sub={bfCategory(enrichedProfile.bodyFat)} color={enrichedProfile.bodyFat > 25 ? C.yellow : enrichedProfile.bodyFat < 15 ? C.accent : "#fff"} />
           </div>
           {/* #34 — FFMI explainer */}
           <button
@@ -405,15 +422,15 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
               color={C.blue}
             />
             <Stat
-              value={`${simResult.summary.endBF}%`}
+              value={`${headlineBF ?? simResult.summary.endBF}%`}
               label="Projected BF"
-              sub={`from ${simResult.summary.startBF}%`}
+              sub={`from ${profile.bodyFat}%`}
               color={C.accent}
             />
             <Stat
-              value={`${simResult.summary.endWeightLbs}`}
+              value={`${headlineWeight ?? simResult.summary.endWeightLbs}`}
               label="Projected Wt"
-              sub={`from ${simResult.summary.startWeightLbs} lbs`}
+              sub={`from ${profile.weight} lbs`}
             />
             <Stat
               value={`+${simResult.summary.compoundEdgeFatLbs}`}

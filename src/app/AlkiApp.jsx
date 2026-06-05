@@ -17,6 +17,7 @@ import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
 import { selectBaseMesh } from "./lib/selectBaseMesh";
 import { getStackVectors } from "./lib/compoundMorphVectors";
+import { projectBodyFat, projectWeight } from "./lib/bodyComposition";
 import { simulate } from "./engine/simulate";
 import { mapToMorphs } from "./engine/mapToMorphs";
 import FeedbackFAB from "./components/utilities/FeedbackFAB";
@@ -1760,6 +1761,7 @@ function EidolonHero({
   profile, avatarUrl, avatarParams, eidolonName,
   editingName, nameInput, setNameInput, onStartEditName, onCommitName, onCancelName,
   onCaptureAvatar, onResetAvatar, showAvatarDebug, setShowAvatarDebug,
+  avatarResetSignal = 0,
   pulse = false, glowLevel = 0, projection = null,
 }) {
   return (
@@ -1822,7 +1824,7 @@ function EidolonHero({
         }} />
         <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
           {avatarUrl ? (
-            <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="large" interactive={true} debugPanel={showAvatarDebug} />
+            <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="large" interactive={true} debugPanel={showAvatarDebug} resetSignal={avatarResetSignal} />
           ) : (
             <BodyAvatar params={avatarParams.current} label="" maxWidth={280} />
           )}
@@ -1898,6 +1900,8 @@ function EidolonHero({
 function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
+  // #9166e05e — bumped on each "Reset Avatar" press to re-center the 3D orbit.
+  const [avatarResetSignal, setAvatarResetSignal] = useState(0);
   // #51-57 — two-tier connected filter (goal -> type) + sort + clear.
   const [goalFilter, setGoalFilter] = useState("all");   // "all" | goalId
   const [catFilter, setCatFilter] = useState("all");     // "all" | category name
@@ -2215,21 +2219,14 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     if (muscleChange > 1)  muscleNote.push(`+${muscleChange}% lean mass`);
     if (muscleChange < 0)  muscleNote.push(`${muscleChange}% lean mass risk`);
 
-    // #bf — projected body fat can't fall below essential fat (men ~3-5%,
-    // women ~10-12%), and never raises an already-leaner user. Prevents the
-    // physiologically impossible "0%" a stacked GLP protocol used to show.
-    const bfEssential = profile.sex === "female" ? 12 : 5;
-    const bfRaw = Math.round((profile.bodyFat + bfChange) * 10) / 10;
-    const projectedBodyFat = Math.max(Math.min(profile.bodyFat, bfEssential), bfRaw);
-
-    // #68 — projected bodyweight: hold lean mass constant and re-solve total
-    // weight at the projected body fat. Naturally zero-change for stacks that
-    // don't move fat (consistent with the #50 dead-zone), so recovery stacks
-    // show no weight delta. Surfaces the bodyweight the projection is based on.
-    const _lbm = profile.weight ? profile.weight * (1 - profile.bodyFat / 100) : null;
-    const projectedWeight = (_lbm != null && projectedBodyFat < 100)
-      ? Math.round(_lbm / (1 - projectedBodyFat / 100))
-      : (profile.weight ?? null);
+    // #47dc1758/#86132d26 — projected body fat & weight come from the shared
+    // lib/bodyComposition helper so the dashboard, the hero projection summary,
+    // and the Modeler headline all display the SAME number (no more per-page
+    // divergence). The helper keeps the #bf clamp (never below essential fat,
+    // never above an already-leaner user's current BF) and the #68 constant-lean
+    // weight re-solve. Deep engines are untouched — see the lib file's scope note.
+    const projectedBodyFat = projectBodyFat(profile, selectedCompounds, COMPOUNDS) ?? profile.bodyFat;
+    const projectedWeight = projectWeight(profile, selectedCompounds, COMPOUNDS) ?? (profile.weight ?? null);
     const weightChange = profile.weight ? projectedWeight - profile.weight : 0;
 
     return {
@@ -2362,7 +2359,12 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   };
   const filtersActive = goalFilter !== "all" || catFilter !== "all" || searchQuery.trim() !== "";
   const setGoal = (g) => { setGoalFilter(g); setCatFilter("all"); setShowAllRecommended(false); };
-  const clearSelection = () => { setSelectedCompounds([]); setGoalFilter("all"); setCatFilter("all"); setSearchQuery(""); };
+  // #b7ee70fb — filter state and selection state are independent. Clearing
+  // filters must NOT discard the user's picked compounds, and clearing the
+  // selection must NOT reset the filters. Two separate handlers, each touching
+  // only its own state.
+  const clearSelection = () => setSelectedCompounds([]);
+  const clearFilters = () => { setGoalFilter("all"); setCatFilter("all"); setSearchQuery(""); setShowAllRecommended(false); };
 
   const recommendedIds = new Set(recommended.map(r => r.compound.id));
   const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
@@ -2632,7 +2634,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         onCommitName={commitEidolonName}
         onCancelName={() => setEditingName(false)}
         onCaptureAvatar={onCaptureAvatar}
-        onResetAvatar={onResetAvatar}
+        onResetAvatar={() => { onResetAvatar?.(); setAvatarResetSignal(n => n + 1); }}
+        avatarResetSignal={avatarResetSignal}
         showAvatarDebug={showAvatarDebug}
         setShowAvatarDebug={setShowAvatarDebug}
         pulse={dosePulse}
@@ -3082,10 +3085,19 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                       {SORTS.map(([id, lbl]) => (
                         <button key={id} onClick={() => setSortMode(id)} style={chip(sortMode === id)}>{lbl}</button>
                       ))}
-                      {selectedCompounds.length > 0 && (
-                        <button onClick={clearSelection} style={{ ...chip(false), marginLeft: "auto", color: "#ef6b6b", borderColor: "rgba(239,107,107,0.3)" }}>
-                          Clear ({selectedCompounds.length})
-                        </button>
+                      {(filtersActive || selectedCompounds.length > 0) && (
+                        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                          {filtersActive && (
+                            <button onClick={clearFilters} style={{ ...chip(false), color: "rgba(255,255,255,0.6)" }}>
+                              Clear filters
+                            </button>
+                          )}
+                          {selectedCompounds.length > 0 && (
+                            <button onClick={clearSelection} style={{ ...chip(false), color: "#ef6b6b", borderColor: "rgba(239,107,107,0.3)" }}>
+                              Clear ({selectedCompounds.length})
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

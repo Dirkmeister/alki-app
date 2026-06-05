@@ -628,6 +628,10 @@ function analyzeStack(stackIds, userProfile = {}, compoundCatalog = []) {
         if (!seenRedundancyPairs.has(pairKey)) {
           seenRedundancyPairs.add(pairKey);
           const other = intelById[rid] || { name: rid, axes: [] };
+          // Recommend keeping the better-evidenced / stronger compound and
+          // dropping the other, so the warning is actionable (#bc9b8b30).
+          const keep = redundancyStrength(c) >= redundancyStrength(other) ? c : other;
+          const drop = keep === c ? other : c;
           redundancies.push({
             type: "explicit",
             axisLabels: c.axes
@@ -635,6 +639,7 @@ function analyzeStack(stackIds, userProfile = {}, compoundCatalog = []) {
               .map((a) => AXES[a.axis]?.label || a.axis),
             compounds: [c.name, other.name],
             severity: "moderate",
+            recommendation: { keepId: keep.id, keepName: keep.name, dropId: drop.id, dropName: drop.name },
             message: `${c.name} and ${other.name} target the same primary axis. Effects are not strictly additive — receptor desensitization or pituitary blunting is possible over extended dual stimulation. If both are desired, run at reduced doses on separate timing or alternating days.`,
           });
         }
@@ -866,6 +871,25 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+// #bc9b8b30 — when two compounds are redundant we don't just warn, we recommend
+// which one to keep. Rank by evidence quality first (a researched compound beats
+// an experimental one), then by primary-axis weight as a tie-breaker. The
+// stronger member is the keep; the other is the suggested drop.
+const DATA_QUALITY_RANK = {
+  fda_approved: 5,
+  phase_iii: 4,
+  phase_ii: 3,
+  moderate: 3,
+  limited_human: 2,
+  minimal: 1,
+};
+function redundancyStrength(intel) {
+  const q = DATA_QUALITY_RANK[intel?.risk?.dataQuality] ?? 2;
+  const weights = (intel?.axes || []).map((a) => a.weight || 0);
+  const w = weights.length ? Math.max(...weights) : 0;
+  return q * 10 + w; // dataQuality dominates; axis weight breaks ties
+}
+
 // ============================================================
 // VISUAL COMPONENTS
 // ============================================================
@@ -950,6 +974,7 @@ export default function StackIntelligence({ stackIds = [], userProfile = {}, onR
         <InteractionsSection
           redundancies={analysis.redundancies}
           synergies={analysis.synergies}
+          onRemoveCompound={onRemoveCompound}
         />
       )}
 
@@ -1160,7 +1185,7 @@ function AxisMap({ analysis }) {
   );
 }
 
-function InteractionsSection({ redundancies, synergies }) {
+function InteractionsSection({ redundancies, synergies, onRemoveCompound }) {
   return (
     <div style={styles.section}>
       <div style={styles.sectionHeader}>
@@ -1204,6 +1229,24 @@ function InteractionsSection({ redundancies, synergies }) {
                 )}
               </div>
               <div style={styles.interactionItemMsg}>{red.message}</div>
+              {/* #bc9b8b30 — actionable recommendation: name the compound to keep
+                  and offer a one-tap removal of the redundant one. */}
+              {red.recommendation && (
+                <div style={styles.redundancyFix}>
+                  <span style={styles.redundancyFixText}>
+                    Recommended: keep <strong style={{ color: ACCENT }}>{red.recommendation.keepName}</strong>, drop{" "}
+                    <strong style={{ color: TEXT }}>{red.recommendation.dropName}</strong>.
+                  </span>
+                  {onRemoveCompound && red.recommendation.dropId && (
+                    <button
+                      style={styles.redundancyFixBtn}
+                      onClick={() => onRemoveCompound(red.recommendation.dropId)}
+                    >
+                      Remove {red.recommendation.dropName}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1741,6 +1784,35 @@ const styles = {
     color: TEXT_DIM,
     lineHeight: 1.55,
   },
+  redundancyFix: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTop: `1px solid ${BORDER}`,
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  redundancyFixText: {
+    fontSize: 12,
+    color: TEXT_DIM,
+    lineHeight: 1.5,
+    flex: 1,
+    minWidth: 160,
+  },
+  redundancyFixBtn: {
+    padding: "7px 12px",
+    borderRadius: 8,
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    background: "transparent",
+    color: AMBER,
+    border: `1px solid ${AMBER}66`,
+    whiteSpace: "nowrap",
+  },
 
   supportGroup: {
     marginBottom: 14,
@@ -1831,12 +1903,29 @@ const styles = {
 function getStackSuggestions(selectedIds = [], catalog = []) {
   const selected = new Set(selectedIds);
   const catalogIds = new Set(catalog.map((c) => c.id));
+
+  // #b56f4ec2 — never suggest a compound already in the stack, nor one that is a
+  // functional duplicate of something selected. The literal id is the obvious
+  // case; the subtle one is composites: with BPC-157 and/or TB-500 selected the
+  // synergy graph points at the BPC-157/TB-500 blend (which CONTAINS them), and
+  // with the blend selected it points back at the components. Build an
+  // "effectively present" set from the bidirectional redundancy graph and
+  // exclude all of it, so the blend↔components pair (and any same-axis redundant
+  // pair) can never be suggested as a new addition.
+  const excluded = new Set(selectedIds);
+  for (const id of selectedIds) {
+    for (const rid of (COMPOUND_INTEL[id]?.redundancies || [])) excluded.add(rid);
+  }
+  for (const [cid, intel] of Object.entries(COMPOUND_INTEL)) {
+    if ((intel.redundancies || []).some((rid) => selected.has(rid))) excluded.add(cid);
+  }
+
   const scores = {};
   for (const id of selectedIds) {
     const intel = COMPOUND_INTEL[id];
     if (!intel) continue;
     for (const synId of intel.synergies || []) {
-      if (selected.has(synId) || !catalogIds.has(synId)) continue;
+      if (excluded.has(synId) || !catalogIds.has(synId)) continue;
       if (!scores[synId]) scores[synId] = { count: 0, partners: [] };
       scores[synId].count++;
       scores[synId].partners.push(intel.name || id);

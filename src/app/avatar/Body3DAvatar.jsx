@@ -314,10 +314,22 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
 // renders live. Damping is OFF on purpose: a damped release needs a run of
 // settle frames that demand mode never supplies (that pairing is what stalled
 // the drag); crisp 1:1 rotation reads fine for a hero avatar.
-function AvatarControls({ targetY }) {
+function AvatarControls({ targetY, resetSignal = 0 }) {
   const invalidate = useThree((s) => s.invalidate);
+  const controlsRef = useRef();
+  // #9166e05e — "Reset Avatar" returns the orbit to the default front view.
+  // The parent bumps resetSignal on each press; we ignore the initial 0 so a
+  // fresh mount isn't treated as a reset, then call OrbitControls.reset()
+  // (restores the camera/target captured at construction) and repaint, since
+  // the Canvas is frameloop="demand".
+  useEffect(() => {
+    if (!resetSignal) return;
+    controlsRef.current?.reset();
+    invalidate();
+  }, [resetSignal, invalidate]);
   return (
     <OrbitControls
+      ref={controlsRef}
       makeDefault
       enablePan={false}
       enableZoom={false}
@@ -340,6 +352,7 @@ export default function Body3DAvatar({
   interactive = true,
   autoRotate = false, // #50 — static by default; drag to rotate (auto-spin stuttered under demand frameloop)
   debugPanel = false,   // TEMP: show live morph-weight sliders for calibration
+  resetSignal = 0,      // #9166e05e — bump to re-center the orbit to the default view
 }) {
   const isSmall = size === "small";
   // Large/full-body view: center the body on `anchorY` and frame it wide enough
@@ -413,7 +426,7 @@ export default function Body3DAvatar({
             />
           </Suspense>
 
-          {interactive && <AvatarControls targetY={targetY} />}
+          {interactive && <AvatarControls targetY={targetY} resetSignal={resetSignal} />}
         </Canvas>
       </div>
       {label && (

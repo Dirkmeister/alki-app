@@ -165,8 +165,13 @@ const CYCLE_PROFILES = {
     rampUpWeeks: 0,
     taperWeeks: 0,
     runsThroughPCT: false,
-    standardCycleWeeks: 4,
-    note: "Naturally-occurring copper peptide. 30-day cycle standard.",
+    // #73b5170e — 4 weeks ended right as results begin: the app's own compound
+    // data notes skin/collagen changes are "gradual (4–8 weeks visible)" and the
+    // published GHK-Cu facial-cream trials (Leyden 2002; Finkley 2005) ran
+    // 8–12 weeks. 8 weeks reaches the end of that documented visible window
+    // (≈ two back-to-back 30-day blocks) so a user actually sees the result.
+    standardCycleWeeks: 8,
+    note: "Naturally-occurring copper peptide. Run continuously ~8 weeks — visible skin/collagen changes begin ~4 weeks and mature by ~8. No receptor downregulation, so it can run continuously (often as back-to-back 30-day blocks) or topically.",
   },
   pt141: {
     id: "pt141",

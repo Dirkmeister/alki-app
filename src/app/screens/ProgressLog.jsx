@@ -97,12 +97,20 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
           setLoading(false);
         });
     } else {
-      // Anonymous / baseline — load from localStorage, filtered by eidolon
+      // Anonymous / baseline — load from localStorage, filtered by eidolon.
+      // PRIVACY (#3a63b324): also scope to the owning user. localStorage is a
+      // single shared key on the device, so a prior account's offline/failed-save
+      // logs must never surface for whoever is on the device now. Authenticated
+      // reads never reach this branch (they go to Supabase, RLS-enforced), so the
+      // owner here is the anonymous bucket — but we filter by user_id defensively
+      // in case a previously-authenticated session left rows behind.
       try {
+        const owner = userId || "anonymous";
         const all = JSON.parse(localStorage.getItem("alki_progress_logs") || "[]");
-        const filtered = eidolonId
-          ? all.filter(l => l.eidolon_id === eidolonId)
-          : all.filter(l => !l.eidolon_id);
+        const filtered = all.filter(l =>
+          (l.user_id || "anonymous") === owner &&
+          (eidolonId ? l.eidolon_id === eidolonId : !l.eidolon_id)
+        );
         setLogs(filtered);
         // Don't push filtered subset to parent — same reason as Supabase path
       } catch (_) {}
