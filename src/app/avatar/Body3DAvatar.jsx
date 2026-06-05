@@ -306,6 +306,31 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
   );
 }
 
+// ── Interactive orbit controls (demand-frameloop safe) ─────────────
+// The Canvas runs frameloop="demand": it only repaints when something calls
+// invalidate(). OrbitControls moves the CAMERA on drag but does not request a
+// frame on its own, so a left/right drag would slide the camera with no visible
+// update and the avatar looks frozen. We invalidate on every change so the spin
+// renders live. Damping is OFF on purpose: a damped release needs a run of
+// settle frames that demand mode never supplies (that pairing is what stalled
+// the drag); crisp 1:1 rotation reads fine for a hero avatar.
+function AvatarControls({ targetY }) {
+  const invalidate = useThree((s) => s.invalidate);
+  return (
+    <OrbitControls
+      makeDefault
+      enablePan={false}
+      enableZoom={false}
+      enableDamping={false}
+      minPolarAngle={Math.PI / 2.4}
+      maxPolarAngle={Math.PI / 1.95}
+      autoRotate={false}
+      target={[0, targetY, 0]}
+      onChange={() => invalidate()}
+    />
+  );
+}
+
 export default function Body3DAvatar({
   avatarUrl,
   params,
@@ -388,17 +413,7 @@ export default function Body3DAvatar({
             />
           </Suspense>
 
-          {interactive && (
-            <OrbitControls
-              enablePan={false}
-              enableZoom={false}
-              minPolarAngle={Math.PI / 2.4}
-              maxPolarAngle={Math.PI / 1.95}
-              autoRotate={false}
-              dampingFactor={0.08}
-              target={[0, targetY, 0]}
-            />
-          )}
+          {interactive && <AvatarControls targetY={targetY} />}
         </Canvas>
       </div>
       {label && (
