@@ -207,14 +207,16 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
   }, [cloned, fat, muscle, useShapeKeys]);
 
   // ── Apply material adjustments (both modes) ──────────────────────
-  // IMPORTANT: HumGen's GLB export slots its textures wrong — the
-  // freckles overlay lands in baseColorTexture and the real skin
-  // albedo isn't exported at all, which renders the body near-black
-  // with red blotches. Rather than depend on those broken maps, we
-  // strip every texture/vertex-color channel off the skin material
-  // and drive a clean, fully-controlled MeshStandard look. This also
-  // means the 29MB of skin textures in the GLB are unused and can be
-  // stripped from the file entirely (huge win for mobile load).
+  // The v7.0 base GLBs carry ONE intentional baseColor map: a baked
+  // underwear overlay - a neutral-WHITE body with only the underwear
+  // region painted dark. We KEEP that map and tint it via material.color
+  // (three multiplies color x map), so the white body reads as the skin
+  // tone while the briefs / bra stay dark. Every OTHER channel (normal /
+  // rough / metal / ao / vertex colors) is nulled: the v7.0 material never
+  // authors them, and the old HumGen export slotted them wrong (freckles in
+  // baseColor, no real albedo -> near-black body). For LEGACY / Avaturn GLBs
+  // (no shape keys) we additionally strip baseColor and drive a flat tone,
+  // exactly as before - see the `hasMorphTargets` branch below.
   const ALKI_SKIN_BASE = "#c89c79"; // warm neutral mid-tone, reads well on dark UI
   const ALKI_SKIN_TAN  = "#9a6440"; // Melanotan II target
 
@@ -234,11 +236,15 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
       // vertex colors so nothing darkens or red-tints the body.
       if (isSkin && !obj.userData._alkiSkinCleaned) {
         const mapSlots = [
-          "map", "normalMap", "roughnessMap", "metalnessMap", "aoMap",
+          "normalMap", "roughnessMap", "metalnessMap", "aoMap",
           "specularMap", "specularIntensityMap", "specularColorMap",
           "clearcoatMap", "clearcoatRoughnessMap", "clearcoatNormalMap",
           "sheenColorMap", "sheenRoughnessMap", "emissiveMap", "bumpMap"
         ];
+        // KEEP baseColor `map` on the shape-key bases (it holds the baked
+        // underwear overlay). Only legacy/Avaturn GLBs — which have no shape
+        // keys and a broken baseColor — get baseColor stripped too.
+        if (!hasMorphTargets) mapSlots.unshift("map");
         for (const slot of mapSlots) {
           if (obj.material[slot] !== undefined) obj.material[slot] = null;
         }
