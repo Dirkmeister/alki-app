@@ -56,7 +56,7 @@ function ScoreInput({ label, value, onChange, icon, hint }) {
   );
 }
 
-export default function ProgressLog({ onBack, userId, eidolonId, profile, cultivationState, onLogsChanged, cycleStart }) {
+export default function ProgressLog({ onBack, userId, eidolonId, profile, cultivationState, onLogsChanged, cycleStart, onPhotos, eidolonName = "your Eidolon" }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -286,9 +286,18 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
 
       {/* Log CTA or Form */}
       {!showForm ? (
-        <button onClick={() => setShowForm(true)} style={{ ...S.btn, marginBottom: 16 }}>
-          Log Research Check-in
-        </button>
+        <>
+          <button onClick={() => setShowForm(true)} style={{ ...S.btn, marginBottom: 10 }}>
+            Log Research Check-in
+          </button>
+          {/* D4 — progress photos live here in the check-in / cultivation log,
+              alongside the weekly check-in, rather than as a separate dashboard button. */}
+          {onPhotos && (
+            <button onClick={onPhotos} style={{ ...S.btnOutline, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              📷 Progress Photos
+            </button>
+          )}
+        </>
       ) : (
         <div style={{ ...S.card, borderColor: "rgba(34,214,138,0.2)" }}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Weekly Research Check-in</div>
@@ -313,7 +322,7 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
           {/* #36 — these three are subjective self-ratings; define them here since
               this is the only place in the app they appear. */}
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 12, lineHeight: 1.5 }}>
-            Subjective check-in — rate each from 1 (poor) to 10 (great). These track how you <em>feel</em> alongside the hard numbers above.
+            Subjective check-in — rate each from 1 (poor) to 10 (great). These track how {eidolonName} is <em>responding</em> alongside the hard numbers above.
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
             <ScoreInput label="Wellbeing" value={wellbeing} onChange={setWellbeing} icon="🧠" hint="Overall mood and how good you feel day-to-day." />
@@ -324,7 +333,7 @@ export default function ProgressLog({ onBack, userId, eidolonId, profile, cultiv
           <div style={{ marginBottom: 16 }}>
             <label style={S.label}>Notes (optional)</label>
             <textarea
-              placeholder="How is your research tracking?"
+              placeholder={`How is ${eidolonName} progressing?`}
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}

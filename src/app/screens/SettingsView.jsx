@@ -31,7 +31,9 @@ const S = {
   sectionHint: { fontSize: 12.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, margin: "0 0 12px" },
 };
 
-const TRAINING_STATUSES = [
+// H1 — exported so onboarding can surface the same Training Status options (it was
+// previously only editable here in Settings).
+export const TRAINING_STATUSES = [
   { id: "sedentary",    label: "Sedentary",    hint: "Little / no exercise" },
   { id: "recreational", label: "Recreational", hint: "1–3× per week" },
   { id: "trained",      label: "Trained",      hint: "4–6× per week, structured" },
@@ -460,6 +462,10 @@ function AccountCard({ userEmail, onChangePassword, onSignOut, onDeleteAccount }
   const [delBusy, setDelBusy] = useState(false);
   const [delErr, setDelErr] = useState(null);
 
+  // B1 — Sign Out asks for confirmation before tearing down the session, so an
+  // accidental tap can't drop the user out. Inline confirm mirrors the delete flow.
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+
   const changePassword = async () => {
     setPwBusy(true); setPwMsg(null); setPwErr(null);
     try {
@@ -499,9 +505,25 @@ function AccountCard({ userEmail, onChangePassword, onSignOut, onDeleteAccount }
         <button onClick={changePassword} disabled={pwBusy} style={{ ...S.btnOutline, marginBottom: 10, ...(pwBusy ? S.btnDisabled : {}) }}>
           {pwBusy ? "Sending…" : "Change Password"}
         </button>
-        <button onClick={onSignOut} style={{ ...S.btnOutline, borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.65)" }}>
-          Sign Out
-        </button>
+        {!confirmingSignOut ? (
+          <button onClick={() => setConfirmingSignOut(true)} style={{ ...S.btnOutline, borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.65)" }}>
+            Sign Out
+          </button>
+        ) : (
+          <div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginBottom: 10, lineHeight: 1.5 }}>
+              Sign out of this device? You'll need to sign back in to reach your Eidolons.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setConfirmingSignOut(false)} style={{ ...S.btnOutline, flex: 1, borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)" }}>
+                Cancel
+              </button>
+              <button onClick={onSignOut} style={{ ...S.btnOutline, flex: 1, borderColor: "rgba(255,255,255,0.25)", color: "#fff" }}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Danger zone — account deletion */}

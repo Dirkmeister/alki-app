@@ -353,6 +353,29 @@ const PATTERNS = {
         `The most aggressive non-androgenic build available: ${c[0]?.name} delivers a direct IGF-1 signal at the muscle, layered over the ${c[1]?.name} GH pulse and ${c[2]?.name} 24-hour IGF-1 coverage. ` +
         `${c[3]?.name} protects connective tissue under the resulting load. Direct IGF-1 carries hypoglycemia risk — keep cycles short, rotate sites, and monitor blood glucose.`,
     },
+    {
+      // E2 — opt-in only: HIGH/UNKNOWN-risk anchor + a larger stack that exceeds the
+      // soft cap. Only emitted when the user explicitly enables high-risk generation.
+      id: "maximal_mass",
+      name: "Maximal Mass (Advanced)",
+      approach: "High-risk AR anchor + direct IGF-1 + GH axis + full support",
+      intensity: "maximal",
+      requiresOptIn: true,
+      slots: [
+        { role: "Maximal AR anchor", mechanism: "ar_max", required: true },
+        { role: "Direct IGF-1 anchor", mechanism: "gh_strong", required: true },
+        { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
+        { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+        { role: "Cardiovascular support", mechanism: "pde5", required: false },
+        { role: "Hepatic support flag", mechanism: "hepatic_support", required: true },
+      ],
+      designTemplate: (c) =>
+        `An advanced, high-risk build you explicitly opted into: ${c[0]?.name} is a maximal androgen-receptor anchor, layered with ${c[1]?.name} for a direct IGF-1 signal, the ${c[2]?.name} GH pulse, and ${c[3]?.name} 24-hour IGF-1 coverage. ` +
+        `${c[4]?.name} protects connective tissue under the load.` +
+        (c[5] ? ` ${c[5].name} adds cardiovascular support.` : "") +
+        ` This exceeds the usual stack size and risk ceiling — full bloodwork, hepatic support, and a complete PCT are mandatory, and the suppression and side-effect burden is significant.`,
+    },
   ],
 
   // ---- Ultra-lean (already very lean, cautious) ----
@@ -407,6 +430,28 @@ const PATTERNS = {
         `${c[2]?.name} protects connective tissue.` +
         (c[3] ? ` ${c[3].name} supports the cardiovascular system under cycle stress.` : "") +
         ` TUDCA/NAC and full pre/mid/post bloodwork are mandatory, and PCT will be required.`,
+    },
+    {
+      // E2 — opt-in only maximal tier (see lean_bulk maximal_mass).
+      id: "maximal_lean",
+      name: "Maximal Lean Build (Advanced)",
+      approach: "High-risk AR anchor + direct IGF-1 + GH axis + full support",
+      intensity: "maximal",
+      requiresOptIn: true,
+      slots: [
+        { role: "Maximal AR anchor", mechanism: "ar_max", required: true },
+        { role: "Direct IGF-1 anchor", mechanism: "gh_strong", required: true },
+        { role: "Primary GH pulse", mechanism: "gh_axis", required: true },
+        { role: "Sustained oral IGF-1", mechanism: "ghrelin", required: true },
+        { role: "Connective tissue", mechanism: "tissue_repair", required: true },
+        { role: "Cardiovascular support", mechanism: "pde5", required: false },
+        { role: "Hepatic support flag", mechanism: "hepatic_support", required: true },
+      ],
+      designTemplate: (c) =>
+        `An advanced, high-risk lean build you explicitly opted into: ${c[0]?.name} is a maximal androgen-receptor anchor over the ${c[2]?.name} GH pulse, ${c[3]?.name} oral IGF-1, and ${c[1]?.name} direct IGF-1 signal. ` +
+        `${c[4]?.name} protects connective tissue.` +
+        (c[5] ? ` ${c[5].name} adds cardiovascular support.` : "") +
+        ` This exceeds the usual stack size and risk ceiling — full bloodwork, hepatic support, and a complete PCT are mandatory.`,
     },
   ],
 
@@ -575,6 +620,9 @@ const MECHANISM_CANDIDATES = {
   ar_mild: ["mk2866", "s4"],
   // AR — stronger mass builders (intermediate first, advanced fallbacks)
   ar_strong: ["rad140", "lgd4033", "lgd3303", "rad150"],
+  // AR — maximal anchors (HIGH / UNKNOWN risk; opt-in only — E2). YK-11 and S-23
+  // carry displayWarning and only become eligible once allowHighRisk is set.
+  ar_max: ["yk11", "s23", "rad150", "lgd3303"],
 
   // Tissue repair
   tissue_repair: ["bpc157"],
@@ -594,7 +642,7 @@ const MECHANISM_CANDIDATES = {
 // COMPOUND SELECTION
 // ============================================================
 
-function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
+function selectCompoundForSlot(slot, profile, catalog, alreadySelected, allowHighRisk = false) {
   const candidates = MECHANISM_CANDIDATES[slot.mechanism] || [];
   const alreadyIds = new Set(alreadySelected.map((c) => c.id));
 
@@ -609,11 +657,15 @@ function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
     if (!compound) continue;
 
     const bf = profile.bodyFat;
-    if (compound.suitability) {
-      if (bf < compound.suitability.minBf) continue;
-      if (bf > compound.suitability.maxBf) continue;
-    }
-
+    // E1 — the suitability minBf/maxBf band is the compound's IDEAL range, an
+    // advisory, not a hard gate. Hard-excluding on it collapsed goal-relevant
+    // ladders: a muscle-gain user above ~20-22% BF had every androgen anchor
+    // (MK-2866 maxBf 22, RAD-140 maxBf 20, ...) filtered out, so the moderate
+    // and aggressive tiers fell back to GH-axis compounds and the whole ladder
+    // read as the lowest-risk, goal-irrelevant GH/recovery stacks. Per
+    // advise-don't-gatekeep we no longer block on the soft suitability band —
+    // the contraindication advisory still surfaces in StackIntelligence — and
+    // keep only the genuine contraindication and reference-only exclusions below.
     if (compound.contraindications) {
       if (compound.contraindications.includes("below15bf") && bf < 15) continue;
       if (compound.contraindications.includes("below22bf_glp1") && bf < 22) continue;
@@ -622,8 +674,12 @@ function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
     // Educational-reference-only / experimental compounds require explicit opt-in.
     // recommendableDespiteWarning (Melanotan II only) keeps a warned-but-usable
     // compound eligible; carcinogen / no-human-data compounds lack it and stay out.
-    if (compound.experienceLevel === "experimental_only") continue;
-    if (compound.displayWarning && !compound.recommendableDespiteWarning) continue;
+    // E2 — when the user has explicitly opted into high/unknown-risk compounds, these
+    // exclusions become advisory and are skipped (advise-don't-gatekeep: warn, allow).
+    if (!allowHighRisk) {
+      if (compound.experienceLevel === "experimental_only") continue;
+      if (compound.displayWarning && !compound.recommendableDespiteWarning) continue;
+    }
 
     return compound;
   }
@@ -747,6 +803,11 @@ function generatePCT(compounds) {
 // ============================================================
 
 function classifyRisk(compounds, intensity) {
+  // E2 — the opt-in maximal tier carries HIGH (or HIGH/UNKNOWN) risk.
+  if (intensity === "maximal") {
+    const hasUnknown = compounds.some((c) => c.riskTier === "unknown");
+    return { label: hasUnknown ? "High · Unknown" : "High", color: "#ef4444" };
+  }
   if (intensity === "aggressive") return { label: "Moderate–High", color: "#f59e0b" };
   if (intensity === "moderate") {
     if (compounds.some((c) => c.category === "SARM")) return { label: "Moderate", color: "#fbbf24" };
@@ -781,11 +842,11 @@ function summarizeAxes(compounds) {
 // PATTERN BUILDER
 // ============================================================
 
-function buildPattern(pattern, profile, catalog) {
+function buildPattern(pattern, profile, catalog, allowHighRisk = false) {
   const selected = [];
 
   for (const slot of pattern.slots) {
-    const compound = selectCompoundForSlot(slot, profile, catalog, selected);
+    const compound = selectCompoundForSlot(slot, profile, catalog, selected, allowHighRisk);
     if (!compound) {
       if (slot.required) return null; // required slot unfilled → pattern not buildable
       continue;
@@ -822,17 +883,23 @@ function buildPattern(pattern, profile, catalog) {
 // Emits an ordered risk ladder: the first buildable pattern per tier.
 // ============================================================
 
-const INTENSITY_ORDER = ["conservative", "moderate", "aggressive"];
+// E2 — "maximal" is the opt-in-only high-risk / larger-stack tier, appended after
+// aggressive when the user enables it.
+const INTENSITY_ORDER = ["conservative", "moderate", "aggressive", "maximal"];
 
-export function generateStacks(profile, catalog) {
+export function generateStacks(profile, catalog, opts = {}) {
+  const allowHighRisk = !!opts.allowHighRisk;
   const phase = detectPhase(profile);
   const patterns = PATTERNS[phase] || PATTERNS.recomp;
 
   const chosen = {}; // intensity -> built stack (first buildable wins)
 
   for (const pattern of patterns) {
+    // E2 — patterns flagged requiresOptIn (the maximal tier) only build when the
+    // user has explicitly enabled high-risk generation.
+    if (pattern.requiresOptIn && !allowHighRisk) continue;
     if (chosen[pattern.intensity]) continue; // tier already filled
-    const built = buildPattern({ ...pattern, phase }, profile, catalog);
+    const built = buildPattern({ ...pattern, phase }, profile, catalog, allowHighRisk);
     if (built) chosen[pattern.intensity] = built;
   }
 
@@ -843,7 +910,8 @@ export function generateStacks(profile, catalog) {
     const safety = buildPattern(
       { ...PATTERNS.recovery[0], phase: "recovery" },
       profile,
-      catalog
+      catalog,
+      allowHighRisk
     );
     if (safety) chosen.conservative = safety;
   }

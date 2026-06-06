@@ -8,6 +8,16 @@ export const metadata = {
   },
 };
 
+// Stage C — explicit mobile viewport so the app sizes to the device like a native
+// app (width=device-width, initial-scale=1). userScalable is intentionally left
+// enabled (pinch-to-zoom stays available for accessibility); we never lock
+// maximumScale. viewport-fit is left at the default (auto) so the fixed bottom CTA
+// bar and nav chrome stay inside the safe area instead of under the home indicator.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

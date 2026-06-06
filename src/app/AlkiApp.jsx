@@ -12,7 +12,7 @@ import PeptideModeler from "./components/PeptideModeler";
 import ProgressLog from "./screens/ProgressLog";
 import ProtocolGuideView from "./screens/ProtocolGuideView";
 import ProgressPhotos from "./screens/ProgressPhotos";
-import SettingsView from "./screens/SettingsView";
+import SettingsView, { TRAINING_STATUSES } from "./screens/SettingsView";
 import { DEFAULT_PREFERENCES, formatWeight, formatHeight, lbToKg } from "./lib/units";
 import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
@@ -811,17 +811,28 @@ function BodyAvatar({ params, label, glow = false, maxWidth = 180 }) {
 // ── STYLES ─────────────────────────────────────────────────
 const S = {
   app: {
-    minHeight: "100vh",
+    // Stage C — the app shell must scroll like a native mobile viewport. This was
+    // `overflow: hidden` (both axes), which clipped any content taller than the
+    // viewport so centered screens (splash, age gate) couldn't be scrolled to.
+    // Only the horizontal axis is clipped now (the 3D canvas / wide rows can bleed
+    // sideways); vertical scroll flows to the page body. globals.css already pins
+    // `overflow-x: hidden` on html/body, so this is belt-and-suspenders for X.
+    minHeight: "100dvh",
     background: "#060608",
     color: "#ededed",
     fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
-    overflow: "hidden"
+    overflowX: "hidden"
   },
   inner: {
     maxWidth: 480,
     margin: "0 auto",
     padding: "0 24px",
-    minHeight: "100vh",
+    // Stage C — `dvh` tracks the visible viewport, so the shell is sized to the
+    // area actually on screen instead of the static `100vh` (which includes the
+    // mobile address-bar strip and made short, centered screens like the age gate
+    // appear to jump/resize as the bar collapsed). Centered screens pair this with
+    // `justifyContent: "safe center"` so taller content scrolls instead of clipping.
+    minHeight: "100dvh",
     display: "flex",
     flexDirection: "column"
   },
@@ -930,7 +941,7 @@ function SplashScreen({ onEnter }) {
   }, []);
 
   return (
-    <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center", position: "relative" }}>
+    <div style={{ ...S.inner, justifyContent: "safe center", alignItems: "center", textAlign: "center", position: "relative" }}>
       {/* Build version — upper-left, bumped each commit */}
       <div style={{ position: "absolute", top: 16, left: 16, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em", zIndex: 2 }}>
         v{APP_VERSION} · {BUILD_SHA}
@@ -1036,7 +1047,7 @@ function AgeGate({ onConfirm, onDeny }) {
   useEffect(() => { setTimeout(() => setShow(true), 100); }, []);
 
   return (
-    <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center", opacity: show ? 1 : 0, transform: show ? "translateY(0)" : "translateY(12px)", transition: "all 0.6s cubic-bezier(0.16,1,0.3,1)" }}>
+    <div style={{ ...S.inner, justifyContent: "safe center", alignItems: "center", textAlign: "center", opacity: show ? 1 : 0, transform: show ? "translateY(0)" : "translateY(12px)", transition: "all 0.6s cubic-bezier(0.16,1,0.3,1)" }}>
       <div style={{ marginBottom: 44 }}>
         <div style={{
           width: 72,
@@ -1081,7 +1092,7 @@ function AgeGate({ onConfirm, onDeny }) {
 
 function AgeBlocked() {
   return (
-    <div style={{ ...S.inner, justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+    <div style={{ ...S.inner, justifyContent: "safe center", alignItems: "center", textAlign: "center" }}>
       <h2 style={{ fontSize: 26, fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>Access Restricted</h2>
       <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 14, maxWidth: 300, lineHeight: 1.7 }}>
         Alki is not available to individuals under 18 years of age. This restriction is non-negotiable.
@@ -1090,9 +1101,41 @@ function AgeBlocked() {
   );
 }
 
+// G2 — optional US Navy (Hodgdon-Beckett) body-fat estimate. This is the canonical
+// IMPERIAL form: every circumference AND height is in INCHES. Men use neck + waist +
+// height; women add hip. (The alternative "495 / (1.0324 − …) − 450" form uses
+// CENTIMETER constants and would under-read badly with inches, so the linear inch
+// coefficients below are used instead — they reproduce the Navy's published inch
+// tables.) Additive to direct BF% entry — it only offers a number the user can apply,
+// never replacing manual entry. Returns a rounded % or null on missing/invalid input.
+function estimateNavyBodyFat({ sex, heightIn, neck, waist, hip }) {
+  const h = parseFloat(heightIn);
+  const n = parseFloat(neck);
+  const w = parseFloat(waist);
+  const hp = parseFloat(hip);
+  if (!(h > 0) || !(n > 0) || !(w > 0)) return null;
+  let bf;
+  if (sex === "female") {
+    if (!(hp > 0)) return null;
+    const x = w + hp - n;
+    if (x <= 0) return null;
+    bf = 163.205 * Math.log10(x) - 97.684 * Math.log10(h) - 78.387;
+  } else {
+    const x = w - n;
+    if (x <= 0) return null;
+    bf = 86.010 * Math.log10(x) - 70.041 * Math.log10(h) + 36.76;
+  }
+  if (!isFinite(bf)) return null;
+  return Math.round(Math.max(3, Math.min(60, bf)) * 10) / 10;
+}
+
 function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 }) {
   const [step, setStep] = useState(initialStep);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // G2 — optional Navy-method estimator state (circumferences in inches). Local only;
+  // it just computes a BF% the user can choose to apply to the bodyFat field.
+  const [navyOpen, setNavyOpen] = useState(false);
+  const [navy, setNavy] = useState({ neck: "", waist: "", hip: "" });
   const [data, setData] = useState(prefill ? {
     sex: prefill.sex || "",
     age: prefill.age != null ? String(prefill.age) : "",
@@ -1101,9 +1144,10 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
     weight: prefill.weight != null ? String(prefill.weight) : "",
     bodyFat: prefill.bodyFat != null ? String(prefill.bodyFat) : "",
     goals: prefill.goals || [],
+    trainingStatus: prefill.trainingStatus || "",
     adv: prefill.adv || { skelMuscle: "", fatFreeMass: "", subFat: "", visceralFat: "", bodyWater: "", muscleMass: "", boneMass: "", bmr: "" }
   } : {
-    sex: "", age: "", heightFt: "5", heightIn: "10", weight: "", bodyFat: "", goals: [],
+    sex: "", age: "", heightFt: "5", heightIn: "10", weight: "", bodyFat: "", goals: [], trainingStatus: "",
     adv: { skelMuscle: "", fatFreeMass: "", subFat: "", visceralFat: "", bodyWater: "", muscleMass: "", boneMass: "", bmr: "" }
   });
 
@@ -1186,6 +1230,31 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
         <label style={S.label}>Weight (lbs)</label>
         <input type="number" placeholder="185" value={data.weight} onChange={e => set("weight", e.target.value)} style={S.input} />
       </div>
+      {/* H1 — Training Status surfaced in onboarding (previously only in Settings).
+          Optional; stored on the profile for Sprint 2 to wire into the engine. */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={S.label}>Training Status <span style={{ color: "rgba(255,255,255,0.25)", fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>· optional</span></label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {TRAINING_STATUSES.map(t => {
+            const active = data.trainingStatus === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => set("trainingStatus", active ? "" : t.id)}
+                style={{
+                  padding: "11px 12px", textAlign: "left", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                  background: active ? S.accentDim : "rgba(255,255,255,0.04)",
+                  border: `1.5px solid ${active ? S.accent : "rgba(255,255,255,0.1)"}`,
+                  color: active ? "#fff" : "rgba(255,255,255,0.6)",
+                }}
+              >
+                <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>{t.label}</span>
+                <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>{t.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <button style={{ ...S.btn, ...(!basicsValid ? S.btnDisabled : {}) }} disabled={!basicsValid} onClick={() => setStep(2)}>
         Continue
       </button>
@@ -1202,6 +1271,79 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
           {bfFeedback.text}
         </div>
       )}
+
+      {/* ── G2 — optional US Navy tape-measure estimator (additive to direct entry) ── */}
+      {(() => {
+        const navyHeightIn = (parseInt(data.heightFt, 10) || 0) * 12 + (parseInt(data.heightIn, 10) || 0);
+        const estimate = estimateNavyBodyFat({ sex: data.sex, heightIn: navyHeightIn, neck: navy.neck, waist: navy.waist, hip: navy.hip });
+        const isFemale = data.sex === "female";
+        const fields = [
+          { key: "neck", label: "Neck", hint: "Below the larynx" },
+          { key: "waist", label: "Waist", hint: isFemale ? "Narrowest point" : "At the navel" },
+          ...(isFemale ? [{ key: "hip", label: "Hip", hint: "Widest point" }] : []),
+        ];
+        return (
+          <div style={{ marginTop: 16 }}>
+            <button
+              onClick={() => setNavyOpen(v => !v)}
+              style={{
+                width: "100%", padding: "13px 16px",
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: navyOpen ? "10px 10px 0 0" : 10, color: "rgba(255,255,255,0.45)",
+                fontFamily: "inherit", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span>📏</span>
+                <span>Not sure? Estimate with a tape measure</span>
+              </span>
+              <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: navyOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+            </button>
+            <div style={{ overflow: "hidden", maxHeight: navyOpen ? 520 : 0, transition: "max-height 0.35s ease" }}>
+              <div style={{ border: "1px solid rgba(255,255,255,0.1)", borderTop: "none", borderRadius: "0 0 10px 10px", padding: "16px 14px 14px" }}>
+                <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, margin: "0 0 14px", lineHeight: 1.5 }}>
+                  US Navy method — measure each circumference in inches with a soft tape. This estimates your body fat from your measurements and height; you can apply it to the field above or keep your own number.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: isFemale ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10 }}>
+                  {fields.map(({ key, label, hint }) => (
+                    <div key={key}>
+                      <label style={{ ...S.label, fontSize: 10, marginBottom: 4 }}>
+                        {label} <span style={{ color: "rgba(255,255,255,0.2)" }}>in</span>
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder={key === "neck" ? "15" : key === "hip" ? "40" : "34"}
+                        value={navy[key]}
+                        onChange={e => setNavy(prev => ({ ...prev, [key]: e.target.value }))}
+                        style={{ ...S.input, padding: "10px 12px", fontSize: 14 }}
+                      />
+                      <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginTop: 3 }}>{hint}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
+                    {estimate != null ? (
+                      <>Estimated: <span style={{ color: S.accent, fontWeight: 800, fontSize: 18 }}>{estimate}%</span></>
+                    ) : (
+                      <span style={{ color: "rgba(255,255,255,0.3)" }}>Enter measurements to estimate</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { if (estimate != null) set("bodyFat", String(estimate)); }}
+                    disabled={estimate == null}
+                    style={{ ...S.btnOutline, width: "auto", padding: "10px 16px", fontSize: 13, ...(estimate == null ? S.btnDisabled : {}) }}
+                  >
+                    Use this estimate
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Advanced body stats accordion ── */}
       {(() => {
@@ -1314,6 +1456,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
           weight: parseFloat(data.weight),
           bodyFat: parseFloat(data.bodyFat),
           goals: data.goals,
+          trainingStatus: data.trainingStatus || null,
           adv: data.adv
         };
         onComplete(profile);
@@ -1354,7 +1497,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
         </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", paddingBottom: 40 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "safe center", paddingBottom: 40 }}>
         {steps[step]}
       </div>
     </div>
@@ -1800,11 +1943,22 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [dosePulse, setDosePulse] = useState(false); // #16 — daily-dose completion pulse
+  // D2 — builder Goals editor collapse state. Collapsed shows the chosen goals as a
+  // compact summary so the section is concise; it stays open when no goals are set
+  // (a new eidolon still needs to pick goals) and is one tap to reopen ("Change").
+  const [goalsEditorOpen, setGoalsEditorOpen] = useState(false);
+  // D3 — the projection surface is now tabbed: "projection" (before/after avatar +
+  // stats, the selling point) and "timeline" (the cycle timeline, rendered inline).
+  const [transformTab, setTransformTab] = useState("projection");
   // #6 — builder lane: null (chooser) | "recommend" | "build".
   const [builderPath, setBuilderPath] = useState(null);
 
   const activeEidolon = eidolons?.find(e => e.id === activeEidolonId) || eidolons?.[0] || null;
   const isModifying = editing && activeEidolon?.lockedAt != null;
+  // G1 — require naming the eidolon before its stack can be built. Only NEW eidolons
+  // are flagged `named: false` at creation; eidolons saved before this change have no
+  // `named` field (undefined), so they're grandfathered in and never re-gated.
+  const needsNaming = editing && activeEidolon && activeEidolon.named === false;
   // #6 — which builder lane to render. A live selection or a modify-flow skips
   // the chooser and lands in the manual lane; a fresh empty build shows the fork.
   const builderView = (selectedCompounds.length > 0 || isModifying)
@@ -1865,7 +2019,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     // Save current eidolon's state before creating a new one
     flushCurrentEidolon();
     const num = (eidolonsRef.current?.length || 0) + 1;
-    const eid = { id: 'e_' + Date.now(), name: `Eidolon ${num}`, goals: [...(profile?.goals || [])], compounds: [], lockedAt: null };
+    // G1 — named:false flags this eidolon for the naming gate before its stack can be built.
+    const eid = { id: 'e_' + Date.now(), name: `Eidolon ${num}`, goals: [...(profile?.goals || [])], compounds: [], lockedAt: null, named: false };
     setEidolons(prev => [...(prev || []), eid]);
     setActiveEidolonId(eid.id);
     setActiveProtocol(null);
@@ -1873,15 +2028,17 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     setEditing(true);
     setShowTransform(false);
     setShowEidolonSwitcher(false);
-    // #20 — drop straight into naming the new eidolon
+    // G1 — the naming gate (needsNaming) owns the naming step now; seed an empty
+    // field for it. The hero's inline editor is no longer auto-opened on create.
     setNameInput("");
-    setEditingName(true);
+    setEditingName(false);
   }, [flushCurrentEidolon, profile?.goals]);
 
   const commitEidolonName = useCallback(() => {
     const trimmed = (nameInput || "").trim();
     if (!trimmed || !activeEidolon) { setEditingName(false); return; }
-    setEidolons(prev => (prev || []).map(e => e.id === activeEidolon.id ? { ...e, name: trimmed } : e));
+    // G1 — committing a name also clears the naming gate (named: true).
+    setEidolons(prev => (prev || []).map(e => e.id === activeEidolon.id ? { ...e, name: trimmed, named: true } : e));
     setEditingName(false);
   }, [nameInput, activeEidolon, setEidolons]);
 
@@ -1935,7 +2092,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
   // #64 — entering/leaving the projection view is a view change; scroll to top
   // so the before/after avatars are framed (matches screen-load behavior).
-  useEffect(() => { try { window.scrollTo(0, 0); } catch (_) {} }, [showTransform]);
+  // D3 — also reset to the Projection tab so the surface always opens on the
+  // selling-point view, not whichever tab was left selected last time.
+  useEffect(() => { try { window.scrollTo(0, 0); } catch (_) {} if (showTransform) setTransformTab("projection"); }, [showTransform]);
 
   const toggleCompound = (id) => {
     setSelectedCompounds(prev =>
@@ -2268,6 +2427,15 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const recommendedIds = new Set(recommended.map(r => r.compound.id));
   const otherCompounds = recommendations.filter(r => !recommendedIds.has(r.compound.id));
 
+  // A2 — auto-expand "Browse all" when a filter becomes active (#54), but as a
+  // one-shot: previously Browse-all visibility was `showOtherCompounds || filtersActive`,
+  // which pinned the section open whenever any filter/search was set and made the
+  // "Hide all compounds" button inert. Opening it via an effect on filter activation
+  // lets the button fully control the section thereafter (collapses in both directions).
+  useEffect(() => {
+    if (filtersActive) setShowOtherCompounds(true);
+  }, [filtersActive]);
+
   // ── Resolve profile with latest log data when protocol is locked ──
   // If user has logged newer BF/weight, the avatar should reflect that
   const effectiveProfile = useMemo(() => {
@@ -2297,6 +2465,48 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </p>
         </div>
 
+        {/* D3 — Projection / Timeline tabs. The projection (before/after) is the
+            selling point and is the default; the cycle timeline lives behind a tab
+            on the SAME surface instead of being buried as a separate screen. */}
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 100, marginBottom: 16 }}>
+          {[["projection", "Projection"], ["timeline", "Timeline"]].map(([id, lbl]) => {
+            const active = transformTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => { setTransformTab(id); try { window.scrollTo(0, 0); } catch (_) {} }}
+                style={{
+                  flex: 1, padding: "9px 12px", borderRadius: 100, border: "none", cursor: "pointer",
+                  fontFamily: "inherit", fontSize: 13, fontWeight: 700, letterSpacing: "0.02em",
+                  background: active ? S.accent : "transparent",
+                  color: active ? "#060608" : "rgba(255,255,255,0.6)",
+                  transition: "background 0.15s ease, color 0.15s ease",
+                }}
+              >
+                {lbl}
+              </button>
+            );
+          })}
+        </div>
+
+        {transformTab === "timeline" ? (
+          <div style={{ marginBottom: 8 }}>
+            <CycleTimeline
+              stack={selectedCompounds}
+              compoundCatalog={COMPOUNDS}
+              initialCycleLength={12}
+              embedded
+              locked={(() => {
+                const ap = activeProtocol;
+                if (!ap?.lockedAt) return false;
+                const a = [...selectedCompounds].sort().join(",");
+                const b = [...(ap.compounds || [])].sort().join(",");
+                return a === b;
+              })()}
+            />
+          </div>
+        ) : (
+        <>
         {/* Before / After — SVG free / 3D premium based on avatarUrl */}
         <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
           <div style={{ flex: 1, maxWidth: 180 }}>
@@ -2316,53 +2526,40 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </div>
         </div>
 
-        {/* Stats — core projections */}
-        <div style={S.card}>
-          <div style={{ ...S.label, marginBottom: 12 }}>Projected Outcomes · {projectedChanges.timeline}-week protocol</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <StatTile
-              label="Body Fat"
-              current={`${profile.bodyFat}%`}
-              projected={`${projectedChanges.projectedBodyFat}%`}
-              delta={projectedChanges.bfChange}
-              unit="%"
-              goodDirection="down"
-            />
-            <StatTile
-              label="Weight"
-              current={formatWeight(profile.weight, units)}
-              projected={formatWeight(projectedChanges.projectedWeight, units)}
-              delta={units === "metric" ? Math.round(lbToKg(projectedChanges.weightChange) * 10) / 10 : projectedChanges.weightChange}
-              unit={units === "metric" ? " kg" : " lbs"}
-              goodDirection="down"
-              note="Est. at projected body fat (lean mass held)"
-            />
-            <StatTile
-              label="Lean Mass"
-              delta={projectedChanges.muscleChange}
-              unit=" pts"
-              isScore
-              goodDirection="up"
-              note={projectedChanges.muscleChange === 0 ? "No change" : "Relative effect score, not a percentage"}
-            />
-            <StatTile
-              label="Skin Quality"
-              delta={projectedChanges.skinChange}
-              unit="pts"
-              goodDirection="up"
-              isScore
-              note={projectedChanges.skinChange === 0 ? "No change" : "Relative improvement score (0–20 scale)"}
-            />
-            <StatTile
-              label="Recovery"
-              delta={projectedChanges.recoveryChange}
-              unit="pts"
-              goodDirection="up"
-              isScore
-              note={projectedChanges.recoveryChange === 0 ? "No change" : "Relative improvement score (0–20 scale)"}
-            />
-          </div>
-        </div>
+        {/* Stats — core projections. D5 — the tiles are data-driven and ordered so
+            the stack's actually-targeted outcomes (a non-zero projected change) lead,
+            with untouched categories ("No change") falling to the end, so the
+            projection reads as "here's what this stack moves" first. */}
+        {(() => {
+          const tiles = [
+            { id: "bf", label: "Body Fat", current: `${profile.bodyFat}%`, projected: `${projectedChanges.projectedBodyFat}%`, delta: projectedChanges.bfChange, unit: "%", goodDirection: "down" },
+            { id: "wt", label: "Weight", current: formatWeight(profile.weight, units), projected: formatWeight(projectedChanges.projectedWeight, units), delta: units === "metric" ? Math.round(lbToKg(projectedChanges.weightChange) * 10) / 10 : projectedChanges.weightChange, unit: units === "metric" ? " kg" : " lbs", goodDirection: "down", note: "Est. at projected body fat (lean mass held)" },
+            { id: "lean", label: "Lean Mass", delta: projectedChanges.muscleChange, unit: " pts", isScore: true, goodDirection: "up", note: projectedChanges.muscleChange === 0 ? "No change" : "Relative effect score, not a percentage" },
+            { id: "skin", label: "Skin Quality", delta: projectedChanges.skinChange, unit: "pts", isScore: true, goodDirection: "up", note: projectedChanges.skinChange === 0 ? "No change" : "Relative improvement score (0–20 scale)" },
+            { id: "rec", label: "Recovery", delta: projectedChanges.recoveryChange, unit: "pts", isScore: true, goodDirection: "up", note: projectedChanges.recoveryChange === 0 ? "No change" : "Relative improvement score (0–20 scale)" },
+          ];
+          const isTargeted = (t) => typeof t.delta === "number" && t.delta !== 0;
+          const ordered = tiles
+            .map((t, i) => ({ t, i }))
+            .sort((a, b) => (isTargeted(b.t) - isTargeted(a.t)) || (a.i - b.i))
+            .map(x => x.t);
+          const targetedCount = tiles.filter(isTargeted).length;
+          return (
+            <div style={S.card}>
+              <div style={{ ...S.label, marginBottom: 12 }}>Projected Outcomes · {projectedChanges.timeline}-week protocol</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {ordered.map(({ id, ...props }) => (
+                  <StatTile key={id} {...props} />
+                ))}
+              </div>
+              {targetedCount > 0 && targetedCount < tiles.length && (
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 10, lineHeight: 1.5 }}>
+                  Outcomes this stack targets are shown first; categories it doesn't act on follow.
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Advanced biomarker projections — only when user provided baselines */}
         {projectedChanges.advProjections.length > 0 && (
@@ -2404,22 +2601,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           onAddCompound={toggleCompoundInPlace}
           compoundCatalog={COMPOUNDS}
         />
+        </>
+        )}
 
-        {/* Cycle Timeline CTA — also reachable from the Transformation view */}
-        <button
-          onClick={onTimeline}
-          style={{
-            ...S.btnOutline,
-            marginTop: 8,
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8
-          }}
-        >
-          Protocol Timeline
-        </button>
+        {/* D3 — the Protocol Timeline is now the "Timeline" tab above, not a
+            separate in-page CTA. The lock-in action stays below, shared by both tabs. */}
 
         {/* Lock In / Confirm Changes — only when actively building or modifying. Hidden when just viewing a locked protocol. */}
         {editing && (
@@ -2438,8 +2624,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </button>
         )}
 
+        {/* A1 — the canonical DISCLAIMER renders once on this surface, inside the
+            StackIntelligence analysis above (<Disclaimer/>). This footer keeps ONLY
+            the projection-specific caveat so the medical disclaimer isn't doubled. */}
         <p style={S.disclaimer}>
-          {"Projected research outcome based on published literature. Individual results are not guaranteed. " + DISCLAIMER}
+          Projected research outcome based on published literature. Individual results are not guaranteed.
         </p>
         <p style={{ fontSize: 12, color: "rgba(26,232,122,0.35)", textAlign: "center", paddingBottom: 20, fontStyle: "italic", letterSpacing: "0.06em" }}>
           Happy Researching.
@@ -2476,7 +2665,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           )}
           {/* #62 — committed-home eidolon management lives here now (was the bottom action grid) */}
           {!editing && activeProtocol && (
-            <div style={{ position: "relative" }}>
+            // B2 — inline-flex + center so the Manage button aligns with its
+            // sibling header controls. As a plain block-div wrapper its button sat
+            // on the div's text baseline (descender space below), nudging it out of
+            // line with Analytics/Q&A, which are flex-centered direct children.
+            <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
               <button onClick={() => setShowManageMenu(v => !v)} style={{ background: "none", border: "none", color: showManageMenu ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 Manage ▾
               </button>
@@ -2515,11 +2708,12 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               ⚙
             </button>
           )}
-          {onSignOut && (
-            <button onClick={onSignOut} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-              Sign Out
-            </button>
-          )}
+          {/* B1 — Sign Out was removed from this top-right header: it sat in the
+              exact corner the global HOME control lands on, so a second tap after
+              navigating home would sign the user out by accident. Sign-out now
+              lives only in Settings (reached via the ⚙ above), behind an explicit
+              "Are you sure?" confirmation. The non-destructive ⚙ is now the
+              rightmost control, so an accidental double-tap just opens Settings. */}
         </div>
       </div>
 
@@ -2553,29 +2747,60 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           behind a nav toggle); the whole card disappears once the protocol is locked
           in (committed mode). Buttons render in fixed GOALS order — selection is
           conveyed by active styling, not reordering (#B11: avoids jump-under-finger). */}
-      {editing && (
-        <div style={{ ...S.card, borderColor: 'rgba(26,232,122,0.2)' }}>
-          <div style={{ ...S.label, marginBottom: 12 }}>
-            Goals for {activeEidolon?.name || 'Eidolon 1'}{' '}
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>· tap to choose</span>
+      {editing && (() => {
+        // D2 — concise, collapsible goals. Collapsed = compact summary pills + a
+        // "Change" toggle; expanded = the full chooser with compact chips. Forced
+        // open when no goals are set so a fresh eidolon is still prompted.
+        const goals = profile.goals || [];
+        const goalsOpen = goalsEditorOpen || goals.length === 0;
+        const compactTag = (active) => ({
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '6px 11px', borderRadius: 100, fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', fontFamily: 'inherit', marginRight: 6, marginBottom: 6,
+          background: active ? S.accentDim : 'rgba(255,255,255,0.04)',
+          border: `1.5px solid ${active ? S.accent : 'rgba(255,255,255,0.1)'}`,
+          color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+        });
+        return (
+          <div style={{ ...S.card, borderColor: 'rgba(26,232,122,0.2)', padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: goalsOpen || goals.length ? 10 : 0 }}>
+              <div style={{ ...S.label, marginBottom: 0 }}>
+                Goals for {activeEidolon?.name || 'Eidolon 1'}
+                {goalsOpen && <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>{' '}· tap to choose</span>}
+              </div>
+              {goals.length > 0 && (
+                <button onClick={() => setGoalsEditorOpen(o => !o)} style={{ background: 'none', border: 'none', color: S.accent, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', padding: 0 }}>
+                  {goalsOpen ? 'Done ▴' : 'Change ▾'}
+                </button>
+              )}
+            </div>
+            {goalsOpen ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
+                {GOALS.map(g => {
+                  const active = goals.includes(g.id);
+                  return (
+                    <button key={g.id} onClick={() => handleGoalToggle(g.id)} style={compactTag(active)}>
+                      {g.icon} {g.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {goals.map(gid => {
+                  const goal = GOALS.find(x => x.id === gid);
+                  if (!goal) return null;
+                  return (
+                    <span key={gid} style={{ fontSize: 12, padding: '5px 11px', borderRadius: 100, background: 'rgba(26,232,122,0.08)', border: '1px solid rgba(26,232,122,0.18)', color: S.accent, fontWeight: 600 }}>
+                      {goal.icon} {goal.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
-            {GOALS.map(g => {
-                const active = (profile.goals || []).includes(g.id);
-                return (
-                  <button key={g.id} onClick={() => handleGoalToggle(g.id)} style={{
-                    ...S.tag,
-                    background: active ? S.accentDim : 'rgba(255,255,255,0.04)',
-                    border: `1.5px solid ${active ? S.accent : 'rgba(255,255,255,0.1)'}`,
-                    color: active ? '#fff' : 'rgba(255,255,255,0.5)'
-                  }}>
-                    {g.icon} {g.label}
-                  </button>
-                );
-              })}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ═══ COMMITTED MODE — Avatar-First Home ═══ */}
       {!editing && activeProtocol && (
@@ -2680,10 +2905,12 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                     );
                   })}
                 </div>
+                {/* F1 — research-subject framing: the EIDOLON is on protocol, not the
+                    user. Log each compound as it's administered to the eidolon. */}
                 <div style={{ fontSize: 11, color: allDone ? "rgba(34,214,138,0.6)" : "rgba(255,255,255,0.3)", textAlign: "center", marginTop: 12, lineHeight: 1.5 }}>
                   {allDone
-                    ? "Protocol complete for today. Your Eidolon is cultivating — see you tomorrow."
-                    : "Check off each compound as you take it. Completing every day keeps your streak alive."}
+                    ? `Protocol complete for today. ${activeEidolon?.name || "Your Eidolon"} is cultivating — see you tomorrow.`
+                    : `Log each compound as it's administered to ${activeEidolon?.name || "your Eidolon"}. Completing the protocol every day keeps the streak alive.`}
                 </div>
               </div>
             );
@@ -2765,40 +2992,24 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             )}
           </div>
 
-          {/* 7. Primary actions — Protocol Guide is the headline post-lock-in
-              action (Plan C); Projection + Timeline below. Eidolon management
-              (Modify / Switch / New) lives in the "Manage ▾" nav dropdown (#62). */}
-          <button onClick={onProtocolGuide} style={{ ...S.btn, marginTop: 8, marginBottom: 10 }}>
-            View Full Protocol →
+          {/* 7. Primary actions. D3 — the projection is the selling point, so
+              "View Projection" is the prominent primary CTA here; the cycle timeline
+              is a tab inside that surface (no longer a separate button). The protocol
+              guide drops to a secondary action. Eidolon management (Modify / Switch /
+              New) lives in the "Manage ▾" nav dropdown (#62). */}
+          <button
+            onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+            disabled={stackAnalysis.isBlocked}
+            style={{ ...S.btn, marginTop: 8, marginBottom: 10, ...(stackAnalysis.isBlocked ? S.btnDisabled : {}) }}
+          >
+            View Projection · Before / After →
           </button>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-            <button
-              onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-              disabled={stackAnalysis.isBlocked}
-              style={{
-                ...S.btnOutline,
-                ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {})
-              }}
-            >
-              View Projection
-            </button>
-            <button
-              onClick={onTimeline}
-              style={S.btnOutline}
-            >
-              Protocol Timeline
-            </button>
-          </div>
-          {/* 4.3 — visible Edit Protocol entry (no longer Manage-menu-only) +
-              Plan E progress photos, two-up. */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-            <button onClick={startModify} style={S.btnOutline}>
-              ✎ Edit Protocol
-            </button>
-            <button onClick={onPhotos} style={S.btnOutline}>
-              📷 Progress Photos
-            </button>
-          </div>
+          <button onClick={onProtocolGuide} style={{ ...S.btnOutline, marginBottom: 10 }}>
+            View Full Protocol
+          </button>
+          {/* D4 — the standalone "Edit Protocol" button was removed (the Active Stack
+              and Goals cards above are already tap-to-edit, re-entering the builder),
+              and Progress Photos moved into the check-in / cultivation log. */}
         </>
       )}
 
@@ -2817,6 +3028,34 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               </button>
             </div>
           )}
+          {/* G1 — naming gate: a newly created eidolon must be named before its stack
+              can be built. The rest of the builder is withheld until then. */}
+          {needsNaming ? (
+            <div style={{ ...S.card, borderColor: S.accentBorder }}>
+              <div style={{ ...S.label, marginBottom: 6 }}>Name your Eidolon</div>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.5, marginBottom: 14 }}>
+                Give your research subject a name before building its protocol. You can rename it anytime.
+              </p>
+              <input
+                autoFocus
+                type="text"
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && nameInput.trim()) commitEidolonName(); }}
+                maxLength={30}
+                placeholder="e.g. Atlas, Prime, Subject One"
+                style={{ ...S.input, marginBottom: 12 }}
+              />
+              <button
+                onClick={commitEidolonName}
+                disabled={!nameInput.trim()}
+                style={{ ...S.btn, ...(!nameInput.trim() ? S.btnDisabled : {}) }}
+              >
+                Name &amp; Build Protocol →
+              </button>
+            </div>
+          ) : (
+          <>
           {/* #6 — Guided two-path fork. First-timers pick a lane instead of seeing
               the generator, the matched list, and the full library all at once. */}
           {builderView === null && (
@@ -2893,8 +3132,15 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             <>
               {/* #58/#59 — Your Stack: see what's selected at a glance + remove in one tap */}
               <div style={{ ...S.card, marginBottom: 14 }}>
-                <div style={{ ...S.label, marginBottom: 10 }}>
-                  Your Stack — {selectedCompounds.length} compound{selectedCompounds.length !== 1 ? "s" : ""}
+                {/* D1 — bulk "Clear all" (clear SELECTION) lives here in the stack
+                    card, distinct from "Clear filters" in the filter bar below. */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+                  <div style={{ ...S.label, marginBottom: 0 }}>
+                    Your Stack — {selectedCompounds.length} compound{selectedCompounds.length !== 1 ? "s" : ""}
+                  </div>
+                  <button onClick={clearSelection} title="Remove all selected compounds" style={{ background: "none", border: "1px solid rgba(239,107,107,0.3)", borderRadius: 100, padding: "5px 12px", fontSize: 11, fontWeight: 600, color: "#ef6b6b", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    Clear all
+                  </button>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {selectedCompounds.map(cid => {
@@ -2942,19 +3188,30 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 ⚡ Recommend a stack for me instead
               </button>
 
-              {/* Compounds — connected filter (goal -> type) + sort (#51-57) */}
+              {/* Compounds — single consolidated filter bar (D1). The three chip
+                  rows (Goal / Type / Sort) were replaced by compact dropdowns so the
+                  filter area reads as ONE bar. The bulk clear-SELECTION control was
+                  removed from here and moved into the "Your Stack" card above, so it
+                  can no longer be confused with clear-FILTERS (the two used to sit
+                  side by side). The connected goal→type→sort logic is unchanged. */}
               {(() => {
-                const chip = (active) => ({
-                  padding: "6px 12px", borderRadius: 100, fontSize: 11, fontWeight: 600,
-                  background: active ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${active ? "rgba(34,214,138,0.25)" : "rgba(255,255,255,0.08)"}`,
-                  color: active ? S.accent : "rgba(255,255,255,0.5)",
-                  cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
-                });
-                const rowLabel = { fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", minWidth: 38 };
-                const goalChips = (profile.goals || []).map(gid => GOALS.find(g => g.id === gid)).filter(Boolean);
+                const goalOpts = (profile.goals || []).map(gid => GOALS.find(g => g.id === gid)).filter(Boolean);
                 const typeCats = goalScopedCats();
                 const SORTS = [["match", "Best match"], ["name", "Name"], ["risk", "Risk"], ["category", "Category"]];
+                const selectStyle = {
+                  appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+                  width: "100%", boxSizing: "border-box",
+                  padding: "9px 30px 9px 13px", borderRadius: 100, fontSize: 12, fontWeight: 600,
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                  color: "#fff", cursor: "pointer", fontFamily: "inherit", outline: "none",
+                };
+                // Wrap each select with its own ▾ (globals.css strips the native one).
+                const field = (key, node) => (
+                  <div key={key} style={{ position: "relative", flex: "1 1 30%", minWidth: 108 }}>
+                    {node}
+                    <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: "rgba(255,255,255,0.4)", pointerEvents: "none" }}>▾</span>
+                  </div>
+                );
                 return (
                   <div style={{ marginBottom: 16 }}>
                     {/* #46 — free-text search; applies to matched + browse-all via passesFilters */}
@@ -2979,42 +3236,28 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                         >×</button>
                       )}
                     </div>
-                    {goalChips.length > 0 && (
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
-                        <span style={rowLabel}>Goal</span>
-                        <button onClick={() => setGoal("all")} style={chip(goalFilter === "all")}>All</button>
-                        {goalChips.map(g => (
-                          <button key={g.id} onClick={() => setGoal(g.id)} style={chip(goalFilter === g.id)}>{g.icon} {g.label}</button>
-                        ))}
-                      </div>
-                    )}
-                    {typeCats.length > 1 && (
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
-                        <span style={rowLabel}>Type</span>
-                        <button onClick={() => { setCatFilter("all"); setShowAllRecommended(false); }} style={chip(catFilter === "all")}>All</button>
-                        {typeCats.map(cat => (
-                          <button key={cat} onClick={() => { setCatFilter(cat); setShowAllRecommended(false); }} style={chip(catFilter === cat)}>{cat}</button>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                      <span style={rowLabel}>Sort</span>
-                      {SORTS.map(([id, lbl]) => (
-                        <button key={id} onClick={() => setSortMode(id)} style={chip(sortMode === id)}>{lbl}</button>
-                      ))}
-                      {(filtersActive || selectedCompounds.length > 0) && (
-                        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-                          {filtersActive && (
-                            <button onClick={clearFilters} style={{ ...chip(false), color: "rgba(255,255,255,0.6)" }}>
-                              Clear filters
-                            </button>
-                          )}
-                          {selectedCompounds.length > 0 && (
-                            <button onClick={clearSelection} style={{ ...chip(false), color: "#ef6b6b", borderColor: "rgba(239,107,107,0.3)" }}>
-                              Clear ({selectedCompounds.length})
-                            </button>
-                          )}
-                        </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      {goalOpts.length > 0 && field("goal",
+                        <select value={goalFilter} onChange={e => setGoal(e.target.value)} style={selectStyle} aria-label="Filter by goal">
+                          <option value="all">All goals</option>
+                          {goalOpts.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
+                        </select>
+                      )}
+                      {typeCats.length > 1 && field("type",
+                        <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setShowAllRecommended(false); }} style={selectStyle} aria-label="Filter by type">
+                          <option value="all">All types</option>
+                          {typeCats.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                      )}
+                      {field("sort",
+                        <select value={sortMode} onChange={e => setSortMode(e.target.value)} style={selectStyle} aria-label="Sort compounds">
+                          {SORTS.map(([id, lbl]) => <option key={id} value={id}>Sort · {lbl}</option>)}
+                        </select>
+                      )}
+                      {filtersActive && (
+                        <button onClick={clearFilters} style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, padding: "9px 14px", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                          Clear filters
+                        </button>
                       )}
                     </div>
                   </div>
@@ -3089,7 +3332,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               {/* Browse all — same filter + sort; auto-opens when a filter is active (#54) */}
               {otherCompounds.length > 0 && (() => {
                 const all = filterAndSort(otherCompounds);
-                const open = showOtherCompounds || filtersActive;
+                // A2 — visibility is driven solely by showOtherCompounds so the Hide
+                // toggle always collapses the list; filter-activation auto-opens it via
+                // the one-shot effect above rather than pinning `open` true here.
+                const open = showOtherCompounds;
                 return (
                   <>
                     <button
@@ -3148,20 +3394,16 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                       </div>
                     );
                   })()}
-                  {/* Secondary actions — Projection (the avatar before/after) +
-                      Timeline, two-up so both are reachable in one tap. */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-                    <button
-                      onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
-                      disabled={stackAnalysis.isBlocked}
-                      style={{ ...S.btnOutline, padding: "13px 12px", ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}
-                    >
-                      View Projection
-                    </button>
-                    <button onClick={onTimeline} style={{ ...S.btnOutline, padding: "13px 12px" }}>
-                      Protocol Timeline
-                    </button>
-                  </div>
+                  {/* D3 — single prominent "View Projection" (the selling point). The
+                      Protocol Timeline is now a tab inside the projection surface, so
+                      it's no longer a competing side-by-side button here. */}
+                  <button
+                    onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+                    disabled={stackAnalysis.isBlocked}
+                    style={{ ...S.btnOutline, width: "100%", padding: "13px 12px", marginBottom: 10, ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}
+                  >
+                    View Projection · Before / After
+                  </button>
                   {/* Primary — Start Protocol (or Confirm Changes when modifying a
                       locked stack). Locks in directly via the unchanged handleLockIn. */}
                   <button
@@ -3184,6 +3426,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 </div>
               </div>
             </>
+          )}
+          </>
           )}
         </>
       )}
@@ -3373,7 +3617,7 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
         </button>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "safe center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <h1 style={{ fontSize: 40, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
             <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(26,232,122,0.2)" }}>KI</span>
@@ -3539,7 +3783,7 @@ function SetNewPassword({ onDone }) {
 
   return (
     <div style={S.inner}>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "safe center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <h1 style={{ fontSize: 40, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
             <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(26,232,122,0.2)" }}>KI</span>
@@ -4022,7 +4266,7 @@ export default function AlkiApp() {
       )}
 
       {screen === "loading" && (
-        <div style={{ ...S.inner, justifyContent: "center", alignItems: "center" }}>
+        <div style={{ ...S.inner, justifyContent: "safe center", alignItems: "center" }}>
           <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
             <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
           </div>
@@ -4077,7 +4321,8 @@ export default function AlkiApp() {
       {screen === "onboarding" && (
         <Onboarding
           onComplete={(p) => {
-            const eid = { id: 'e_' + Date.now(), name: 'Eidolon 1', goals: p.goals, compounds: [], lockedAt: null };
+            // G1 — named:false routes the new user through the naming gate before building.
+            const eid = { id: 'e_' + Date.now(), name: 'Eidolon 1', goals: p.goals, compounds: [], lockedAt: null, named: false };
             setEidolons(prev => [...(prev || []).filter(e => e.id !== eid.id), eid]);
             setActiveEidolonId(eid.id);
             setProfile(p);
@@ -4139,6 +4384,8 @@ export default function AlkiApp() {
           cultivationState={cultivationState}
           onLogsChanged={setProgressLogs}
           cycleStart={(eidolons.find(e => e.id === activeEidolonId)?.lockedAt) || activeProtocol?.lockedAt || null}
+          onPhotos={() => navTo("photos")}
+          eidolonName={(eidolons.find(e => e.id === activeEidolonId) || eidolons[0])?.name || "your Eidolon"}
         />
       )}
       {screen === "photos" && (() => {

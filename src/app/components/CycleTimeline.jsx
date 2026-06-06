@@ -1116,30 +1116,8 @@ function CompoundLanes({ lanes, totalWeeks, cycleLength }) {
   );
 }
 
-function StepBtn({ children, onClick, disabled }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        width: 36, height: 36,
-        background: TOKENS.surfaceElevated,
-        border: `1px solid ${TOKENS.border}`,
-        borderRadius: 10,
-        color: disabled ? TOKENS.textTertiary : TOKENS.textPrimary,
-        fontSize: 18,
-        fontWeight: 500,
-        fontFamily: FONT_STACK,
-        cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-        transition: "all 0.15s ease",
-        lineHeight: 1,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
+// A4 — StepBtn (the cycle-length +/- stepper) was removed: the timeline is a
+// read-only projection, so there is no longer an editable control to render.
 
 function Header() {
   // Back/Home navigation is provided globally by AlkiApp's nav chrome
@@ -1200,17 +1178,21 @@ export default function CycleTimeline({
   minCycleLength = 4,
   maxCycleLength = 24,
   locked = false,          // #71 — locked protocol: cycle length is fixed, not editable
+  embedded = false,        // D3 — render inline as a tab (no full-screen container/nav band/header)
   onBack,
 }) {
-  // #71 — the cycle length is calculated from the compounds. On a locked protocol
-  // it's read-only; while building your own you can override the suggestion.
+  // #71 / A4 — the cycle length is calculated from the compounds and is always
+  // read-only (it's a projection). `locked` now only distinguishes a committed
+  // protocol from a draft for the descriptor copy, not editability.
   const suggested = useMemo(
     () => suggestedCycleLength(stack, compoundCatalog, { min: minCycleLength, max: maxCycleLength, fallback: initialCycleLength }),
     [stack, compoundCatalog, minCycleLength, maxCycleLength, initialCycleLength]
   );
-  const [override, setOverride] = useState(null); // null = follow the suggestion
-  const cycleLength = locked ? suggested : (override ?? suggested);
-  const setCycleLength = (n) => setOverride(Math.max(minCycleLength, Math.min(maxCycleLength, n)));
+  // A4 — the timeline is a read-only PROJECTION, not user-editable data. Cycle
+  // length is always the value calculated from the stack's compounds + PCT; the
+  // old build-my-own stepper override was removed so it can't be edited on any
+  // path (it was still reachable while building/modifying, e.g. via Analytics).
+  const cycleLength = suggested;
   const [selectedWeek, setSelectedWeek] = useState(1);
 
   const timeline = useMemo(
@@ -1232,7 +1214,14 @@ export default function CycleTimeline({
   (timeline.lanes || []).forEach(l => (l.segments || []).forEach(seg => usedPhaseKeys.add(seg.phase)));
   const hasBloodwork = (timeline.bloodwork || []).length > 0;
 
-  const containerStyle = {
+  // D3 — embedded mode drops the full-screen chrome so the timeline can sit inside
+  // the projection screen's "Timeline" tab. Standalone mode keeps the nav band.
+  const containerStyle = embedded ? {
+    width: "100%",
+    boxSizing: "border-box",
+    color: TOKENS.textPrimary,
+    fontFamily: FONT_STACK,
+  } : {
     maxWidth: 480,
     margin: "0 auto",
     // Top padding reserves the global nav band (HOME + BACK at the app root, 4.1).
@@ -1248,9 +1237,9 @@ export default function CycleTimeline({
   if (normalizedStack.length === 0) {
     return (
       <div style={containerStyle}>
-        <Header />
+        {!embedded && <Header />}
         <div style={{
-          marginTop: 60,
+          marginTop: embedded ? 0 : 60,
           padding: 40,
           textAlign: "center",
           background: TOKENS.surface,
@@ -1279,7 +1268,7 @@ export default function CycleTimeline({
 
   return (
     <div style={containerStyle}>
-      <Header onBack={onBack} />
+      {!embedded && <Header onBack={onBack} />}
 
       {/* Cycle length — #71. Locked protocol: read-only, calculated from compounds.
           Build-my-own: editable stepper seeded with the suggestion. */}
@@ -1317,23 +1306,9 @@ export default function CycleTimeline({
           <div style={{ fontSize: 11, color: TOKENS.textTertiary, marginTop: 3, lineHeight: 1.4 }}>
             {locked
               ? "Set by your locked protocol — calculated from its compounds + PCT."
-              : (override != null && override !== suggested
-                  ? <>Suggested from your compounds: {suggested} wk. <button onClick={() => setOverride(null)} style={{ background: "none", border: "none", color: TOKENS.accent, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: FONT_STACK, padding: 0 }}>↺ reset</button></>
-                  : `Suggested from your compounds. Adjust to explore.`)}
+              : "Calculated from your compounds + PCT."}
           </div>
         </div>
-        {!locked && (
-          <div style={{ display: "flex", gap: 6 }}>
-            <StepBtn
-              onClick={() => setCycleLength(Math.max(minCycleLength, cycleLength - 1))}
-              disabled={cycleLength <= minCycleLength}
-            >−</StepBtn>
-            <StepBtn
-              onClick={() => setCycleLength(Math.min(maxCycleLength, cycleLength + 1))}
-              disabled={cycleLength >= maxCycleLength}
-            >+</StepBtn>
-          </div>
-        )}
       </div>
 
       <SectionLabel>Protocol phases</SectionLabel>

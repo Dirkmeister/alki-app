@@ -309,19 +309,32 @@ function GLBAvatar({ url, params, glow, autoRotate, centerVertically = true, anc
 // renders live. Damping is OFF on purpose: a damped release needs a run of
 // settle frames that demand mode never supplies (that pairing is what stalled
 // the drag); crisp 1:1 rotation reads fine for a hero avatar.
-function AvatarControls({ targetY, resetSignal = 0 }) {
+function AvatarControls({ targetY, camPos, resetSignal = 0 }) {
   const invalidate = useThree((s) => s.invalidate);
+  const camera = useThree((s) => s.camera);
   const controlsRef = useRef();
-  // #9166e05e — "Reset Avatar" returns the orbit to the default front view.
+  // #9166e05e / A3 — "Reset Avatar" returns the orbit to the default front view.
   // The parent bumps resetSignal on each press; we ignore the initial 0 so a
-  // fresh mount isn't treated as a reset, then call OrbitControls.reset()
-  // (restores the camera/target captured at construction) and repaint, since
-  // the Canvas is frameloop="demand".
+  // fresh mount isn't treated as a reset.
+  //
+  // We do NOT use OrbitControls.reset(): its captured target0 is (0,0,0), saved
+  // at construction BEFORE the `target` prop is applied. Since the Sprint-4
+  // neutral-box centering frames the body at y≈targetY (1.0), reset() pointed the
+  // camera at the floor and threw the avatar out of frame. Instead we explicitly
+  // restore the known-good camera position + look-at target, then repaint (the
+  // Canvas is frameloop="demand"). camPos/targetY are read from the live closure
+  // (stable values) so this isn't in the dep array — keeping the effect from
+  // re-snapping the camera on every demand repaint while the user is orbiting.
   useEffect(() => {
     if (!resetSignal) return;
-    controlsRef.current?.reset();
+    const controls = controlsRef.current;
+    if (!controls || !camera) return;
+    camera.position.set(camPos[0], camPos[1], camPos[2]);
+    controls.target.set(0, targetY, 0);
+    controls.update();
     invalidate();
-  }, [resetSignal, invalidate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetSignal, invalidate, camera]);
   return (
     <OrbitControls
       ref={controlsRef}
@@ -421,7 +434,7 @@ export default function Body3DAvatar({
             />
           </Suspense>
 
-          {interactive && <AvatarControls targetY={targetY} resetSignal={resetSignal} />}
+          {interactive && <AvatarControls targetY={targetY} camPos={camPos} resetSignal={resetSignal} />}
         </Canvas>
       </div>
       {label && (

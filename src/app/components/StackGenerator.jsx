@@ -33,15 +33,19 @@ const INTENSITY_LABELS = {
   conservative: "Conservative",
   moderate: "Moderate",
   aggressive: "Aggressive",
+  maximal: "Maximal",
 };
 
 export default function StackGenerator({ profile, compoundCatalog, onLoadStack, defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [openStackId, setOpenStackId] = useState(null);
+  // E2 — opt-in to high/unknown-risk compounds and a larger "Maximal" stack that
+  // exceeds the usual soft cap. Off by default (advise-don't-gatekeep: warn, allow).
+  const [allowHighRisk, setAllowHighRisk] = useState(false);
 
   const stacks = useMemo(
-    () => generateStacks(profile, compoundCatalog),
-    [profile, compoundCatalog]
+    () => generateStacks(profile, compoundCatalog, { allowHighRisk }),
+    [profile, compoundCatalog, allowHighRisk]
   );
 
   const phase = useMemo(() => detectPhase(profile), [profile]);
@@ -87,6 +91,35 @@ export default function StackGenerator({ profile, compoundCatalog, onLoadStack, 
           <div style={styles.phaseNote}>
             Based on your body fat ({profile.bodyFat}%), goals, and biometrics, Alki identified <span style={{ color: "#22d68a", fontWeight: 600 }}>{phaseLabel}</span> as your primary research phase. Each protocol below uses a different architectural approach.
           </div>
+
+          {/* E2 — advisory opt-in: the soft cap and risk ceiling are not hard limits.
+              Enabling this surfaces high/unknown-risk compounds and a larger Maximal
+              protocol. Advise-don't-gatekeep: warn clearly, let the user proceed. */}
+          <button
+            onClick={() => setAllowHighRisk((v) => !v)}
+            style={{
+              display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left",
+              padding: "11px 14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+              background: allowHighRisk ? "rgba(239,68,68,0.08)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${allowHighRisk ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.1)"}`,
+            }}
+          >
+            <span style={{
+              width: 20, height: 20, flexShrink: 0, marginTop: 1, borderRadius: 6,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: allowHighRisk ? "#ef4444" : "transparent",
+              border: `1.5px solid ${allowHighRisk ? "#ef4444" : "rgba(255,255,255,0.25)"}`,
+              color: "#fff", fontSize: 12, fontWeight: 800,
+            }}>{allowHighRisk ? "✓" : ""}</span>
+            <span>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: allowHighRisk ? "#fca5a5" : "rgba(255,255,255,0.85)" }}>
+                Include high-risk & unknown-risk compounds
+              </span>
+              <span style={{ display: "block", fontSize: 11.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5, marginTop: 2 }}>
+                The 3-tier ladder and ~4-compound size are advisory, not hard limits. Turning this on adds a larger <strong>Maximal</strong> protocol built around HIGH/UNKNOWN-risk anchors. Suppression and side-effect burden rise sharply — full bloodwork and PCT become mandatory.
+              </span>
+            </span>
+          </button>
 
           {stacks.map((stack) => (
             <StackCard
