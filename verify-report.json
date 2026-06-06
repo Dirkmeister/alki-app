@@ -1,0 +1,407 @@
+[
+  {
+    "feedback_id": "73b5170e",
+    "sprint": "Compound data unification",
+    "check": "GHK-Cu cycle = 8-week continuous — source 1: compound card (compoundsCore.js)",
+    "result": "PASS",
+    "detail": "ghkcu.cycle = \"Continuous; ~8 weeks for visible skin changes\" — continuous + ~8 weeks, no 4-on/2-off.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "73b5170e",
+    "sprint": "Compound data unification",
+    "check": "GHK-Cu cycle = 8-week continuous — source 2: protocolProtocols.js",
+    "result": "PASS",
+    "detail": "AUTHORED.ghkcu.cycle = { onWeeks:8, offWeeks:0, standardCycleWeeks:8 }.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "73b5170e",
+    "sprint": "Compound data unification",
+    "check": "GHK-Cu cycle = 8-week continuous — source 3: CycleTimeline profile",
+    "result": "PASS",
+    "detail": "CYCLE_PROFILES.ghkcu.standardCycleWeeks = 8, continuous (no 4-on/2-off).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "73b5170e",
+    "sprint": "Compound data unification",
+    "check": "GHK-Cu cycle = 8-week continuous — source 4: AlkiProtocolQA FAQ",
+    "result": "PASS",
+    "detail": "GHK-Cu cycle FAQ says run continuously for ~8 weeks (no 4-on/2-off).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "audit-9",
+    "sprint": "Compound data unification",
+    "check": "No inline COMPOUNDS array in AlkiApp.jsx (imported instead)",
+    "result": "PASS",
+    "detail": "AlkiApp.jsx imports COMPOUNDS from ./data/compounds and declares no inline array.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "audit-9",
+    "sprint": "Compound data unification",
+    "check": "data/compounds.js combines core + expanded",
+    "result": "PASS",
+    "detail": "compounds.js spreads ...CORE_COMPOUNDS and ...EXPANDED_COMPOUNDS.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "audit-9",
+    "sprint": "Compound data unification",
+    "check": "Combined COMPOUNDS length === 71",
+    "result": "PASS",
+    "detail": "COMPOUNDS.length === 71 (core 8 + expanded 63).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "audit-9",
+    "sprint": "Compound data unification",
+    "check": "Zero duplicate compound ids",
+    "result": "PASS",
+    "detail": "All 71 compound ids unique.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.9",
+    "sprint": "Classification & dosing",
+    "check": "Melanotan2 category !== Cosmetic",
+    "result": "PASS",
+    "detail": "melanotan2.category = \"Performance\".",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.9",
+    "sprint": "Classification & dosing",
+    "check": "gw501516 category !== SARM",
+    "result": "PASS",
+    "detail": "gw501516.category = \"Metabolic\".",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.9",
+    "sprint": "Classification & dosing",
+    "check": "gw0742 category !== SARM",
+    "result": "PASS",
+    "detail": "gw0742.category = \"Metabolic\".",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "Task-2",
+    "sprint": "Classification & dosing",
+    "check": "Melanotan2 has recommendableDespiteWarning + displayWarning",
+    "result": "PASS",
+    "detail": "melanotan2 has recommendableDespiteWarning === true AND a displayWarning.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "Task-2",
+    "sprint": "Classification & dosing",
+    "check": "No OTHER displayWarning compound has recommendableDespiteWarning",
+    "result": "PASS",
+    "detail": "Of 9 displayWarning compounds (yk11, s23, gw501516, gw0742, slu_pp_332, melanotan2, phenibut, methylphenylpiracetam, idra21), only melanotan2 has the override.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.2",
+    "sprint": "Compliance",
+    "check": "Shared DISCLAIMER constant exists in lib/disclaimer.js",
+    "result": "PASS",
+    "detail": "lib/disclaimer.js exports a canonical DISCLAIMER constant.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.2",
+    "sprint": "Compliance",
+    "check": "AlkiApp imports DISCLAIMER (not re-typed inline)",
+    "result": "PASS",
+    "detail": "AlkiApp.jsx imports DISCLAIMER from ./lib/disclaimer.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.2",
+    "sprint": "Compliance",
+    "check": "Canonical disclaimer text is not re-typed inline outside disclaimer.js",
+    "result": "PASS",
+    "detail": "Canonical disclaimer literal lives only in disclaimer.js.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.1",
+    "sprint": "Compliance",
+    "check": "False \"Alki blocks GLP\" copy removed from AlkiProtocolQA",
+    "result": "PASS",
+    "detail": "No \"blocks GLP\" / \"Alki blocks\" copy present (advise-don't-gatekeep wording intact).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.10",
+    "sprint": "Home redesign",
+    "check": "LEAN MASS hero pill shows directional readout, not raw muscle \"%\"",
+    "result": "PASS",
+    "detail": "LEAN MASS pill renders \"Supported\"/\"At risk\"/\"—\", no raw scalar \"%\".",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.10",
+    "sprint": "Home redesign",
+    "check": "No effects.muscle scalar rendered with % suffix anywhere",
+    "result": "PASS",
+    "detail": "No \"{effects.muscle}%\" render found.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "5.3",
+    "sprint": "Profile & Settings (Sprint 5)",
+    "check": "delete_user() RPC is SECURITY DEFINER, zero params, returns void",
+    "result": "PASS",
+    "detail": "Migration declares public.delete_user() SECURITY DEFINER, zero params, returns void; pinned search_path. Live remote confirmed (prosecdef=t, pronargs=0, returns void).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "3a63b324",
+    "sprint": "Privacy/RLS",
+    "check": "progress_logs SELECT policy gated on auth.uid() = user_id",
+    "result": "PASS",
+    "detail": "RLS enabled; SELECT policy uses (auth.uid() = user_id). Live remote pg_policies confirmed all four CRUD policies owner-scoped, UPDATE has WITH CHECK.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "3a63b324",
+    "sprint": "Privacy/RLS",
+    "check": "Cross-user read isolation (user A cannot see user B rows)",
+    "result": "MANUAL",
+    "detail": "Requires two authenticated users with logged rows. Policy catalog confirms SELECT is owner-scoped; behavioral proof needs a 2-account round-trip (see MANUAL_CHECKLIST).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.7-a",
+    "sprint": "Compliance",
+    "check": "age_verified column declared (migration 006) + present on remote",
+    "result": "PASS",
+    "detail": "006_age_verification.sql adds profiles.age_verified boolean NOT NULL DEFAULT false; live remote query 2026-06-06 confirms the column exists (data_type=boolean). NOTE: the migration file header still says 'NOT yet applied' — it HAS since been applied; the comment is stale.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.7-a",
+    "sprint": "Compliance",
+    "check": "Passing the age gate writes age_verified; profile without it re-gates",
+    "result": "MANUAL",
+    "detail": "Behavioral: requires a signed-in account round-trip (guest mode does not persist). Verify a real account: pass gate → row.age_verified=true; force false → app re-gates on load. See MANUAL_CHECKLIST.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "b7ee70fb",
+    "sprint": "Builder UX",
+    "check": "Clear filters preserves selected compounds",
+    "result": "PASS",
+    "detail": "Selection held at 1 across a Clear-filters click (filters and selection are independent controls).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "b56f4ec2",
+    "sprint": "Builder UX",
+    "check": "Suggestions exclude in-stack compounds",
+    "result": "PASS",
+    "detail": "Suggestions offered (MK-677, Ipamorelin + CJC-1295) contain none of the selected ().",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "75eccc5b",
+    "sprint": "Builder UX",
+    "check": "Builder footer surfaces Start Protocol + View Projection + Timeline",
+    "result": "PASS",
+    "detail": "All three CTAs present in the builder footer with a live stack.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "bc9b8b30",
+    "sprint": "Builder UX",
+    "check": "Redundant stack → recommend-which-to-keep + one-tap remove",
+    "result": "PASS",
+    "detail": "Redundancy warning on the projection view shows \"Recommended: keep …\" plus a one-tap \"Remove …\" button.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "09c05bc4",
+    "sprint": "Home redesign (Plan A)",
+    "check": "Committed home: Edit Protocol button + tap-to-edit Active Stack & Goals cards",
+    "result": "PASS",
+    "detail": "Found \"✎ Edit Protocol\" plus Active Stack and Goals cards each with an \"Edit ✎\" tap cue.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "31825ac1",
+    "sprint": "Home redesign (Plan A)",
+    "check": "Tapping Active Stack card re-enters the builder",
+    "result": "PASS",
+    "detail": "Active Stack card click returned to the builder (search box visible).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "5f9535d0",
+    "sprint": "Compliance",
+    "check": "Committed home shows canonical disclaimer once (not twice)",
+    "result": "PASS",
+    "detail": "Canonical disclaimer text appears exactly once on the committed home.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "c3966ca7",
+    "sprint": "Avatar",
+    "check": "Avatar canvas sits within its container/viewport on home",
+    "result": "PASS",
+    "detail": "Avatar box 200×320 fits horizontally in the 390px viewport.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "c0f63971",
+    "sprint": "Avatar",
+    "check": "Avatar stays within viewport after Reset Avatar",
+    "result": "PASS",
+    "detail": "After Reset, avatar box 200×320 still within viewport.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "5f9535d0",
+    "sprint": "Compliance",
+    "check": "Projection (transform) surface shows canonical disclaimer once",
+    "result": "FAIL",
+    "detail": "Canonical disclaimer appears 2× on the projection surface.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "47dc1758",
+    "sprint": "Modeler / projection",
+    "check": "Dashboard headline BF% === Analytics/Modeler headline BF% (one fixed stack)",
+    "result": "PASS",
+    "detail": "Headline BF% is consistent across pages (dashboard pill 20% === modeler tile 20%). (Projected-figure divergence is tracked separately under 252dcc4d.)",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "252dcc4d",
+    "sprint": "Modeler / projection",
+    "check": "Modeler chart endpoint matches its own headline BF% (known-gap)",
+    "result": "FAIL",
+    "detail": "KNOWN GAP confirmed: modeler headline 20% vs chart endpoint 14% (the 3% vs 7.9%-class mismatch).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "02df6d6b",
+    "sprint": "Navigation (Sprint 4)",
+    "check": "Inner screens: HOME returns to dashboard, BACK hidden at depth 1",
+    "result": "PASS",
+    "detail": "Verified for: modeler, qa, timeline, protocol_guide, photos, settings, progress. HOME present + returns to dashboard, BACK hidden at depth 1.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "ef1083fa",
+    "sprint": "Navigation (Sprint 4)",
+    "check": "Settings HOME and Sign-Out are not adjacent (no accidental sign-out)",
+    "result": "MANUAL",
+    "detail": "Sign Out renders only for a SIGNED-IN account (this run is a guest, so no Sign Out exists and no accidental-sign-out risk applies). Verify on a signed-in device that the top-right HOME chrome and the in-card Sign Out are not adjacent. Structurally: HOME is fixed top-right nav chrome; Sign Out lives inside the AccountCard body — different regions.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6e4cc0ad",
+    "sprint": "Protocol Q&A",
+    "check": "Q&A answer container does not overflow horizontally (committed)",
+    "result": "PASS",
+    "detail": "No horizontal overflow at 390px (page overflow 0px, worst element +0px).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6e4cc0ad",
+    "sprint": "Protocol Q&A",
+    "check": "Q&A context filtering reflects the stack (committed)",
+    "result": "PASS",
+    "detail": "A stack/context section is rendered on the Q&A screen.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6e4cc0ad",
+    "sprint": "Protocol Q&A",
+    "check": "Q&A answer container does not overflow horizontally (builder)",
+    "result": "PASS",
+    "detail": "No horizontal overflow at 390px (page overflow 0px, worst element +0px).",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6e4cc0ad",
+    "sprint": "Protocol Q&A",
+    "check": "Q&A context filtering reflects the stack (builder)",
+    "result": "PASS",
+    "detail": "A stack/context section is rendered on the Q&A screen.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "6.7-b",
+    "sprint": "Compliance",
+    "check": "/admin gated when signed out (access-restricted shown, triage board not mounted)",
+    "result": "PASS",
+    "detail": "\"Access Restricted\" screen renders and the triage board does not mount for an unauthenticated visitor.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "3a63b324",
+    "sprint": "Privacy/RLS",
+    "check": "Anon (no session) client reads ZERO progress_logs rows",
+    "result": "PASS",
+    "detail": "Unauthenticated select returned 0 rows — SELECT is owner-scoped, no cross-user leak to anon.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  },
+  {
+    "feedback_id": "3a63b324",
+    "sprint": "Privacy/RLS",
+    "check": "User A cannot read User B's progress_logs (cross-user)",
+    "result": "MANUAL",
+    "detail": "Behavioural cross-user isolation needs two authenticated accounts each with logged rows; standing them up writes to the live project (out of scope for read-only verification). Anon-read PASS + policy-catalog PASS together cover the machine-checkable surface.",
+    "tested_commit": "851e73266de466abbbfb4dcda2488ef6a8c704dc",
+    "tested_dirty": true
+  }
+]

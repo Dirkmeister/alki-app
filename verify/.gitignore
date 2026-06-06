@@ -1,0 +1,3 @@
+# Runtime artifacts produced by the verification suite — not source.
+screenshots/
+.server.log
