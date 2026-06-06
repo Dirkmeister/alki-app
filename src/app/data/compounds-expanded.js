@@ -390,14 +390,14 @@ export const EXPANDED_COMPOUNDS = [
   {
     id: "gw501516",
     name: "GW-501516",
-    category: "SARM",
+    category: "Metabolic",
     tagline: "Cardarine — Educational Reference Only",
-    mechanism: "PPARδ agonist developed by GSK for metabolic syndrome. Produces dramatic endurance and fat oxidation effects. Development abandoned due to multi-organ cancer signal in animal studies.",
-    keyBenefits: ["Dramatic endurance improvement", "Strong fat oxidation effect", "Lipid profile improvement", "Listed for educational reference"],
+    mechanism: "PPARδ agonist developed by GSK for metabolic syndrome. Showed marked endurance and fat-oxidation effects in animal studies. Development abandoned due to multi-organ cancer signal in animal studies.",
+    keyBenefits: ["Endurance effects in animal studies", "Fat-oxidation effect in animal studies", "Lipid profile changes in studies", "Listed for educational reference"],
     dosing: "10 mg/day oral (if used at all)",
     cycle: "No protocol eliminates the cancer signal",
     route: "Oral, pre-workout",
-    pros: ["Dramatic endurance improvement in animal studies", "Strong fat oxidation effect", "Lipid profile improvement (HDL up, LDL down)", "No HPG suppression"],
+    pros: ["Endurance improvement reported in animal studies", "Fat-oxidation effect in animal studies", "Lipid profile changes in studies (HDL up, LDL down)", "No HPG suppression"],
     cons: ["Carcinogenic across multiple organs in animal studies", "GSK abandoned development specifically due to cancer signal", "Cancer risk does not respond to cycling", "WADA-banned"],
     effects: { bf: -3, muscle: 0, skin: 0, recovery: 0 },
     suitability: { minBf: 100, maxBf: 100, goals: [] },
@@ -411,7 +411,7 @@ export const EXPANDED_COMPOUNDS = [
   {
     id: "gw0742",
     name: "GW-0742",
-    category: "SARM",
+    category: "Metabolic",
     tagline: "PPARδ Successor — Same Concerns",
     mechanism: "More selective PPARδ agonist than Cardarine, developed by GSK in the same research program. Same fundamental mechanism, same fundamental class-level cancer concern.",
     keyBenefits: ["Higher PPARδ selectivity than Cardarine", "Strong endurance effects in preclinical models", "Lipid profile improvements", "Listed for educational reference"],
@@ -540,11 +540,11 @@ export const EXPANDED_COMPOUNDS = [
     category: "Metabolic",
     tagline: "Aggressive Fat Loss",
     mechanism: "The active thyroid hormone introduced exogenously to directly increase BMR, fat oxidation, and protein turnover. Suppresses endogenous thyroid production during use.",
-    keyBenefits: ["Most aggressive fat loss tool in catalog", "Direct mechanism — bypasses appetite pathways", "Effective when other tools plateau", "Affordable"],
+    keyBenefits: ["Potent, direct metabolic fat-loss mechanism", "Direct mechanism — bypasses appetite pathways", "May still act where other tools plateau", "Affordable"],
     dosing: "25 mcg/day (titrate up to 75 mcg)",
     cycle: "6 weeks with full taper; minimum 4 weeks recovery",
     route: "Oral, morning",
-    pros: ["Most aggressive fat loss tool in the catalog", "Direct mechanism — bypasses appetite and glucose pathways", "Effective even when other fat loss tools plateau", "Strong clinical history"],
+    pros: ["Potent metabolic fat-loss mechanism", "Direct mechanism — bypasses appetite and glucose pathways", "May still act when other fat loss tools plateau", "Strong clinical history"],
     cons: ["Muscle catabolism without anabolic protection", "Cardiac strain at higher doses", "Endogenous thyroid suppression — temporary but real", "Psychological addiction risk"],
     effects: { bf: -5, muscle: -2.5, skin: 0, recovery: -1.5 },
     suitability: { minBf: 15, maxBf: 35, goals: ["fat_loss"] },
@@ -621,7 +621,7 @@ export const EXPANDED_COMPOUNDS = [
   {
     id: "melanotan2",
     name: "Melanotan II",
-    category: "Cosmetic",
+    category: "Performance",
     tagline: "Tan + Libido + Appetite",
     mechanism: "Non-selective melanocortin agonist driving melanin production for tanning, activating central libido pathways, and suppressing appetite. The most multi-functional melanocortin peptide.",
     keyBenefits: ["Multi-functional — tan, libido, appetite", "Tan effects last weeks beyond cessation", "Libido enhancement well-reported", "Useful adjunct in fat loss phases"],
@@ -635,7 +635,13 @@ export const EXPANDED_COMPOUNDS = [
     contraindications: [],
     visualChange: true,
     riskTier: "moderate",
-    experienceLevel: "intermediate"
+    experienceLevel: "intermediate",
+    displayWarning: "Melanocortin agonist — can darken existing moles and new pigmented spots; a dermatologist mole/skin baseline is advised before use, and a long-term melanoma risk is a theoretical concern. Listed for educational reference.",
+    // Opt-in: keep MT-II in recommendations/auto-stacks despite its displayWarning
+    // (its warning is a precaution, not a do-not-use signal like the carcinogen /
+    // no-human-data compounds). The warning banner still renders on the card. This
+    // flag is MT-II-only by design, so no carcinogen can slip into recommendations.
+    recommendableDespiteWarning: true
   },
 
   {
@@ -1386,10 +1392,13 @@ export const EXPANDED_COMPOUNDS = [
  *   Growth Hormone:   6 (MK-677, Sermorelin, IGF-1, CJC variants, Ipa)
  *   Fat Loss:         1 (Fragment 176-191)
  *   Recovery:         2 (BPC/TB blend, Gonadorelin)
- *   SARM:            10 (Ostarine, RAD-140, LGD-4033, YK-11, S-23,
- *                        S-4, LGD-3303, RAD-150, Cardarine, GW-0742)
- *   Metabolic:        8 (MOTS-C, SR-9009/9011, SLU-PP-332, AICAR,
- *                        T3, T4, Clenbuterol, Metformin)
+ *   SARM:             8 (Ostarine, RAD-140, LGD-4033, YK-11, S-23,
+ *                        S-4, LGD-3303, RAD-150)
+ *                        (Cardarine/GW-0742 reclassified to Metabolic —
+ *                         PPARδ agonists, not androgen-receptor SARMs)
+ *   Metabolic:       10 (MOTS-C, SR-9009/9011, SLU-PP-332, AICAR,
+ *                        T3, T4, Clenbuterol, Metformin, Cardarine,
+ *                        GW-0742)
  *   Performance:      2 (Melanotan II, Semax)
  *   Anti-Aging:       2 (Epitalon, Pregnenolone)
  *   Nootropic:       15 (full cognitive spectrum + 3 support)
@@ -1403,7 +1412,7 @@ export const EXPANDED_COMPOUNDS = [
  *   very_low:        4
  *   low:            13
  *   low_mod:        10
- *   moderate:       10
+ *   moderate:       10 (incl. Melanotan II, now has displayWarning set)
  *   mod_high:       12
  *   high:            4 (have displayWarning set)
  *   unknown:         2 (have displayWarning set)

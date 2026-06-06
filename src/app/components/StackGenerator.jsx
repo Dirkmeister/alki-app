@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { generateStacks, detectPhase } from "../lib/stackGenerator";
+import { DISCLAIMER } from "../lib/disclaimer";
 
 /**
  * ============================================================
@@ -102,7 +103,7 @@ export default function StackGenerator({ profile, compoundCatalog, onLoadStack, 
           ))}
 
           <div style={styles.footerNote}>
-            For research and educational purposes only. Not medical advice. Each stack is a starting framework — review every compound's full profile before committing to a protocol.
+            {DISCLAIMER + " Each stack is a starting framework — review every compound's full profile before committing to a protocol."}
           </div>
         </div>
       )}

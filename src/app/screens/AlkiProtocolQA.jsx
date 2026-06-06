@@ -16,8 +16,8 @@ import { useState, useMemo } from "react";
 // MK-677, CycleTimeline, StackGenerator, Body3DAvatar additions.
 // ═══════════════════════════════════════════════════════════
 
-const DISCLAIMER =
-  "All information is for research and educational purposes only. Nothing here constitutes medical advice, diagnosis, or treatment. Consult a licensed healthcare provider before initiating any peptide protocol. Alki assumes no liability for user decisions.";
+// 6.2 — single source of truth for the disclaimer (lib/disclaimer.js).
+import { DISCLAIMER } from "../lib/disclaimer";
 
 // ── COMPOUND FAQ DATA ──────────────────────────────────────
 const COMPOUND_FAQS = {
@@ -242,7 +242,7 @@ const COMPOUND_FAQS = {
       },
       {
         q: "Is Retatrutide appropriate for leaner users?",
-        a: "No. Like Semaglutide, Retatrutide is inappropriate for lean individuals — and given its greater potency, it carries higher risk for lean users. Alki blocks GLP agents for users below 22% body fat and flags Retatrutide as the highest-risk GLP option.",
+        a: "Like Semaglutide, Retatrutide is poorly suited to lean individuals — and given its greater potency, the lean-mass-loss risk is higher for lean users. Alki does not block any compound: below roughly 22% body fat, GLP agents are de-prioritized in your recommended list and shown with a lean-mass-loss advisory, but they stay selectable if you choose to research them. Within the GLP class, Retatrutide is flagged as the highest-risk option for lean users.",
       },
     ],
   },
@@ -262,7 +262,7 @@ const COMPOUND_FAQS = {
       },
       {
         q: "How long should a GHK-Cu cycle run?",
-        a: "30-day cycles are the common framework for injectable or intranasal GHK-Cu, followed by a break before reassessment. Topical cosmetic use can be daily and continuous. There is no documented receptor downregulation or dependence mechanism that mandates cycling.",
+        a: "There is no documented receptor downregulation or dependence mechanism that mandates cycling, so GHK-Cu does not need forced breaks. For skin and collagen goals, run it continuously for at least ~8 weeks — visible changes typically begin around 4 weeks and mature by ~8 (the published facial-cream trials ran 8–12 weeks). Topical cosmetic use can be daily and ongoing.",
       },
       {
         q: "Does GHK-Cu promote hair growth?",
@@ -347,7 +347,7 @@ const COMPOUND_FAQS = {
       },
       {
         q: "What results can I realistically expect?",
-        a: "At 20mg/day for 8–12 weeks with proper training and nutrition: 4–8 lbs of lean mass gain with simultaneous modest fat loss (body recomposition). Strength improvements typically begin within 2 weeks. Users who go into a Ostarine cycle expecting the aggressive results of LGD-4033 or RAD-140 will be underwhelmed — that is by design. The milder result and milder risk are the same feature.",
+        a: "At 20mg/day for 8–12 weeks with proper training and nutrition, users commonly report on the order of a few pounds of lean mass alongside modest fat loss (body recomposition), with strength improvements often beginning within about 2 weeks. Individual results vary widely with genetics, training, and nutrition. Users who go into an Ostarine cycle expecting the aggressive results of LGD-4033 or RAD-140 will be underwhelmed — that is by design. The milder result and milder risk are the same feature.",
       },
       {
         q: "What does the suppression profile look like?",

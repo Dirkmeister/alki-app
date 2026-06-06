@@ -619,9 +619,11 @@ function selectCompoundForSlot(slot, profile, catalog, alreadySelected) {
       if (compound.contraindications.includes("below22bf_glp1") && bf < 22) continue;
     }
 
-    // Educational-reference-only / experimental compounds require explicit opt-in
+    // Educational-reference-only / experimental compounds require explicit opt-in.
+    // recommendableDespiteWarning (Melanotan II only) keeps a warned-but-usable
+    // compound eligible; carcinogen / no-human-data compounds lack it and stay out.
     if (compound.experienceLevel === "experimental_only") continue;
-    if (compound.displayWarning) continue;
+    if (compound.displayWarning && !compound.recommendableDespiteWarning) continue;
 
     return compound;
   }

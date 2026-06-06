@@ -1,155 +1,19 @@
 // ─────────────────────────────────────────────────────────────
-// EXPANDED COMPOUND DATABASE INTEGRATION
-// The line below imports the 63-compound expansion from
-// `./compounds-expanded.js`. To revert to the original 8 compounds:
-//   1. Delete `./compounds-expanded.js`
-//   2. Remove this import line
-//   3. Remove the `...EXPANDED_COMPOUNDS` spread at the bottom of
-//      the COMPOUNDS array
-// The original 8 compounds below remain completely untouched.
+// ALKI — COMBINED COMPOUND DATABASE
 // ─────────────────────────────────────────────────────────────
+// Single combiner for the full compound list. The 8 founding
+// compounds live in `./compoundsCore.js` (canonical source of truth,
+// audit item 9), the 63-compound expansion in `./compounds-expanded.js`.
+// This file just concatenates them.
+//
+// Consumed by AlkiApp.jsx (the app UI) and protocolProtocols.js (the
+// Protocol Guide). Both import COMPOUNDS from here, so the 8 core are
+// now defined exactly ONCE.
+//
+// Pure data — imports nothing from React / Next / DOM / three
+// (portability firewall, CLAUDE.md rule 1).
+// ─────────────────────────────────────────────────────────────
+import { CORE_COMPOUNDS } from "./compoundsCore";
 import { EXPANDED_COMPOUNDS } from "./compounds-expanded";
 
-export const COMPOUNDS = [
-  {
-    id: "bpc157",
-    name: "BPC-157",
-    category: "Recovery",
-    tagline: "The Wolverine Peptide",
-    mechanism: "Gastric pentadecapeptide that accelerates tissue repair via angiogenesis, nitric oxide modulation, and growth factor upregulation.",
-    keyBenefits: ["Tendon & ligament repair", "Gut healing", "Systemic anti-inflammatory", "Neuroprotective effects"],
-    dosing: "250–500 mcg/day SubQ",
-    cycle: "4–6 weeks on, 2 weeks off",
-    route: "Subcutaneous injection near injury site or abdomen",
-    pros: ["Extensive preclinical evidence for tissue repair", "Well-tolerated in available human data", "Versatile: gut, tendon, ligament, muscle", "Pairs synergistically with TB-500"],
-    cons: ["Most research is preclinical (rodent models)", "Not FDA-approved for any indication", "Injectable formulation requires sterile technique", "Oral bioavailability is debated"],
-    effects: { bf: 0, muscle: 0.5, skin: 1, recovery: 5 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["recovery", "performance"] },
-    contraindications: [],
-    visualChange: false
-  },
-  {
-    id: "tb500",
-    name: "TB-500",
-    category: "Recovery",
-    tagline: "Systemic Healing Factor",
-    mechanism: "Synthetic fragment of thymosin beta-4 that promotes cell migration, reduces inflammation, and supports systemic tissue repair.",
-    keyBenefits: ["Whole-body healing acceleration", "Flexibility improvement", "Cardiac tissue protection", "Synergistic with BPC-157"],
-    dosing: "2.5 mg 2x/week (loading), then 2.5 mg/week",
-    cycle: "6–8 weeks loading, 4 weeks maintenance",
-    route: "Subcutaneous injection",
-    pros: ["Systemic healing; not site-specific like BPC-157", "Strong preclinical evidence for cardiac and wound repair", "Excellent synergy in BPC-157/TB-500 stack", "Supports flexibility and joint health"],
-    cons: ["Preclinical data predominates", "Higher cost per cycle than BPC-157", "Some users report temporary fatigue during loading", "Not FDA-approved"],
-    effects: { bf: 0, muscle: 0.3, skin: 0.5, recovery: 4 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["recovery", "performance"] },
-    contraindications: [],
-    visualChange: false
-  },
-  {
-    id: "ipacjc",
-    name: "Ipamorelin + CJC-1295",
-    category: "Growth Hormone",
-    tagline: "The Clean GH Stack",
-    mechanism: "Ipamorelin is a selective GH secretagogue; CJC-1295 (DAC) extends GH release duration. Together they amplify pulsatile GH output without cortisol or prolactin spikes.",
-    keyBenefits: ["Lean mass accrual", "Fat redistribution & reduction", "Deep sleep enhancement", "Recovery acceleration"],
-    dosing: "200–300 mcg each, combined injection, 5 days on / 2 off",
-    cycle: "8–12 weeks, with 4-week breaks between cycles",
-    route: "Subcutaneous injection, pre-bed or AM fasted",
-    pros: ["Selective GH release without cortisol/prolactin elevation", "Synergistic stack amplifies results vs either alone", "Improves sleep architecture; users report deeper sleep", "Supports body recomposition: simultaneous fat loss and lean gain"],
-    cons: ["Requires consistent daily injection schedule", "Results are gradual; full effects at 6–8 weeks", "Water retention possible in first 2 weeks", "Cost of two compounds adds up"],
-    effects: { bf: -2.5, muscle: 3, skin: 1.5, recovery: 2 },
-    suitability: { minBf: 8, maxBf: 30, goals: ["muscle", "fat_loss", "recovery", "anti_aging", "performance"] },
-    contraindications: [],
-    visualChange: true
-  },
-  {
-    id: "tesamorelin",
-    name: "Tesamorelin",
-    category: "Fat Loss",
-    tagline: "Visceral Fat Eliminator",
-    mechanism: "GHRH analog that stimulates endogenous GH release, with FDA-documented efficacy for reducing visceral adipose tissue.",
-    keyBenefits: ["Targeted visceral fat reduction", "GH stimulation via natural pathway", "FDA-approved mechanism (for lipodystrophy)", "Cognitive benefits in emerging research"],
-    dosing: "1–2 mg/day SubQ",
-    cycle: "12–26 weeks continuous",
-    route: "Subcutaneous injection, abdomen",
-    pros: ["FDA-approved for lipodystrophy; established safety data", "Specifically targets visceral fat (the dangerous kind)", "Stimulates natural GH pathway", "Emerging evidence for cognitive benefits (Alzheimer's research)"],
-    cons: ["Higher cost than most peptides ($200+/month)", "Daily injection commitment", "Less effective for subcutaneous fat than GLP-1s", "May cause injection site reactions"],
-    effects: { bf: -2, muscle: 1, skin: 0.5, recovery: 0.5 },
-    suitability: { minBf: 15, maxBf: 100, goals: ["fat_loss", "anti_aging", "performance"] },
-    contraindications: ["below15bf"],
-    visualChange: true
-  },
-  {
-    id: "semaglutide",
-    name: "Semaglutide",
-    category: "Weight Loss",
-    tagline: "The GLP-1 Standard",
-    mechanism: "GLP-1 receptor agonist that reduces appetite, slows gastric emptying, and improves insulin sensitivity. The compound behind Ozempic and Wegovy.",
-    keyBenefits: ["Significant weight loss (15–20% body weight)", "Appetite suppression", "Metabolic improvement", "Cardiovascular risk reduction"],
-    dosing: "0.25 mg/week escalating to 2.4 mg/week over 16 weeks",
-    cycle: "Ongoing; weight regain common upon discontinuation",
-    route: "Subcutaneous injection, weekly",
-    pros: ["Most robust clinical evidence of any compound on this list", "FDA-approved for weight management (Wegovy)", "Once-weekly dosing; highest compliance", "Cardiovascular and metabolic benefits beyond weight loss"],
-    cons: ["Significant muscle mass loss without resistance training", "GI side effects (nausea, constipation) common during titration", "Weight regain upon discontinuation is well-documented", "Not appropriate for lean individuals; depletes necessary mass"],
-    effects: { bf: -6, muscle: -1.5, skin: 0, recovery: 0 },
-    suitability: { minBf: 22, maxBf: 100, goals: ["fat_loss"] },
-    contraindications: ["below15bf", "below22bf_glp1"],
-    visualChange: true
-  },
-  {
-    id: "retatrutide",
-    name: "Retatrutide",
-    category: "Weight Loss",
-    tagline: "The Triple Agonist",
-    mechanism: "Triple agonist targeting GLP-1, GIP, and glucagon receptors simultaneously. The most powerful weight loss compound in current research.",
-    keyBenefits: ["Superior weight loss vs semaglutide in trials", "Triple receptor activation", "Metabolic reset potential", "Active Phase 3 trials"],
-    dosing: "Research phase; 4–12 mg/week in clinical trials",
-    cycle: "Ongoing; research protocols vary",
-    route: "Subcutaneous injection, weekly",
-    pros: ["Phase 2 data showed up to 24% body weight loss at 48 weeks", "Triple agonist mechanism targets more metabolic pathways", "Potentially superior to semaglutide and tirzepatide", "Strong pharmaceutical pipeline backing (Eli Lilly)"],
-    cons: ["Not yet FDA-approved; still in clinical trials", "Dosing protocols not finalized", "GI side effects expected similar to or greater than semaglutide", "Same muscle loss concerns as all GLP-1 class compounds"],
-    effects: { bf: -8, muscle: -2, skin: 0, recovery: 0 },
-    suitability: { minBf: 22, maxBf: 100, goals: ["fat_loss"] },
-    contraindications: ["below15bf", "below22bf_glp1"],
-    visualChange: true
-  },
-  {
-    id: "ghkcu",
-    name: "GHK-Cu",
-    category: "Anti-Aging",
-    tagline: "The Regeneration Signal",
-    mechanism: "Copper-binding tripeptide that resets gene expression toward a regenerative profile, stimulating collagen synthesis, stem cell activity, and antioxidant enzyme production.",
-    keyBenefits: ["Collagen and elastin stimulation", "Skin texture and luminosity", "Wound healing acceleration", "Anti-inflammatory gene regulation"],
-    dosing: "1–2 mg/day SubQ or topical",
-    cycle: "30-day cycles with 2-week breaks",
-    route: "Subcutaneous injection or topical cream",
-    pros: ["Dual delivery options (injectable and topical)", "Strong evidence for skin quality and wound healing", "Resets 4,000+ genes toward a younger expression profile", "Well-tolerated; copper peptide has long safety history"],
-    cons: ["Skin quality changes are gradual (4–8 weeks visible)", "Injectable form is more effective but requires commitment", "Topical penetration varies by formulation quality", "Not a body composition compound; purely regenerative"],
-    effects: { bf: 0, muscle: 0, skin: 4, recovery: 1.5 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["anti_aging", "skin", "recovery"] },
-    contraindications: [],
-    visualChange: false
-  },
-  {
-    id: "pt141",
-    name: "PT-141",
-    category: "Performance",
-    tagline: "Central Activation",
-    mechanism: "Melanocortin receptor agonist that works via CNS activation rather than vascular mechanisms. FDA-approved pathway (Vyleesi).",
-    keyBenefits: ["CNS-mediated performance enhancement", "Works regardless of vascular status", "FDA-approved mechanism", "On-demand dosing"],
-    dosing: "1.75 mg as needed, max 2x/week",
-    cycle: "As needed; not a daily protocol",
-    route: "Subcutaneous injection, 45 min before desired effect",
-    pros: ["FDA-approved mechanism via Vyleesi", "CNS pathway; works when vascular compounds do not", "On-demand dosing; no daily commitment", "Both male and female applications"],
-    cons: ["Nausea is common side effect (30–40% of users)", "Should not be used more than 2x per week", "Can cause temporary skin flushing or darkening", "Not a body composition compound"],
-    effects: { bf: 0, muscle: 0, skin: 0, recovery: 0 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["performance"] },
-    contraindications: [],
-    visualChange: false
-  },
-  // ─────────────────────────────────────────────────────────
-  // Expansion compounds (63 additions). See `compounds-expanded.js`.
-  // To revert: remove the line below and the import at the top.
-  // ─────────────────────────────────────────────────────────
-  ...EXPANDED_COMPOUNDS
-];
+export const COMPOUNDS = [...CORE_COMPOUNDS, ...EXPANDED_COMPOUNDS];

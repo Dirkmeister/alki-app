@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { DISCLAIMER } from "../lib/disclaimer";
 
 /**
  * ============================================================
@@ -1374,9 +1375,7 @@ function DesignNotes({ compounds }) {
 function Disclaimer() {
   return (
     <div style={styles.disclaimer}>
-      For research and educational purposes only. Not medical advice, diagnosis, or treatment
-      recommendations. Consult a licensed healthcare provider before initiating any peptide
-      protocol.
+      {DISCLAIMER}
     </div>
   );
 }

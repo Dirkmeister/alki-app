@@ -129,10 +129,10 @@ const AUTHORED = {
     routeType: "topical", injectionDepth: null, injectionSites: [],
     dose: { amount: 2, unit: "mg" }, frequency: "daily", timing: "AM",
     reconstitution: null,
-    cycle: { onWeeks: 4, offWeeks: 2, standardCycleWeeks: 4 },
+    cycle: { onWeeks: 8, offWeeks: 0, standardCycleWeeks: 8 },
     weekByWeek: [
       { weeks: "1–4", expect: "Skin texture, tone, and luminosity improve gradually." },
-      { weeks: "5–8", expect: "Collagen-driven changes mature with repeated 30-day cycles." },
+      { weeks: "5–8", expect: "Collagen-driven changes mature by ~8 weeks of continuous use." },
     ],
     bloodwork: { required: false, panel: [], note: "Topical copper peptide — no routine bloodwork required." },
     supplies: { needsSyringe: false, syringeType: null, needsBacWater: false, extras: ["Topical GHK-Cu serum/cream (or vial if injecting)"] },

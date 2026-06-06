@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, Fragment } from "react";
+import { DISCLAIMER } from "../lib/disclaimer";
 
 /**
  * ============================================================
@@ -1440,7 +1441,7 @@ export default function CycleTimeline({
         fontFamily: FONT_STACK,
         textAlign: "center",
       }}>
-        All information is for research and educational purposes only. Nothing on this platform constitutes medical advice. Consult a licensed healthcare provider before initiating any peptide protocol.
+        {DISCLAIMER}
       </div>
     </div>
   );
@@ -1466,7 +1467,16 @@ function generateFallbackProfile(compound) {
   let standardWeeks = 12;
   if (c.cycle) {
     const m = c.cycle.match(/(\d+)\s*(?:–|-|to)\s*(\d+)\s*week/i) || c.cycle.match(/(\d+)\s*week/i);
-    if (m) standardWeeks = parseInt(m[2] || m[1]) || 12;
+    if (m) {
+      standardWeeks = parseInt(m[2] || m[1]) || 12;
+    } else {
+      // Day-based cycles (e.g. Epitalon "10–20 day cycles") previously fell
+      // through to the 12-week default, so the Timeline contradicted the card
+      // and the Protocol Guide (which converts days→weeks). Convert the upper
+      // bound to whole weeks so all three surfaces agree (20 days → ~3 weeks).
+      const dm = c.cycle.match(/(\d+)\s*(?:–|-|to)\s*(\d+)\s*day/i) || c.cycle.match(/(\d+)\s*day/i);
+      if (dm) standardWeeks = Math.max(1, Math.round((parseInt(dm[2] || dm[1]) || 7) / 7));
+    }
     if (/ongoing|indefinite|as needed|sustainable|long.?term/i.test(c.cycle)) standardWeeks = 0;
   }
 

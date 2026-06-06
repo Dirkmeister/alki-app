@@ -4,7 +4,7 @@ import StackIntelligence, { analyzeStack, getStackSuggestions } from "./componen
 import StackGenerator from "./components/StackGenerator";
 import AlkiProtocolQA from "./screens/AlkiProtocolQA";
 import CycleTimeline from "./components/CycleTimeline";
-import { EXPANDED_COMPOUNDS } from "./data/compounds-expanded";
+import { COMPOUNDS } from "./data/compounds";
 import Body3DAvatar from "./avatar/Body3DAvatar";
 import AvaturnCapture from "./avatar/AvaturnCapture";
 import { AVATURN_ENABLED } from "./avatar/avaturnConfig";
@@ -20,6 +20,7 @@ import { resolveMorphStates } from "./lib/morphTargets";
 import { selectBaseMesh } from "./lib/selectBaseMesh";
 import { getStackVectors } from "./lib/compoundMorphVectors";
 import { projectBodyFat, projectWeight } from "./lib/bodyComposition";
+import { DISCLAIMER } from "./lib/disclaimer";
 import { simulate } from "./engine/simulate";
 import { mapToMorphs } from "./engine/mapToMorphs";
 import FeedbackFAB from "./components/utilities/FeedbackFAB";
@@ -42,13 +43,6 @@ const DEFAULT_AVATAR_URL = "/alki_humgen_male_lean.glb";
 const SITE_URL =
   (typeof process !== "undefined" && process.env && process.env.NEXT_PUBLIC_SITE_URL) ||
   (typeof window !== "undefined" ? window.location.origin : "");
-// ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-// The import above adds 63 compounds via `data/compounds-expanded.js`.
-// The original 8 compounds remain inline below, untouched.
-// To revert: remove this import line AND remove the
-// `...EXPANDED_COMPOUNDS` spread at the end of the COMPOUNDS array.
-// ─────────────────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — ἀλκή — The AI-Powered Peptide Intelligence Platform
@@ -86,149 +80,10 @@ const BASELINE_PROFILE = {
 };
 
 // ── COMPOUND DATABASE ──────────────────────────────────────
-const COMPOUNDS = [
-  {
-    id: "bpc157",
-    name: "BPC-157",
-    category: "Recovery",
-    tagline: "The Wolverine Peptide",
-    mechanism: "Gastric pentadecapeptide that accelerates tissue repair via angiogenesis, nitric oxide modulation, and growth factor upregulation.",
-    keyBenefits: ["Tendon & ligament repair", "Gut healing", "Systemic anti-inflammatory", "Neuroprotective effects"],
-    dosing: "250–500 mcg/day SubQ",
-    cycle: "4–6 weeks on, 2 weeks off",
-    route: "Subcutaneous injection near injury site or abdomen",
-    pros: ["Extensive preclinical evidence for tissue repair", "Well-tolerated in available human data", "Versatile: gut, tendon, ligament, muscle", "Pairs synergistically with TB-500"],
-    cons: ["Most research is preclinical (rodent models)", "Not FDA-approved for any indication", "Injectable formulation requires sterile technique", "Oral bioavailability is debated"],
-    effects: { bf: 0, muscle: 0.5, skin: 1, recovery: 5 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["recovery", "performance"] },
-    contraindications: [],
-    visualChange: false
-  },
-  {
-    id: "tb500",
-    name: "TB-500",
-    category: "Recovery",
-    tagline: "Systemic Healing Factor",
-    mechanism: "Synthetic fragment of thymosin beta-4 that promotes cell migration, reduces inflammation, and supports systemic tissue repair.",
-    keyBenefits: ["Whole-body healing acceleration", "Flexibility improvement", "Cardiac tissue protection", "Synergistic with BPC-157"],
-    dosing: "2.5 mg 2x/week (loading), then 2.5 mg/week",
-    cycle: "6–8 weeks loading, 4 weeks maintenance",
-    route: "Subcutaneous injection",
-    pros: ["Systemic healing; not site-specific like BPC-157", "Strong preclinical evidence for cardiac and wound repair", "Excellent synergy in BPC-157/TB-500 stack", "Supports flexibility and joint health"],
-    cons: ["Preclinical data predominates", "Higher cost per cycle than BPC-157", "Some users report temporary fatigue during loading", "Not FDA-approved"],
-    effects: { bf: 0, muscle: 0.3, skin: 0.5, recovery: 4 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["recovery", "performance"] },
-    contraindications: [],
-    visualChange: false
-  },
-  {
-    id: "ipacjc",
-    name: "Ipamorelin + CJC-1295",
-    category: "Growth Hormone",
-    tagline: "The Clean GH Stack",
-    mechanism: "Ipamorelin is a selective GH secretagogue; CJC-1295 (DAC) extends GH release duration. Together they amplify pulsatile GH output without cortisol or prolactin spikes.",
-    keyBenefits: ["Lean mass accrual", "Fat redistribution & reduction", "Deep sleep enhancement", "Recovery acceleration"],
-    dosing: "200–300 mcg each, combined injection, 5 days on / 2 off",
-    cycle: "8–12 weeks, with 4-week breaks between cycles",
-    route: "Subcutaneous injection, pre-bed or AM fasted",
-    pros: ["Selective GH release without cortisol/prolactin elevation", "Synergistic stack amplifies results vs either alone", "Improves sleep architecture; users report deeper sleep", "Supports body recomposition: simultaneous fat loss and lean gain"],
-    cons: ["Requires consistent daily injection schedule", "Results are gradual; full effects at 6–8 weeks", "Water retention possible in first 2 weeks", "Cost of two compounds adds up"],
-    effects: { bf: -2.5, muscle: 3, skin: 1.5, recovery: 2 },
-    suitability: { minBf: 8, maxBf: 30, goals: ["muscle", "fat_loss", "recovery", "anti_aging", "performance"] },
-    contraindications: [],
-    visualChange: true
-  },
-  {
-    id: "tesamorelin",
-    name: "Tesamorelin",
-    category: "Fat Loss",
-    tagline: "Visceral Fat Eliminator",
-    mechanism: "GHRH analog that stimulates endogenous GH release, with FDA-documented efficacy for reducing visceral adipose tissue.",
-    keyBenefits: ["Targeted visceral fat reduction", "GH stimulation via natural pathway", "FDA-approved mechanism (for lipodystrophy)", "Cognitive benefits in emerging research"],
-    dosing: "1–2 mg/day SubQ",
-    cycle: "12–26 weeks continuous",
-    route: "Subcutaneous injection, abdomen",
-    pros: ["FDA-approved for lipodystrophy; established safety data", "Specifically targets visceral fat (the dangerous kind)", "Stimulates natural GH pathway", "Emerging evidence for cognitive benefits (Alzheimer's research)"],
-    cons: ["Higher cost than most peptides ($200+/month)", "Daily injection commitment", "Less effective for subcutaneous fat than GLP-1s", "May cause injection site reactions"],
-    effects: { bf: -2, muscle: 1, skin: 0.5, recovery: 0.5 },
-    suitability: { minBf: 15, maxBf: 100, goals: ["fat_loss", "anti_aging", "performance"] },
-    contraindications: ["below15bf"],
-    visualChange: true
-  },
-  {
-    id: "semaglutide",
-    name: "Semaglutide",
-    category: "Weight Loss",
-    tagline: "The GLP-1 Standard",
-    mechanism: "GLP-1 receptor agonist that reduces appetite, slows gastric emptying, and improves insulin sensitivity. The compound behind Ozempic and Wegovy.",
-    keyBenefits: ["Significant weight loss (15–20% body weight)", "Appetite suppression", "Metabolic improvement", "Cardiovascular risk reduction"],
-    dosing: "0.25 mg/week escalating to 2.4 mg/week over 16 weeks",
-    cycle: "Ongoing; weight regain common upon discontinuation",
-    route: "Subcutaneous injection, weekly",
-    pros: ["Most robust clinical evidence of any compound on this list", "FDA-approved for weight management (Wegovy)", "Once-weekly dosing; highest compliance", "Cardiovascular and metabolic benefits beyond weight loss"],
-    cons: ["Significant muscle mass loss without resistance training", "GI side effects (nausea, constipation) common during titration", "Weight regain upon discontinuation is well-documented", "Not appropriate for lean individuals; depletes necessary mass"],
-    effects: { bf: -6, muscle: -1.5, skin: 0, recovery: 0 },
-    suitability: { minBf: 22, maxBf: 100, goals: ["fat_loss"] },
-    contraindications: ["below15bf", "below22bf_glp1"],
-    visualChange: true
-  },
-  {
-    id: "retatrutide",
-    name: "Retatrutide",
-    category: "Weight Loss",
-    tagline: "The Triple Agonist",
-    mechanism: "Triple agonist targeting GLP-1, GIP, and glucagon receptors simultaneously. The most powerful weight loss compound in current research.",
-    keyBenefits: ["Superior weight loss vs semaglutide in trials", "Triple receptor activation", "Metabolic reset potential", "Active Phase 3 trials"],
-    dosing: "Research phase; 4–12 mg/week in clinical trials",
-    cycle: "Ongoing; research protocols vary",
-    route: "Subcutaneous injection, weekly",
-    pros: ["Phase 2 data showed up to 24% body weight loss at 48 weeks", "Triple agonist mechanism targets more metabolic pathways", "Potentially superior to semaglutide and tirzepatide", "Strong pharmaceutical pipeline backing (Eli Lilly)"],
-    cons: ["Not yet FDA-approved; still in clinical trials", "Dosing protocols not finalized", "GI side effects expected similar to or greater than semaglutide", "Same muscle loss concerns as all GLP-1 class compounds"],
-    effects: { bf: -8, muscle: -2, skin: 0, recovery: 0 },
-    suitability: { minBf: 22, maxBf: 100, goals: ["fat_loss"] },
-    contraindications: ["below15bf", "below22bf_glp1"],
-    visualChange: true
-  },
-  {
-    id: "ghkcu",
-    name: "GHK-Cu",
-    category: "Anti-Aging",
-    tagline: "The Regeneration Signal",
-    mechanism: "Copper-binding tripeptide that resets gene expression toward a regenerative profile, stimulating collagen synthesis, stem cell activity, and antioxidant enzyme production.",
-    keyBenefits: ["Collagen and elastin stimulation", "Skin texture and luminosity", "Wound healing acceleration", "Anti-inflammatory gene regulation"],
-    dosing: "1–2 mg/day SubQ or topical",
-    cycle: "30-day cycles with 2-week breaks",
-    route: "Subcutaneous injection or topical cream",
-    pros: ["Dual delivery options (injectable and topical)", "Strong evidence for skin quality and wound healing", "Resets 4,000+ genes toward a younger expression profile", "Well-tolerated; copper peptide has long safety history"],
-    cons: ["Skin quality changes are gradual (4–8 weeks visible)", "Injectable form is more effective but requires commitment", "Topical penetration varies by formulation quality", "Not a body composition compound; purely regenerative"],
-    effects: { bf: 0, muscle: 0, skin: 4, recovery: 1.5 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["anti_aging", "skin", "recovery"] },
-    contraindications: [],
-    visualChange: false
-  },
-  {
-    id: "pt141",
-    name: "PT-141",
-    category: "Performance",
-    tagline: "Central Activation",
-    mechanism: "Melanocortin receptor agonist that works via CNS activation rather than vascular mechanisms. FDA-approved pathway (Vyleesi).",
-    keyBenefits: ["CNS-mediated performance enhancement", "Works regardless of vascular status", "FDA-approved mechanism", "On-demand dosing"],
-    dosing: "1.75 mg as needed, max 2x/week",
-    cycle: "As needed; not a daily protocol",
-    route: "Subcutaneous injection, 45 min before desired effect",
-    pros: ["FDA-approved mechanism via Vyleesi", "CNS pathway; works when vascular compounds do not", "On-demand dosing; no daily commitment", "Both male and female applications"],
-    cons: ["Nausea is common side effect (30–40% of users)", "Should not be used more than 2x per week", "Can cause temporary skin flushing or darkening", "Not a body composition compound"],
-    effects: { bf: 0, muscle: 0, skin: 0, recovery: 0 },
-    suitability: { minBf: 0, maxBf: 100, goals: ["performance"] },
-    contraindications: [],
-    visualChange: false
-  },
-  // ─────────────────────────────────────────────────────────
-  // Expansion (63 compounds). Source: ./data/compounds-expanded.js
-  // To revert: remove the line below and the import at the top.
-  // ─────────────────────────────────────────────────────────
-  ...EXPANDED_COMPOUNDS
-];
+// The full list (8 core + 63 expanded) is assembled in
+// ./data/compounds.js, which combines compoundsCore.js (the canonical
+// original 8) with compounds-expanded.js. Imported at the top of this
+// file; no longer declared inline (audit item 9 — dual source removed).
 
 // Category color tokens — shared between CompoundCard, stack badges, and any
 // other surface that wants a consistent per-category accent.
@@ -249,8 +104,11 @@ const CAT_COLORS = {
 };
 
 // #3G — compounds that suppress the natural HPG axis (need a visible PCT warning):
-// all androgen-receptor SARMs + Hormonal compounds. The two GW "SARMs" (Cardarine /
-// GW-0742) are PPARδ agonists, not androgenic, so they don't suppress — excluded.
+// all androgen-receptor SARMs + Hormonal compounds. Cardarine / GW-0742 are PPARδ
+// agonists, not androgenic, so they don't suppress — they were reclassified out of
+// the SARM category (now Metabolic, audit 6.9), so the category check below no
+// longer catches them. This set is kept as a defensive safety net in case either
+// is ever re-tagged SARM, so it would still be excluded from the PCT warning.
 const NON_SUPPRESSIVE_SARMS = new Set(["gw501516", "gw0742"]);
 function isSuppressiveCompound(c) {
   if (!c) return false;
@@ -1163,7 +1021,7 @@ function SplashScreen({ onEnter }) {
           Enter Platform
         </button>
         <p style={{ ...S.disclaimer, marginTop: 24, maxWidth: 280, margin: "24px auto 0", fontSize: 10, lineHeight: 1.7 }}>
-          For informational and research purposes only. Not medical advice. Consult a licensed physician before initiating any peptide protocol.
+          {DISCLAIMER}
         </p>
         <p style={{ fontSize: 11, color: "rgba(26,232,122,0.3)", marginTop: 14, fontFamily: "'DM Sans', sans-serif", fontStyle: "italic", letterSpacing: "0.06em" }}>
           Happy Researching.
@@ -1256,6 +1114,15 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
     goals: prev.goals.includes(g) ? prev.goals.filter(x => x !== g) : [...prev.goals, g]
   }));
 
+  // 6.7-c — the age gate is a binary attestation; this is the second guard.
+  // The basics step's `min="18"` is only a browser hint, so an under-18 value
+  // could be typed and saved. Block it here: the Continue button stays disabled
+  // and an inline notice explains why, so under-18 never reaches the profile.
+  const ageNum = parseInt(data.age, 10);
+  const ageEntered = data.age !== "" && !Number.isNaN(ageNum);
+  const ageUnder18 = ageEntered && ageNum < 18;
+  const basicsValid = ageEntered && ageNum >= 18 && !!data.weight;
+
   const bfNum = parseFloat(data.bodyFat);
   // #31 — informational only. Describe what the range *means* physiologically;
   // don't prescribe a goal or protocol. The recommendation engine still ranks
@@ -1293,7 +1160,12 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
       <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 24, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Biometrics</h2>
       <div style={{ marginBottom: 20 }}>
         <label style={S.label}>Age</label>
-        <input type="number" placeholder="28" value={data.age} onChange={e => set("age", e.target.value)} style={S.input} min="18" max="99" />
+        <input type="number" placeholder="28" value={data.age} onChange={e => set("age", e.target.value)} style={{ ...S.input, ...(ageUnder18 ? { borderColor: "rgba(239,68,68,0.6)" } : {}) }} min="18" max="99" />
+        {ageUnder18 && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#fca5a5", lineHeight: 1.5 }}>
+            Alki is available only to adults aged 18 and older.
+          </div>
+        )}
       </div>
       <div style={{ marginBottom: 20 }}>
         <label style={S.label}>Height</label>
@@ -1314,7 +1186,7 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
         <label style={S.label}>Weight (lbs)</label>
         <input type="number" placeholder="185" value={data.weight} onChange={e => set("weight", e.target.value)} style={S.input} />
       </div>
-      <button style={{ ...S.btn, ...((!data.age || !data.weight) ? S.btnDisabled : {}) }} disabled={!data.age || !data.weight} onClick={() => setStep(2)}>
+      <button style={{ ...S.btn, ...(!basicsValid ? S.btnDisabled : {}) }} disabled={!basicsValid} onClick={() => setStep(2)}>
         Continue
       </button>
     </div>,
@@ -1428,7 +1300,12 @@ function Onboarding({ onComplete, onExitHome, prefill = null, initialStep = 0 })
           );
         })}
       </div>
-      <button style={{ ...S.btn, marginTop: 28, ...(data.goals.length === 0 ? S.btnDisabled : {}) }} disabled={data.goals.length === 0} onClick={() => {
+      {/* 6.2 — onboarding carried no disclaimer on any step; surface the
+          canonical form right before the user generates a protocol. */}
+      <p style={{ ...S.disclaimer, marginTop: 24, textAlign: "left", fontSize: 11, lineHeight: 1.6 }}>
+        {DISCLAIMER}
+      </p>
+      <button style={{ ...S.btn, marginTop: 16, ...(data.goals.length === 0 ? S.btnDisabled : {}) }} disabled={data.goals.length === 0} onClick={() => {
         const profile = {
           sex: data.sex,
           age: parseInt(data.age),
@@ -1520,6 +1397,20 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
         )}
       </div>
 
+      {/* Audit 6.4/6.9 — the strongest per-compound safety string (carcinogenicity,
+          no human data, dependency risk, etc.) previously rendered only in the
+          Protocol Guide. Surface it on the card itself, at the point of selection,
+          so a flagged compound never appears without its warning. Purely
+          informational — it never blocks selection (advise, don't gatekeep). */}
+      {c.displayWarning && (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 12px", borderRadius: 8, background: "rgba(239,68,68,0.16)", border: "1px solid rgba(239,68,68,0.5)", marginBottom: 10 }}>
+          <span style={{ fontSize: 14, lineHeight: 1.3, flexShrink: 0 }}>⛔</span>
+          <span style={{ fontSize: 12, color: "#fca5a5", fontWeight: 700, lineHeight: 1.45 }}>
+            {c.displayWarning}
+          </span>
+        </div>
+      )}
+
       {/* #3G — unmissable testosterone-suppression warning on every SARM / hormonal
           compound. Sits at the top of the card, not buried in the detail text. */}
       {isSuppressiveCompound(c) && (
@@ -1558,7 +1449,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
       </div>
 
       <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 8, lineHeight: 1.4, fontStyle: "italic" }}>
-        All information is derived from published research literature and is presented for educational purposes.
+        {DISCLAIMER}
       </div>
 
       <button onClick={() => setExpanded(!expanded)} style={{
@@ -1860,7 +1751,11 @@ function EidolonHero({
         const cells = [
           { k: "BODY FAT", cur: `${profile.bodyFat}%`, proj: `${projection.projectedBodyFat}%`, delta: projection.bfChange, good: "down", unit: "%" },
           { k: "WEIGHT", cur: formatWeight(profile.weight, units), proj: formatWeight(projection.projectedWeight, units), delta: projection.weightChange, good: "down", unit: "lb" },
-          { k: "LEAN MASS", cur: null, proj: projection.muscleChange === 0 ? "—" : `${projection.muscleChange > 0 ? "+" : ""}${projection.muscleChange}%`, delta: projection.muscleChange, good: "up", unit: "" },
+          // 6.10 — muscleChange is a unitless 0–3 effect score (Σ effects.muscle),
+          // NOT a percentage and not an engine LBM delta. The compact pill has no
+          // room for a clarifying note, so show an honest directional readout
+          // instead of a fake "%". (Detailed Transform tile shows it as "pts".)
+          { k: "LEAN MASS", cur: null, proj: projection.muscleChange === 0 ? "—" : (projection.muscleChange > 0 ? "Supported" : "At risk"), delta: projection.muscleChange, good: "up", unit: "" },
         ];
         const col = (d, good) => (!d || d === 0) ? "rgba(255,255,255,0.4)" : ((good === "up" ? d > 0 : d < 0) ? "#22d68a" : "#ef4444");
         return (
@@ -2315,9 +2210,12 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     if (c.contraindications && c.contraindications.includes("below15bf") && bf < 15) return false;
     if (c.contraindications && c.contraindications.includes("below22bf_glp1") && bf < 22) return false;
 
-    // Skip experimental-only and warning-flagged compounds (need explicit opt-in)
+    // Skip experimental-only and warning-flagged compounds (need explicit opt-in).
+    // recommendableDespiteWarning lets a specific compound (Melanotan II) keep its
+    // card warning yet stay recommendable; every other warned compound (carcinogens,
+    // no-human-data) lacks the flag and remains excluded.
     if (c.experienceLevel === "experimental_only") return false;
-    if (c.displayWarning) return false;
+    if (c.displayWarning && !c.recommendableDespiteWarning) return false;
 
     return true;
   });
@@ -2442,9 +2340,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             <StatTile
               label="Lean Mass"
               delta={projectedChanges.muscleChange}
-              unit="%"
+              unit=" pts"
+              isScore
               goodDirection="up"
-              note={projectedChanges.muscleChange === 0 ? "No change" : null}
+              note={projectedChanges.muscleChange === 0 ? "No change" : "Relative effect score, not a percentage"}
             />
             <StatTile
               label="Skin Quality"
@@ -2540,7 +2439,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         )}
 
         <p style={S.disclaimer}>
-          Projected research outcome based on published literature. Individual results are not guaranteed. This is not medical advice. Consult a licensed healthcare provider before initiating any protocol.
+          {"Projected research outcome based on published literature. Individual results are not guaranteed. " + DISCLAIMER}
         </p>
         <p style={{ fontSize: 12, color: "rgba(26,232,122,0.35)", textAlign: "center", paddingBottom: 20, fontStyle: "italic", letterSpacing: "0.06em" }}>
           Happy Researching.
@@ -3301,7 +3200,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       )}
 
       <p style={{ ...S.disclaimer, paddingBottom: 8 }}>
-        All information is for research and educational purposes only. Nothing on this platform constitutes medical advice. Consult a licensed healthcare provider before initiating any peptide protocol. Alki assumes no liability for user decisions.
+        {DISCLAIMER}
       </p>
       <p style={{ fontSize: 12, color: "rgba(26,232,122,0.3)", textAlign: "center", paddingBottom: 32, fontStyle: "italic", letterSpacing: "0.06em" }}>
         Alki · ἀλκή · Happy Researching.
@@ -3337,7 +3236,10 @@ async function loadProfile(userId) {
       activeProtocol: data.active_protocol || null,
       eidolons: data.eidolons || [],
       activeEidolonId: data.active_eidolon_id || null,
-      preferences: data.preferences || null
+      preferences: data.preferences || null,
+      // 6.7-a — server-side 18+ attestation. `=== true` so a missing column
+      // (pre-migration) or null reads as not-yet-verified and re-gates.
+      ageVerified: data.age_verified === true
     };
   } catch (e) {
     console.error("loadProfile error:", e);
@@ -3345,7 +3247,7 @@ async function loadProfile(userId) {
   }
 }
 
-async function saveProfile(userId, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId, preferences) {
+async function saveProfile(userId, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId, preferences, ageVerified) {
   if (!supabase || !profile) return;
   try {
     const { error } = await supabase
@@ -3367,6 +3269,11 @@ async function saveProfile(userId, profile, selectedCompounds, avatarUrl, active
         eidolons: eidolons || [],
         active_eidolon_id: activeEidolonId || null,
         preferences: preferences || {},
+        // 6.7-a — persist the 18+ attestation. Only ever written true (the
+        // caller passes the live ageVerified flag, which is true once the gate
+        // is passed); never downgraded to false by an auto-save, since a
+        // verified session keeps the flag true for its lifetime.
+        age_verified: ageVerified === true,
         updated_at: new Date().toISOString()
       });
     if (error) console.error("saveProfile error:", error);
@@ -3679,6 +3586,16 @@ function SetNewPassword({ onDone }) {
 export default function AlkiApp() {
   const [screen, setScreen] = useState(supabase ? "loading" : "splash");
   const [user, setUser] = useState(null);
+  // 6.7-a — the 18+ attestation, mirrored from profiles.age_verified. Starts
+  // false; flips true when the user passes the age gate OR when a loaded
+  // profile already carries the server-side attestation. Threaded into
+  // saveProfile so it persists, so returning users aren't re-gated forever.
+  const [ageVerified, setAgeVerified] = useState(false);
+  // Where to route after the age gate is confirmed. Null → the default
+  // first-run target (auth when Supabase is wired, else onboarding). Set to
+  // "dashboard"/"onboarding" when an already-signed-in user is re-gated
+  // because their profile lacks a server-side attestation.
+  const [pendingAfterGate, setPendingAfterGate] = useState(null);
   const [profile, setProfile] = useState(null);
   const [selectedCompounds, setSelectedCompounds] = useState([]);
   const [showTransform, setShowTransform] = useState(false);
@@ -3814,7 +3731,17 @@ export default function AlkiApp() {
             if (saved.preferences && Object.keys(saved.preferences).length) {
               updatePreferences({ ...DEFAULT_PREFERENCES, ...saved.preferences });
             }
-            setScreen("dashboard");
+            // 6.7-a — a live session bypasses splash → agegate, so the gate is
+            // re-enforced here from the server-side attestation. If the profile
+            // already carries it, proceed; otherwise route through the gate
+            // (landing back on the dashboard once confirmed).
+            if (saved.ageVerified) {
+              setAgeVerified(true);
+              setScreen("dashboard");
+            } else {
+              setPendingAfterGate("dashboard");
+              setScreen("agegate");
+            }
           } else {
             setScreen("onboarding");
           }
@@ -3844,10 +3771,10 @@ export default function AlkiApp() {
       // The live base is derived from the profile via selectBaseMesh(), so we
       // must NOT write the selected base path here, or the future override
       // read would treat it as a custom mesh and re-break selection.
-      saveProfile(user.id, profile, selectedCompounds, null, activeProtocol, eidolons, activeEidolonId, preferences);
+      saveProfile(user.id, profile, selectedCompounds, null, activeProtocol, eidolons, activeEidolonId, preferences, ageVerified);
     }, 1500);
     return () => clearTimeout(saveTimeout.current);
-  }, [user, profile, selectedCompounds, activeProtocol, eidolons, activeEidolonId, preferences]);
+  }, [user, profile, selectedCompounds, activeProtocol, eidolons, activeEidolonId, preferences, ageVerified]);
 
   const cultivationState = useMemo(() => {
     // Filter progress logs to the active eidolon for cultivation state
@@ -4036,7 +3963,16 @@ export default function AlkiApp() {
       if (saved.preferences && Object.keys(saved.preferences).length) {
         updatePreferences({ ...DEFAULT_PREFERENCES, ...saved.preferences });
       }
-      setScreen("dashboard");
+      // 6.7-a — re-enforce the age gate from the server-side attestation. The
+      // normal sign-in path already passed the gate (ageVerified true), but the
+      // password-recovery deep link reaches here without it, so gate if absent.
+      if (saved.ageVerified) {
+        setAgeVerified(true);
+        setScreen("dashboard");
+      } else {
+        setPendingAfterGate("dashboard");
+        setScreen("agegate");
+      }
     } else {
       setScreen("onboarding");
     }
@@ -4067,6 +4003,14 @@ export default function AlkiApp() {
   const goHome = () => { setNavHistory([]); setScreen("dashboard"); };
 
   const afterAgeGate = supabase ? "auth" : "onboarding";
+  // 6.7-a — passing the gate records the attestation in client state (carried
+  // to Supabase by the next profile save) and routes onward. pendingAfterGate
+  // overrides the first-run target when an already-signed-in user was re-gated.
+  const confirmAgeGate = () => {
+    setAgeVerified(true);
+    setScreen(pendingAfterGate || afterAgeGate);
+    setPendingAfterGate(null);
+  };
 
   return (
     <div style={S.app}>
@@ -4087,7 +4031,7 @@ export default function AlkiApp() {
       )}
 
       {screen === "splash" && <SplashScreen onEnter={() => setScreen("agegate")} />}
-      {screen === "agegate" && <AgeGate onConfirm={() => setScreen(afterAgeGate)} onDeny={() => setScreen("blocked")} />}
+      {screen === "agegate" && <AgeGate onConfirm={confirmAgeGate} onDeny={() => setScreen("blocked")} />}
       {screen === "blocked" && <AgeBlocked />}
       {screen === "auth" && (
         <AuthScreen

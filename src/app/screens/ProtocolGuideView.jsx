@@ -191,7 +191,7 @@ function InjectionSiteSection({ stackIds }) {
           )}
         </svg>
         <div style={{ flex: 1, minWidth: 140 }}>
-          <div style={{ fontSize: 12, color: T.text3, marginBottom: 8 }}>Recommended SubQ sites for this stack:</div>
+          <div style={{ fontSize: 12, color: T.text3, marginBottom: 8 }}>Common SubQ sites for this stack:</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
             {sites.map(s => (
               <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: 100, background: T.accentDim, border: `1px solid ${T.accentBorder}`, fontSize: 12, fontWeight: 600, color: T.accent }}>
@@ -201,7 +201,7 @@ function InjectionSiteSection({ stackIds }) {
             ))}
           </div>
           <div style={{ fontSize: 11, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>
-            Rotate sites each injection to avoid irritation. Pinch SubQ tissue; insert at 45–90°.
+            Sites are generally rotated between injections to reduce irritation; SubQ injections are typically given by pinching the tissue and inserting at 45–90°. Educational information only — not medical advice; consult a licensed healthcare provider.
           </div>
         </div>
       </div>
