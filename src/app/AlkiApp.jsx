@@ -24,6 +24,8 @@ import { selectBaseMesh } from "./lib/selectBaseMesh";
 import { getStackVectors } from "./lib/compoundMorphVectors";
 import { projectBodyFat, projectWeight } from "./lib/bodyComposition";
 import { DISCLAIMER } from "./lib/disclaimer";
+import { isProUser } from "./lib/subscription";
+import UpgradePrompt from "./components/UpgradePrompt";
 import { simulate } from "./engine/simulate";
 import { mapToMorphs } from "./engine/mapToMorphs";
 import FeedbackFAB from "./components/utilities/FeedbackFAB";
@@ -1657,6 +1659,7 @@ function EidolonHero({
   onCaptureAvatar, onResetAvatar, showAvatarDebug,
   avatarResetSignal = 0,
   pulse = false, glowLevel = 0, projection = null, units = "imperial",
+  isPro = false, onUpgrade,
 }) {
   return (
     <>
@@ -1717,7 +1720,8 @@ function EidolonHero({
           animation: pulse ? "alkiDosePulse 1.4s ease" : undefined
         }} />
         <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
-          {avatarUrl ? (
+          {/* Sprint 7 — the interactive 3D Eidolon is Pro; free users get the 2D SVG. */}
+          {isPro && avatarUrl ? (
             <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="large" interactive={true} debugPanel={showAvatarDebug} resetSignal={avatarResetSignal} />
           ) : (
             <BodyAvatar params={avatarParams.current} label="" maxWidth={280} />
@@ -1727,7 +1731,11 @@ function EidolonHero({
 
       {/* Avatar customization chip */}
       <div style={{ textAlign: "center", marginBottom: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
-        {avatarUrl ? (
+        {!isPro ? (
+          <button onClick={() => onUpgrade?.()} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
+            ✦ Unlock 3D Eidolon
+          </button>
+        ) : avatarUrl ? (
           <button onClick={onResetAvatar} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
             ↺ Reset Avatar
           </button>
@@ -1811,8 +1819,14 @@ function applyEidolonState(eid, { setActiveEidolonId, setProfile, setActiveProto
   return locked;
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog, isPro = false, onSubscribe }) {
   const [animateIn, setAnimateIn] = useState(false);
+  // Sprint 7 — the ONE paywall surface for this screen. Set to a PRO_FEATURES
+  // key to open the upgrade modal; gates call gatePro(feature, action) so a free
+  // user gets the prompt and a Pro user runs the action. Centralizes the check
+  // instead of scattering isPro branches across every button.
+  const [paywall, setPaywall] = useState(null);
+  const gatePro = (feature, action) => { if (isPro) { action?.(); } else { setPaywall(feature); } };
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   // #9166e05e — bumped on each "Reset Avatar" press to re-center the 3D orbit.
   const [avatarResetSignal, setAvatarResetSignal] = useState(0);
@@ -1933,6 +1947,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   }, [profile?.goals, activeEidolon]);
 
   const handleLockIn = useCallback((compounds) => {
+    // Sprint 7 — locking in a protocol is Pro. Free users can build/preview a
+    // draft stack, but committing it (and the cultivation it unlocks) gates here.
+    if (!isPro) { setPaywall("stack_lock_in"); return; }
     const protocol = { compounds, lockedAt: new Date().toISOString() };
     setActiveProtocol(protocol);
     if (activeEidolon) {
@@ -1947,7 +1964,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     // the scroll-reset effect wouldn't fire on its own; reset it here for both paths.
     setTransformTab("projection");
     try { window.scrollTo(0, 0); } catch (_) {}
-  }, [activeEidolon]);
+  }, [activeEidolon, isPro]);
 
   // 4.3 — re-enter the builder on the committed stack to adjust it. Surfaced on
   // the committed home as a visible "Edit Protocol" button AND tappable Active
@@ -2358,6 +2375,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   if (showTransform) {
     return (
       <div style={S.inner}>
+        {paywall && (
+          <UpgradePrompt featureKey={paywall} onSubscribe={onSubscribe} onClose={() => setPaywall(null)} />
+        )}
         {/* ef1083fa — the projection surface now uses the SAME persistent HOME
             chrome as every other inner screen (fixed top-right ALKI⌂ pill), not a
             back arrow. The pill collapses the projection back to the dashboard home
@@ -2398,7 +2418,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             return (
               <button
                 key={id}
-                onClick={() => { setTransformTab(id); try { window.scrollTo(0, 0); } catch (_) {} }}
+                onClick={() => {
+                  // Sprint 7 — the Cycle Timeline tab is Pro-gated.
+                  if (id === "timeline" && !isPro) { setPaywall("cycle_timeline"); return; }
+                  setTransformTab(id); try { window.scrollTo(0, 0); } catch (_) {}
+                }}
                 style={{
                   flex: 1, padding: "9px 12px", borderRadius: 100, border: "none", cursor: "pointer",
                   fontFamily: "inherit", fontSize: 13, fontWeight: 700, letterSpacing: "0.02em",
@@ -2407,7 +2431,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                   transition: "background 0.15s ease, color 0.15s ease",
                 }}
               >
-                {lbl}
+                {lbl}{id === "timeline" && !isPro ? " 🔒" : ""}
               </button>
             );
           })}
@@ -2434,7 +2458,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         {/* Before / After — SVG free / 3D premium based on avatarUrl */}
         <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            {avatarUrl ? (
+            {/* Sprint 7 — 3D Eidolon is Pro; free users see the 2D SVG avatar. */}
+            {isPro && avatarUrl ? (
               <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="Current Eidolon" size="large" interactive={true} />
             ) : (
               <BodyAvatar params={avatarParams.current} label="Current Eidolon" />
@@ -2442,13 +2467,24 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </div>
           <div style={{ fontSize: 24, color: "rgba(255,255,255,0.15)", paddingBottom: 40 }}>→</div>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            {avatarUrl ? (
+            {isPro && avatarUrl ? (
               <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.projected} label="Projected Eidolon" size="large" interactive={true} glow={true} />
             ) : (
               <BodyAvatar params={avatarParams.projected} label="Projected Eidolon" glow={true} />
             )}
           </div>
         </div>
+        {/* Free-tier nudge to unlock the interactive 3D Eidolon. */}
+        {!isPro && (
+          <div style={{ textAlign: "center", marginTop: -8, marginBottom: 14 }}>
+            <button
+              onClick={() => setPaywall("avatar_3d")}
+              style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              ✦ Unlock 3D Eidolon
+            </button>
+          </div>
+        )}
 
         {/* Stats — core projections. D5 — the tiles are data-driven and ordered so
             the stack's actually-targeted outcomes (a non-zero projected change) lead,
@@ -2564,6 +2600,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
   return (
     <div style={{ ...S.inner, opacity: animateIn ? 1 : 0, transition: "opacity 0.6s ease" }}>
+      {paywall && (
+        <UpgradePrompt featureKey={paywall} onSubscribe={onSubscribe} onClose={() => setPaywall(null)} />
+      )}
       {/* Header */}
       <div style={{ padding: "16px 0 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
@@ -2664,6 +2703,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         glowLevel={doseProgress}
         units={units}
         projection={editing && selectedCompounds.length > 0 ? projectedChanges : null}
+        isPro={isPro}
+        onUpgrade={() => setPaywall("avatar_3d")}
       />
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
@@ -2736,7 +2777,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             const cv = getCultivationVisuals(cultivationState?.state || "new");
             return (
               <div
-                onClick={onProgress}
+                onClick={() => gatePro("progress_log", onProgress)}
                 style={{
                   ...S.card,
                   borderColor: cv.statusBorder,
@@ -2928,8 +2969,8 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           >
             View Projection · Before / After →
           </button>
-          <button onClick={onProtocolGuide} style={{ ...S.btnOutline, marginBottom: 10 }}>
-            View Full Protocol
+          <button onClick={() => gatePro("protocol_guide", onProtocolGuide)} style={{ ...S.btnOutline, marginBottom: 10 }}>
+            View Full Protocol{!isPro ? " 🔒" : ""}
           </button>
           {/* D4 — the standalone "Edit Protocol" button was removed (the Active Stack
               and Goals cards above are already tap-to-edit, re-entering the builder),
@@ -3259,15 +3300,17 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 // A2 — visibility is driven solely by showOtherCompounds so the Hide
                 // toggle always collapses the list; filter-activation auto-opens it via
                 // the one-shot effect above rather than pinning `open` true here.
-                const open = showOtherCompounds;
+                // Sprint 7 — the full catalog only renders for Pro, so a filter
+                // auto-opening showOtherCompounds can't leak it to free users.
+                const open = isPro && showOtherCompounds;
                 return (
                   <>
                     <button
-                      onClick={() => setShowOtherCompounds(v => !v)}
+                      onClick={() => gatePro("browse_all", () => setShowOtherCompounds(v => !v))}
                       style={{ ...S.btnOutline, marginTop: 20, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", fontSize: 13 }}
                     >
                       <span>{open ? "Hide" : "Browse"} all compounds ({filtersActive ? `${all.length} matching` : `${otherCompounds.length} more`})</span>
-                      <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                      <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>{isPro ? "▼" : "🔒"}</span>
                     </button>
                     {open && (
                       <>
@@ -3398,7 +3441,16 @@ async function loadProfile(userId) {
         bodyFat: data.body_fat,
         goals: data.goals || [],
         adv: data.adv || {},
-        trainingStatus: data.training_status || null
+        trainingStatus: data.training_status || null,
+        // Sprint 7 — subscription state rides on the profile object so isPro is
+        // derivable wherever the profile flows. These are READ-only on the
+        // client: saveProfile never writes them back (migration 007's guard
+        // trigger would reject it anyway). `|| 'free'` / `=== true` keep a
+        // pre-migration profile (columns absent → undefined) reading as free.
+        subscriptionStatus: data.subscription_status || "free",
+        subscriptionTier: data.subscription_tier || null,
+        stripeCustomerId: data.stripe_customer_id || null,
+        comped: data.comped === true
       },
       selectedCompounds: data.selected_compounds || [],
       avatarUrl: data.avatar_url || null,
@@ -3962,6 +4014,101 @@ export default function AlkiApp() {
     return getCultivationState(merged);
   }, [progressLogs, activeEidolonId, doseLog]);
 
+  // ── Sprint 7 — Pro entitlement + Stripe actions ─────────────────────────
+  // isPro is derived purely from the loaded profile (active subscription OR a
+  // manual comp). Recomputed each render; it's a cheap field read.
+  const isPro = isProUser(profile);
+
+  // Attach the caller's Supabase access token so the API route can verify the
+  // session SERVER-SIDE (we never trust a client-supplied user id). Returns the
+  // parsed JSON or throws a friendly error.
+  const callStripeRoute = useCallback(async (path, body) => {
+    if (!supabase) throw new Error("Account required. Please sign in first.");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error("Please sign in to manage your subscription.");
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Something went wrong. Please try again.");
+    return data;
+  }, []);
+
+  // Start Checkout for a tier ('monthly' | 'annual'); redirects to Stripe.
+  const startCheckout = useCallback(async (tier) => {
+    const { url } = await callStripeRoute("/api/stripe/checkout", { tier });
+    if (url) window.location.href = url;
+    else throw new Error("Could not start checkout. Please try again.");
+  }, [callStripeRoute]);
+
+  // Open the Stripe Customer Portal so a subscriber can manage/cancel.
+  const openBillingPortal = useCallback(async () => {
+    const { url } = await callStripeRoute("/api/stripe/portal", {});
+    if (url) window.location.href = url;
+    else throw new Error("Could not open the billing portal. Please try again.");
+  }, [callStripeRoute]);
+
+  // Re-read ONLY the subscription columns from Supabase and merge them into the
+  // in-memory profile (leaving the user's other fields/edits untouched). This is
+  // a plain DB read — NOT a Stripe call — so it's safe to use on the checkout
+  // return without violating the "no extra Stripe calls on load" rule. Reused by
+  // the Settings "Refresh subscription status" action after /api/stripe/sync.
+  const refreshSubscriptionFromDb = useCallback(async () => {
+    if (!supabase || !user) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("subscription_status, subscription_tier, stripe_customer_id, comped")
+      .eq("id", user.id)
+      .single();
+    if (data) {
+      setProfile(prev => prev ? {
+        ...prev,
+        subscriptionStatus: data.subscription_status || "free",
+        subscriptionTier: data.subscription_tier || null,
+        stripeCustomerId: data.stripe_customer_id || null,
+        comped: data.comped === true,
+      } : prev);
+    }
+  }, [user]);
+
+  // Stage 4 — reconciliation. Asks the server to re-fetch the subscription from
+  // Stripe and correct the DB (covers a missed webhook), then re-reads the
+  // corrected fields into the in-memory profile. Wired to Settings' "Refresh
+  // subscription status" only — never on profile load.
+  const syncSubscription = useCallback(async () => {
+    await callStripeRoute("/api/stripe/sync", {});
+    await refreshSubscriptionFromDb();
+  }, [callStripeRoute, refreshSubscriptionFromDb]);
+
+  // ── Sprint 7 — handle the return from Stripe Checkout / Portal ──
+  // The webhook writes the new status server-side; here we only clean the query
+  // params and, after a successful checkout, re-read the subscription a couple
+  // of times to catch the (usually sub-second) webhook without a manual reload.
+  // Declared AFTER refreshSubscriptionFromDb so its dep array isn't evaluated
+  // against the callback before it's initialized (TDZ).
+  useEffect(() => {
+    if (typeof window === "undefined" || !user) return;
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    const portal = params.get("portal");
+    if (!checkout && !portal) return;
+    try {
+      params.delete("checkout");
+      params.delete("portal");
+      const qs = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    } catch (_) {}
+    if (checkout === "success" || portal === "return") {
+      refreshSubscriptionFromDb();
+      const t1 = setTimeout(refreshSubscriptionFromDb, 2000);
+      const t2 = setTimeout(refreshSubscriptionFromDb, 5000);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [user, refreshSubscriptionFromDb]);
+
   const handleAvatarCreated = useCallback((url, headshotDataUrl) => {
     setAvatarUrl(url);
     setAvatarHeadshot(headshotDataUrl || null);
@@ -4288,6 +4435,8 @@ export default function AlkiApp() {
           setActiveEidolonId={setActiveEidolonId}
           doseLog={doseLog}
           setDoseLog={setDoseLog}
+          isPro={isPro}
+          onSubscribe={startCheckout}
         />
       )}
       {screen === "progress" && (
@@ -4370,6 +4519,13 @@ export default function AlkiApp() {
           onChangePassword={handleChangePassword}
           onSignOut={handleSignOut}
           onDeleteAccount={handleDeleteAccount}
+          isPro={isPro}
+          subscriptionStatus={profile?.subscriptionStatus || "free"}
+          subscriptionTier={profile?.subscriptionTier || null}
+          comped={profile?.comped === true}
+          onSubscribe={startCheckout}
+          onManageBilling={openBillingPortal}
+          onRefreshSubscription={syncSubscription}
         />
       )}
 

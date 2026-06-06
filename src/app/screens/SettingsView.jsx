@@ -4,6 +4,8 @@ import {
   formatWeight, formatHeight,
   lbToKg, kgToLb, ftInToCm, cmToFtIn,
 } from "../lib/units";
+import UpgradePrompt from "../components/UpgradePrompt";
+import { PRO_PRICING } from "../lib/subscription";
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — Profile & Settings (Sprint 5)
@@ -39,6 +41,110 @@ export const TRAINING_STATUSES = [
   { id: "trained",      label: "Trained",      hint: "4–6× per week, structured" },
   { id: "athlete",      label: "Athlete",      hint: "Competitive / daily" },
 ];
+
+// ── Sprint 7 — subscription management card ──
+// Renders one of three states from the loaded profile's subscription fields:
+//   • Pro (active or comped) → status + Manage Subscription (Stripe portal)
+//   • past_due               → payment-failed warning + Manage Subscription
+//   • free / canceled        → inline upgrade prompt (both prices)
+// "Refresh subscription status" calls the reconciliation route (Stage 4) and is
+// always available so a missed webhook can be corrected on demand.
+function SubscriptionCard({ isPro, subscriptionStatus, subscriptionTier, comped, onSubscribe, onManageBilling, onRefreshSubscription }) {
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const tierLabel = subscriptionTier === "annual"
+    ? `Annual · ${PRO_PRICING.annual.price}${PRO_PRICING.annual.cadence}`
+    : subscriptionTier === "monthly"
+      ? `Monthly · ${PRO_PRICING.monthly.price}${PRO_PRICING.monthly.cadence}`
+      : null;
+
+  const openPortal = async () => {
+    setPortalBusy(true); setErr(null); setMsg(null);
+    try {
+      await onManageBilling();
+      // On success the browser navigates to Stripe.
+    } catch (e) {
+      setErr(e?.message || "Couldn't open the billing portal. Try again.");
+      setPortalBusy(false);
+    }
+  };
+
+  const refresh = async () => {
+    setRefreshBusy(true); setErr(null); setMsg(null);
+    try {
+      await onRefreshSubscription();
+      setMsg("Subscription status refreshed.");
+    } catch (e) {
+      setErr(e?.message || "Couldn't refresh status. Try again.");
+    } finally {
+      setRefreshBusy(false);
+    }
+  };
+
+  const refreshLink = (
+    <button onClick={refresh} disabled={refreshBusy} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: 600, cursor: refreshBusy ? "wait" : "pointer", fontFamily: "inherit", padding: "10px 0 0", textDecoration: "underline" }}>
+      {refreshBusy ? "Refreshing…" : "Refresh subscription status"}
+    </button>
+  );
+
+  // ── Pro: active subscription OR a manual comp ──
+  if (isPro) {
+    return (
+      <div style={S.card}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", fontFamily: "'Syne',sans-serif" }}>Alki Pro</span>
+          <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1ae87a", background: "rgba(26,232,122,0.12)", border: "1px solid rgba(26,232,122,0.25)", borderRadius: 100, padding: "2px 8px" }}>
+            {comped ? "Complimentary" : "Active"}
+          </span>
+        </div>
+        <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5, margin: "0 0 14px" }}>
+          {comped
+            ? "You have complimentary Pro access. Enjoy the full Eidolon."
+            : `Your plan: ${tierLabel || "Pro"}. Manage your plan, payment method, or cancel anytime.`}
+        </p>
+
+        {msg && <Banner kind="ok">{msg}</Banner>}
+        {err && <Banner kind="err">{err}</Banner>}
+
+        {/* Comped users have no Stripe customer to manage — only paying subs do. */}
+        {!comped && (
+          <button onClick={openPortal} disabled={portalBusy} style={{ ...S.btnOutline, ...(portalBusy ? S.btnDisabled : {}) }}>
+            {portalBusy ? "Opening…" : "Manage Subscription"}
+          </button>
+        )}
+        {refreshLink}
+      </div>
+    );
+  }
+
+  // ── past_due: keep them in the loop with a recovery path ──
+  if (subscriptionStatus === "past_due") {
+    return (
+      <div style={S.card}>
+        <Banner kind="err">Your last payment failed, so Pro is paused. Update your payment method to restore access.</Banner>
+        {err && <Banner kind="err">{err}</Banner>}
+        {msg && <Banner kind="ok">{msg}</Banner>}
+        <button onClick={openPortal} disabled={portalBusy} style={{ ...S.btn, ...(portalBusy ? S.btnDisabled : {}) }}>
+          {portalBusy ? "Opening…" : "Update Payment Method"}
+        </button>
+        {refreshLink}
+      </div>
+    );
+  }
+
+  // ── free / canceled: show the upgrade prompt inline ──
+  return (
+    <div>
+      {err && <Banner kind="err">{err}</Banner>}
+      {msg && <Banner kind="ok">{msg}</Banner>}
+      <UpgradePrompt variant="inline" onSubscribe={onSubscribe} />
+      <div style={{ textAlign: "center" }}>{refreshLink}</div>
+    </div>
+  );
+}
 
 function Section({ title, hint, children }) {
   return (
@@ -77,6 +183,14 @@ export default function SettingsView({
   onChangePassword,
   onSignOut,
   onDeleteAccount,
+  // Sprint 7 — subscription
+  isPro = false,
+  subscriptionStatus = "free",
+  subscriptionTier = null,
+  comped = false,
+  onSubscribe,
+  onManageBilling,
+  onRefreshSubscription,
 }) {
   const units = preferences?.units || "imperial";
   const metric = units === "metric";
@@ -309,6 +423,25 @@ export default function SettingsView({
             })}
           </div>
         </div>
+      </Section>
+
+      {/* ───────────── SPRINT 7 — SUBSCRIPTION ───────────── */}
+      <Section title="Subscription" hint="Alki Pro unlocks your 3D Eidolon, the protocol guide, progress tracking, the cycle timeline, and the full compound library.">
+        {!hasAccount ? (
+          <div style={{ ...S.card, fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
+            Subscriptions are tied to an account. Create one from the start screen to go Pro and sync across devices.
+          </div>
+        ) : (
+          <SubscriptionCard
+            isPro={isPro}
+            subscriptionStatus={subscriptionStatus}
+            subscriptionTier={subscriptionTier}
+            comped={comped}
+            onSubscribe={onSubscribe}
+            onManageBilling={onManageBilling}
+            onRefreshSubscription={onRefreshSubscription}
+          />
+        )}
       </Section>
 
       {/* ───────────── 5.2 EIDOLON MANAGEMENT ───────────── */}
