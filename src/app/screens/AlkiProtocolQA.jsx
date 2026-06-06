@@ -18,6 +18,9 @@ import { useState, useMemo } from "react";
 
 // 6.2 — single source of truth for the disclaimer (lib/disclaimer.js).
 import { DISCLAIMER } from "../lib/disclaimer";
+// #c673160a — full compound DB, so stacked compounds without a curated FAQ can
+// still render a basic entry built from their own data fields (no invented content).
+import { COMPOUNDS } from "../data/compounds";
 
 // ── COMPOUND FAQ DATA ──────────────────────────────────────
 const COMPOUND_FAQS = {
@@ -840,21 +843,127 @@ const ACCENT_BORDER = "rgba(34,214,138,0.2)";
 // ── #18 — contextual scoping: match the user's stack (compound display names)
 // to COMPOUND_FAQS keys via normalized substring (handles "RAD-140 (Testolone)" etc.)
 const _normFaq = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-function stackFaqKeysFor(contextCompounds) {
-  if (!contextCompounds || !contextCompounds.length) return [];
-  const ctx = contextCompounds.map(_normFaq).filter(Boolean);
-  return Object.keys(COMPOUND_FAQS).filter((k) => {
-    const kn = _normFaq(k);
-    return ctx.some((c) => kn.includes(c) || c.includes(kn));
+
+// Find the curated COMPOUND_FAQS key (if any) that corresponds to a stack
+// compound display name, via the same normalized substring match.
+function curatedKeyForName(name) {
+  const cn = _normFaq(name);
+  if (!cn) return null;
+  return (
+    Object.keys(COMPOUND_FAQS).find((k) => {
+      const kn = _normFaq(k);
+      return kn.includes(cn) || cn.includes(kn);
+    }) || null
+  );
+}
+
+// Category → accent color, mirroring the catColor values used on curated FAQ
+// entries so synthesized entries look consistent. Falls back to slate gray.
+const FAQ_CAT_COLORS = {
+  Recovery: "#3b82f6",
+  "Growth Hormone": "#a855f7",
+  "GH Stack": "#a855f7",
+  "Fat Loss": "#f59e0b",
+  "Weight Loss": "#ef4444",
+  "Anti-Aging": "#ec4899",
+  Performance: "#06b6d4",
+  SARM: "#f97316",
+  "Cycle Support": "#64748b",
+  Nootropic: "#8b5cf6",
+  "Hair Support": "#14b8a6",
+  Metabolic: "#eab308",
+  Hormonal: "#f43f5e",
+};
+
+// #c673160a — build a BASIC Q&A entry for a stacked compound that has no curated
+// FAQ. Every answer is sourced verbatim from the compound's own data fields
+// (mechanism / dosing / route / cycle / keyBenefits / cons / displayWarning) —
+// nothing is invented. Questions are generic labels, not new content. The
+// per-answer research disclaimer is rendered by FAQItem, matching curated entries.
+function basicEntryFromCompound(c) {
+  const faqs = [];
+  if (c.mechanism) {
+    faqs.push({ q: `How does ${c.name} work?`, a: c.mechanism });
+  }
+  const protoParts = [];
+  if (c.dosing) protoParts.push(`Typical research dosing: ${c.dosing}.`);
+  if (c.route) protoParts.push(`Route: ${c.route}.`);
+  if (c.cycle) protoParts.push(`Cycle: ${c.cycle}.`);
+  if (protoParts.length) {
+    faqs.push({
+      q: `What does the research protocol for ${c.name} look like?`,
+      a: protoParts.join(" "),
+    });
+  }
+  if (c.keyBenefits && c.keyBenefits.length) {
+    faqs.push({
+      q: `What are the key benefits of ${c.name}?`,
+      a: c.keyBenefits.join(" • "),
+    });
+  }
+  const cautionParts = [];
+  if (c.displayWarning) cautionParts.push(c.displayWarning);
+  if (c.cons && c.cons.length) cautionParts.push(c.cons.join(" • "));
+  if (cautionParts.length) {
+    faqs.push({
+      q: `What should I be cautious about with ${c.name}?`,
+      a: cautionParts.join(" "),
+    });
+  }
+  return {
+    category: c.category || "Compound",
+    tagline: c.tagline || "",
+    catColor: FAQ_CAT_COLORS[c.category] || "#64748b",
+    faqs,
+    basic: true, // flag: this entry was synthesized from compound data, not curated
+  };
+}
+
+// Name → full compound object, for synthesizing basic entries.
+const _compoundByName = (() => {
+  const m = {};
+  COMPOUNDS.forEach((c) => {
+    if (c && c.name) m[c.name] = c;
   });
+  return m;
+})();
+
+// #c673160a — build the stack-scoped compound registry. Returns an ordered list
+// of entry names covering EVERY compound in the user's stack (curated where one
+// exists, otherwise a basic synthesized entry) plus an entryMap that merges all
+// curated FAQs with the synthesized stack entries for lookup by name.
+function buildStackRegistry(contextCompounds) {
+  const entryMap = { ...COMPOUND_FAQS };
+  const stackEntryNames = [];
+  const seen = new Set();
+  (contextCompounds || []).forEach((rawName) => {
+    if (!rawName) return;
+    const curatedKey = curatedKeyForName(rawName);
+    if (curatedKey) {
+      if (!seen.has(curatedKey)) {
+        seen.add(curatedKey);
+        stackEntryNames.push(curatedKey);
+      }
+      return;
+    }
+    // No curated FAQ — synthesize from the compound's own data so it still shows.
+    if (seen.has(rawName)) return;
+    const c = _compoundByName[rawName];
+    if (!c) return; // unknown name (not in DB) — nothing to render
+    entryMap[rawName] = basicEntryFromCompound(c);
+    seen.add(rawName);
+    stackEntryNames.push(rawName);
+  });
+  return { stackEntryNames, entryMap };
 }
 
 export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, contextCompounds = [] }) {
-  const initStackKeys = stackFaqKeysFor(contextCompounds);
+  const initReg = buildStackRegistry(contextCompounds);
+  const initStackKeys = initReg.stackEntryNames;
   const initTab = (activeCompound || initStackKeys.length) ? "Compound" : activeGoal ? "Goal" : "Compound";
   const [tab, setTab] = useState(initTab);
   const [selectedCompound, setSelectedCompound] = useState(
-    activeCompound && COMPOUND_FAQS[activeCompound]
+    activeCompound && initReg.entryMap[activeCompound]
       ? activeCompound
       : (initStackKeys[0] || Object.keys(COMPOUND_FAQS)[0])
   );
@@ -866,8 +975,17 @@ export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, con
   const [openItems, setOpenItems] = useState({});
   const [search, setSearch] = useState("");
   const [showAllCompounds, setShowAllCompounds] = useState(false); // #18
-  const stackKeys = useMemo(() => stackFaqKeysFor(contextCompounds), [contextCompounds]); // #18
-  const stackKeySet = useMemo(() => new Set(stackKeys), [stackKeys]);
+  // #c673160a — every stack compound gets an entry (curated or synthesized).
+  const { stackEntryNames, entryMap } = useMemo(
+    () => buildStackRegistry(contextCompounds),
+    [contextCompounds]
+  );
+  const stackKeySet = useMemo(() => new Set(stackEntryNames), [stackEntryNames]);
+  // Curated compounds not already shown in the stack list ("show all" section).
+  const otherCurated = useMemo(
+    () => Object.keys(COMPOUND_FAQS).filter((n) => !stackKeySet.has(n)),
+    [stackKeySet]
+  );
 
   const toggleItem = (key) =>
     setOpenItems((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -907,7 +1025,7 @@ export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, con
     return results;
   }, [search]);
 
-  const currentCompound = COMPOUND_FAQS[selectedCompound];
+  const currentCompound = entryMap[selectedCompound] || COMPOUND_FAQS[selectedCompound];
   const currentGoal = GOAL_FAQS[selectedGoal];
   const currentStack = STACK_FAQS[selectedStack];
   const currentGeneral = GENERAL_FAQS[selectedGeneral];
@@ -972,7 +1090,7 @@ export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, con
           <div style={S.twoCol}>
             {/* Sidebar */}
             <div style={S.sidebar}>
-              {tab === "Compound" && (stackKeys.length === 0
+              {tab === "Compound" && (stackEntryNames.length === 0
                 ? Object.entries(COMPOUND_FAQS).map(([name, data]) => (
                     <SidebarBtn
                       key={name}
@@ -985,30 +1103,31 @@ export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, con
                 : (
                   <>
                     <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#22d68a", padding: "2px 4px 8px" }}>Your Stack</div>
-                    {Object.entries(COMPOUND_FAQS).filter(([n]) => stackKeySet.has(n)).map(([name, data]) => (
+                    {/* #c673160a — every stack compound (curated or synthesized) */}
+                    {stackEntryNames.map((name) => (
                       <SidebarBtn
                         key={name}
                         active={selectedCompound === name}
                         onClick={() => { setSelectedCompound(name); setOpenItems({}); }}
                         label={name}
-                        sub={data.category}
+                        sub={entryMap[name]?.category}
                       />
                     ))}
-                    {Object.keys(COMPOUND_FAQS).length > stackKeys.length && (
+                    {otherCurated.length > 0 && (
                       <button
                         onClick={() => setShowAllCompounds((v) => !v)}
                         style={{ width: "100%", textAlign: "left", background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "10px 4px 6px" }}
                       >
-                        {showAllCompounds ? "− Hide other compounds" : `+ Show all compounds (${Object.keys(COMPOUND_FAQS).length - stackKeys.length})`}
+                        {showAllCompounds ? "− Hide other compounds" : `+ Show all compounds (${otherCurated.length})`}
                       </button>
                     )}
-                    {showAllCompounds && Object.entries(COMPOUND_FAQS).filter(([n]) => !stackKeySet.has(n)).map(([name, data]) => (
+                    {showAllCompounds && otherCurated.map((name) => (
                       <SidebarBtn
                         key={name}
                         active={selectedCompound === name}
                         onClick={() => { setSelectedCompound(name); setOpenItems({}); }}
                         label={name}
-                        sub={data.category}
+                        sub={COMPOUND_FAQS[name].category}
                       />
                     ))}
                   </>

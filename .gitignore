@@ -14,8 +14,10 @@
 .DS_Store
 *.pem
 
-# smoke tests (local Playwright suite + screenshots — not committed)
-/tests/
+# smoke tests: track the harness itself so the fix persists in version control,
+# but keep the generated failure screenshots (and any other throwaway) out.
+/tests/*
+!/tests/smoke.spec.mjs
 
 # debug
 npm-debug.log*
