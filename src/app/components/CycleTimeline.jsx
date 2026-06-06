@@ -24,7 +24,6 @@ import { DISCLAIMER } from "../lib/disclaimer";
  *   <CycleTimeline
  *     stack={selectedCompounds}        // string[] of compound IDs
  *     initialCycleLength={12}
- *     onBack={() => setScreen("dashboard")}
  *   />
  *
  * `stack` accepts either array of IDs (string[]) or array of
@@ -1179,7 +1178,6 @@ export default function CycleTimeline({
   maxCycleLength = 24,
   locked = false,          // #71 — locked protocol: cycle length is fixed, not editable
   embedded = false,        // D3 — render inline as a tab (no full-screen container/nav band/header)
-  onBack,
 }) {
   // #71 / A4 — the cycle length is calculated from the compounds and is always
   // read-only (it's a projection). `locked` now only distinguishes a committed
@@ -1268,7 +1266,7 @@ export default function CycleTimeline({
 
   return (
     <div style={containerStyle}>
-      {!embedded && <Header onBack={onBack} />}
+      {!embedded && <Header />}
 
       {/* Cycle length — #71. Locked protocol: read-only, calculated from compounds.
           Build-my-own: editable stepper seeded with the suggestion. */}

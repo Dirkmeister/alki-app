@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { buildProfile, simulate, estimateMonthlyCost, kgToLbs, lbsToKg, calcFFMI, feetInchesToCm } from "../lib/peptideEngine";
+import { buildProfile, simulate, estimateMonthlyCost } from "../lib/peptideEngine";
 // Canonical BF% display helpers — shared with the dashboard so the headline
 // body-fat numbers are cohesive app-wide (#47dc1758 / #86132d26). The
 // week-by-week charts below stay on peptideEngine (deferred engine reconciliation).
@@ -27,7 +27,6 @@ import { suggestedCycleLength } from "./CycleTimeline";
  *     profile={profile}
  *     selectedCompounds={selectedCompounds}
  *     compoundCatalog={COMPOUNDS}
- *     onBack={() => setScreen("dashboard")}
  *   />
  * ============================================================
  */
@@ -189,7 +188,7 @@ function Meter({ value, max = 100, color = C.accent }) {
 // MAIN COMPONENT
 // ============================================================
 
-export default function PeptideModeler({ profile, selectedCompounds, compoundCatalog, onBack, initialInputs = {}, onPersist }) {
+export default function PeptideModeler({ profile, selectedCompounds, compoundCatalog, initialInputs = {}, onPersist }) {
   // ── Extended model inputs (beyond what onboarding captures) ──
   // #33 — seeded from the persisted profile inputs so they survive across sessions
   // (Option B); changes are written back via onPersist below.

@@ -9,6 +9,9 @@ import Body3DAvatar from "./avatar/Body3DAvatar";
 import AvaturnCapture from "./avatar/AvaturnCapture";
 import { AVATURN_ENABLED } from "./avatar/avaturnConfig";
 import PeptideModeler from "./components/PeptideModeler";
+import StatTile from "./components/StatTile";
+import BiomarkerRow from "./components/BiomarkerRow";
+import EidolonSwitcherModal from "./components/EidolonSwitcherModal";
 import ProgressLog from "./screens/ProgressLog";
 import ProtocolGuideView from "./screens/ProtocolGuideView";
 import ProgressPhotos from "./screens/ProgressPhotos";
@@ -1641,143 +1644,6 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
   );
 }
 
-function StatTile({ label, current, projected, delta, unit, goodDirection = "up", isScore = false, note = null }) {
-  // Determine if the delta is favorable based on the metric's direction.
-  const hasDelta = typeof delta === "number" && delta !== 0;
-  const isFavorable = hasDelta && (goodDirection === "up" ? delta > 0 : delta < 0);
-  const deltaColor = !hasDelta
-    ? "rgba(255,255,255,0.35)"
-    : isFavorable
-    ? "#1ae87a"
-    : "#ef4444";
-
-  // Display value: prefer projected absolute when provided, otherwise show delta.
-  const showAbsolute = current && projected;
-  const formattedDelta = hasDelta
-    ? `${delta > 0 ? "+" : ""}${Math.round(delta * 10) / 10}${unit}`
-    : `0${unit}`;
-
-  return (
-    <div style={{
-      padding: "12px 14px",
-      borderRadius: 10,
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.05)",
-      display: "flex",
-      flexDirection: "column",
-      gap: 4
-    }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-        {label}
-      </div>
-      {showAbsolute ? (
-        <>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", lineHeight: 1.1, fontFamily: "'JetBrains Mono', monospace" }}>
-            {projected}
-          </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-            from <span style={{ color: "rgba(255,255,255,0.6)" }}>{current}</span>{" "}
-            <span style={{ color: deltaColor, fontWeight: 600 }}>({formattedDelta})</span>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ fontSize: 22, fontWeight: 800, color: deltaColor, lineHeight: 1.1, fontFamily: "'JetBrains Mono', monospace" }}>
-            {hasDelta ? formattedDelta : (isScore ? "—" : `0${unit}`)}
-          </div>
-          {note && (
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
-              {note}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function BiomarkerRow({ projection }) {
-  const { label, unit, current, delta, projected, positive } = projection;
-  const hasDelta = delta !== 0;
-  const deltaColor = !hasDelta
-    ? "rgba(255,255,255,0.35)"
-    : positive
-    ? "#1ae87a"
-    : "#ef4444";
-  const deltaStr = `${delta > 0 ? "+" : ""}${delta}${unit}`;
-
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "10px 12px",
-      borderRadius: 8,
-      background: "rgba(255,255,255,0.03)",
-      border: "1px solid rgba(255,255,255,0.05)",
-      gap: 12
-    }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)", flexShrink: 0 }}>
-        {label}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
-        <span style={{ color: "rgba(255,255,255,0.45)" }}>{current}{unit}</span>
-        <span style={{ color: "rgba(255,255,255,0.2)" }}>→</span>
-        <span style={{ color: "#fff", fontWeight: 700 }}>{projected}{unit}</span>
-        <span style={{ color: deltaColor, fontWeight: 600, fontSize: 11, minWidth: 50, textAlign: "right" }}>
-          {hasDelta ? deltaStr : "—"}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function EidolonSwitcherModal({ eidolons, activeEidolonId, onSelect, onClose, onCreate }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} />
-      <div style={{ position: 'relative', width: '100%', maxWidth: 360, background: '#141414', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 24, maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Switch Eidolon</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 20 }}>Select a research profile to load.</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {eidolons.map(e => (
-            <button
-              key={e.id}
-              onClick={() => onSelect(e.id)}
-              style={{
-                width: '100%', padding: '14px 16px', textAlign: 'left',
-                background: e.id === activeEidolonId ? 'rgba(26,232,122,0.08)' : 'rgba(255,255,255,0.04)',
-                border: `1.5px solid ${e.id === activeEidolonId ? '#1ae87a' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{e.name}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-                  {e.goals?.length ? e.goals.map(gid => GOALS.find(g => g.id === gid)?.label).filter(Boolean).join(', ') : 'No goals set'}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {e.lockedAt && <span style={{ fontSize: 10, color: 'rgba(26,232,122,0.6)', fontWeight: 600 }}>LOCKED</span>}
-                {e.id === activeEidolonId && <span style={{ color: '#1ae87a', fontSize: 16 }}>●</span>}
-              </div>
-            </button>
-          ))}
-        </div>
-        {onCreate && (
-          <button onClick={onCreate} style={{ width: '100%', marginTop: 12, padding: '12px 16px', background: 'rgba(26,232,122,0.08)', border: '1px solid rgba(26,232,122,0.25)', borderRadius: 10, color: '#1ae87a', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            + New Eidolon
-          </button>
-        )}
-        <button onClick={onClose} style={{ width: '100%', marginTop: 12, padding: '12px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ── EIDOLON HERO ───────────────────────────────────────────
 // Avatar-first header shared by BOTH the committed home and the builder
 // (Plan A Step 2). The eidolon is always front-and-center — large centered
@@ -1922,7 +1788,30 @@ function EidolonHero({
   );
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
+// Shared apply-core for switching the active eidolon. Used by both the Dashboard
+// switcher (switchToEidolon) and the Settings switcher (switchActiveEidolon),
+// which live in different component scopes and pass their own state setters in.
+// Adopts the eidolon's id, goals, and its locked-vs-unlocked stack, then exits
+// the transform view. Each caller layers its own extra side-effects (builder
+// flush, editing flags, modal toggles) around this and supplies its own
+// source-of-truth read. Returns whether the eidolon is locked so callers can set
+// the editing flag accordingly.
+function applyEidolonState(eid, { setActiveEidolonId, setProfile, setActiveProtocol, setSelectedCompounds, setShowTransform }) {
+  const locked = !!(eid.lockedAt && eid.compounds?.length);
+  setActiveEidolonId(eid.id);
+  setProfile(prev => ({ ...prev, goals: eid.goals || [] }));
+  if (locked) {
+    setActiveProtocol({ compounds: [...eid.compounds], lockedAt: eid.lockedAt });
+    setSelectedCompounds([...eid.compounds]);
+  } else {
+    setActiveProtocol(null);
+    setSelectedCompounds(eid.compounds ? [...eid.compounds] : []);
+  }
+  setShowTransform(false);
+  return locked;
+}
+
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   // #9166e05e — bumped on each "Reset Avatar" press to re-center the 3D orbit.
@@ -1998,22 +1887,12 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     const latest = eidolonsRef.current || [];
     const eid = latest.find(e => e.id === eidId);
     if (!eid) return;
-    // 3. Full clean swap — every piece of eidolon-dependent state
-    setActiveEidolonId(eidId);
-    setProfile(prev => ({ ...prev, goals: eid.goals || [] }));
-    if (eid.lockedAt && eid.compounds?.length) {
-      setActiveProtocol({ compounds: [...eid.compounds], lockedAt: eid.lockedAt });
-      setSelectedCompounds([...eid.compounds]);
-      setEditing(false);
-    } else {
-      setActiveProtocol(null);
-      setSelectedCompounds(eid.compounds ? [...eid.compounds] : []);
-      setEditing(true);
-    }
-    setShowTransform(false);
+    // 3. Full clean swap — shared apply-core plus the builder-specific flags
+    const locked = applyEidolonState(eid, { setActiveEidolonId, setProfile, setActiveProtocol, setSelectedCompounds, setShowTransform });
+    setEditing(!locked);
     setShowEidolonSwitcher(false);
     setEditingName(false);
-  }, [flushCurrentEidolon]);
+  }, [flushCurrentEidolon, setActiveEidolonId, setProfile, setActiveProtocol, setSelectedCompounds, setShowTransform]);
 
   const createNewEidolon = useCallback(() => {
     // Save current eidolon's state before creating a new one
@@ -3485,6 +3364,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           onSelect={switchToEidolon}
           onClose={() => setShowEidolonSwitcher(false)}
           onCreate={createNewEidolon}
+          goalsCatalog={GOALS}
         />
       )}
 
@@ -4139,16 +4019,7 @@ export default function AlkiApp() {
   const switchActiveEidolon = useCallback((eidId) => {
     const eid = (eidolons || []).find(e => e.id === eidId);
     if (!eid) return;
-    setActiveEidolonId(eidId);
-    setProfile(prev => ({ ...prev, goals: eid.goals || [] }));
-    if (eid.lockedAt && eid.compounds?.length) {
-      setActiveProtocol({ compounds: [...eid.compounds], lockedAt: eid.lockedAt });
-      setSelectedCompounds([...eid.compounds]);
-    } else {
-      setActiveProtocol(null);
-      setSelectedCompounds(eid.compounds ? [...eid.compounds] : []);
-    }
-    setShowTransform(false);
+    applyEidolonState(eid, { setActiveEidolonId, setProfile, setActiveProtocol, setSelectedCompounds, setShowTransform });
   }, [eidolons]);
 
   const renameEidolon = useCallback((eidId, name) => {
@@ -4395,7 +4266,6 @@ export default function AlkiApp() {
           onLockIn={(compounds) => { const p = { compounds, lockedAt: new Date().toISOString() }; setActiveProtocol(p); }}
           activeProtocol={activeProtocol}
           setActiveProtocol={setActiveProtocol}
-          onBackToHome={null}
           onQA={() => navTo("qa")}
           onTimeline={() => navTo("timeline")}
           onProtocolGuide={() => navTo("protocol_guide")}
@@ -4422,7 +4292,6 @@ export default function AlkiApp() {
       )}
       {screen === "progress" && (
         <ProgressLog
-          onBack={navBack}
           userId={user?.id}
           eidolonId={activeEidolonId}
           profile={profile}
@@ -4442,7 +4311,6 @@ export default function AlkiApp() {
             eidolonName={activeName}
             onCapture={(dataUrl) => setPhotos(prev => ({ ...prev, [key]: [...(prev[key] || []), { id: "p_" + Date.now(), dataUrl, ts: Date.now() }] }))}
             onDelete={(id) => setPhotos(prev => ({ ...prev, [key]: (prev[key] || []).filter(p => p.id !== id) }))}
-            onBack={navBack}
           />
         );
       })()}
@@ -4450,7 +4318,7 @@ export default function AlkiApp() {
         // #18 — scope Q&A to the user's stack: committed → locked stack, else builder selection
         const qaIds = (activeProtocol?.compounds?.length ? activeProtocol.compounds : selectedCompounds) || [];
         const qaNames = qaIds.map(id => COMPOUNDS.find(c => c.id === id)?.name).filter(Boolean);
-        return <AlkiProtocolQA onBack={navBack} contextCompounds={qaNames} />;
+        return <AlkiProtocolQA contextCompounds={qaNames} />;
       })()}
       {screen === "timeline" && (
         <CycleTimeline
@@ -4466,14 +4334,12 @@ export default function AlkiApp() {
             const b = [...(ap.compounds || [])].sort().join(",");
             return a === b;
           })()}
-          onBack={navBack}
         />
       )}
       {screen === "protocol_guide" && (
         <ProtocolGuideView
           stackIds={(activeProtocol?.compounds?.length ? activeProtocol.compounds : selectedCompounds) || []}
           profile={profile}
-          onBack={navBack}
           onQA={() => navTo("qa")}
           onTimeline={() => navTo("timeline")}
         />
@@ -4483,7 +4349,6 @@ export default function AlkiApp() {
           profile={profile}
           selectedCompounds={selectedCompounds}
           compoundCatalog={COMPOUNDS}
-          onBack={navBack}
           initialInputs={trainingInputs}
           onPersist={persistTrainingInputs}
         />

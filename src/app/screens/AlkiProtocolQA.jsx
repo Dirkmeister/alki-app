@@ -7,7 +7,6 @@ import { useState, useMemo } from "react";
 // Drop in as a screen from Dashboard or Transform view.
 //
 // Props:
-//   onBack         — () => void   — back navigation callback
 //   activeCompound — string|null  — pre-select a compound tab
 //   activeGoal     — string|null  — pre-select a goal tab
 //
@@ -957,7 +956,7 @@ function buildStackRegistry(contextCompounds) {
   return { stackEntryNames, entryMap };
 }
 
-export default function AlkiProtocolQA({ onBack, activeCompound, activeGoal, contextCompounds = [] }) {
+export default function AlkiProtocolQA({ activeCompound, activeGoal, contextCompounds = [] }) {
   const initReg = buildStackRegistry(contextCompounds);
   const initStackKeys = initReg.stackEntryNames;
   const initTab = (activeCompound || initStackKeys.length) ? "Compound" : activeGoal ? "Goal" : "Compound";

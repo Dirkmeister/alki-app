@@ -30,6 +30,10 @@ npm-debug.log*
 
 # showcase output (generated screenshots + docs)
 /showcase/
+
+# verify suite generated report
+/verify-report.json
+/verify/verify-report.json
 .claude/worktrees/wizardly-einstein-dd1d40/
 .claude/worktrees/ecstatic-aryabhata-605d85/
 .claude/skills/impeccable/SKILL.md

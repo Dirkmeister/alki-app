@@ -32,7 +32,7 @@ function fmt(ts) {
   } catch { return ""; }
 }
 
-export default function ProgressPhotos({ photos = [], eidolonName = "Eidolon", onCapture, onDelete, onBack }) {
+export default function ProgressPhotos({ photos = [], eidolonName = "Eidolon", onCapture, onDelete }) {
   const fileRef = useRef(null);
   const [viewing, setViewing] = useState(null);
 

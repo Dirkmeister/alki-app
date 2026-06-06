@@ -56,7 +56,7 @@ function ScoreInput({ label, value, onChange, icon, hint }) {
   );
 }
 
-export default function ProgressLog({ onBack, userId, eidolonId, profile, cultivationState, onLogsChanged, cycleStart, onPhotos, eidolonName = "your Eidolon" }) {
+export default function ProgressLog({ userId, eidolonId, profile, cultivationState, onLogsChanged, cycleStart, onPhotos, eidolonName = "your Eidolon" }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

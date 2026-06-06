@@ -6,7 +6,7 @@
  * injection sites, weekly schedule, what-to-expect, bloodwork.
  *
  * SOURCE OF TRUTH for the guide. Keyed by compound `id` (matches
- * data/compounds.js COMPOUNDS and AlkiApp's inline COMPOUNDS).
+ * data/compounds.js COMPOUNDS).
  *
  * Pure data + pure helpers — imports NOTHING from React/renderers
  * (portability firewall, CLAUDE.md rule 1).

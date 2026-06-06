@@ -345,7 +345,7 @@ function WarningBanner({ stackIds }) {
 }
 
 // ── Screen ───────────────────────────────────────────────────────
-export default function ProtocolGuideView({ stackIds = [], profile, onBack, onQA, onTimeline }) {
+export default function ProtocolGuideView({ stackIds = [], profile, onQA, onTimeline }) {
   const ids = Array.isArray(stackIds) ? stackIds.filter(Boolean) : [];
 
   const container = {
