@@ -12,6 +12,8 @@ import PeptideModeler from "./components/PeptideModeler";
 import ProgressLog from "./screens/ProgressLog";
 import ProtocolGuideView from "./screens/ProtocolGuideView";
 import ProgressPhotos from "./screens/ProgressPhotos";
+import SettingsView from "./screens/SettingsView";
+import { DEFAULT_PREFERENCES, formatWeight, formatHeight, lbToKg } from "./lib/units";
 import { getCultivationState, getCultivationVisuals } from "./lib/cultivation";
 import { supabase } from "./lib/supabase";
 import { resolveMorphStates } from "./lib/morphTargets";
@@ -67,7 +69,7 @@ const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
 // listed here, so it shows no chrome. Each of these screens reserves a top
 // nav band (≈60px top padding) and no longer renders its own back button —
 // the root chrome is the one consistent nav surface (Sprint 4, item 4.1).
-const INNER_SCREENS = ["modeler", "progress", "qa", "timeline", "protocol_guide", "photos"];
+const INNER_SCREENS = ["modeler", "progress", "qa", "timeline", "protocol_guide", "photos", "settings"];
 
 // Baseline test profile — average male, useful neutral starting point
 // for evaluating stacks and testing the new-user flow without creating
@@ -1754,7 +1756,7 @@ function EidolonHero({
   editingName, nameInput, setNameInput, onStartEditName, onCommitName, onCancelName,
   onCaptureAvatar, onResetAvatar, showAvatarDebug,
   avatarResetSignal = 0,
-  pulse = false, glowLevel = 0, projection = null,
+  pulse = false, glowLevel = 0, projection = null, units = "imperial",
 }) {
   return (
     <>
@@ -1840,8 +1842,8 @@ function EidolonHero({
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 14 }}>
         {[
           { label: "BF",  value: `${profile.bodyFat}%` },
-          { label: "WT",  value: `${profile.weight}lb` },
-          { label: "HT",  value: `${profile.heightFt}'${profile.heightIn}\"` },
+          { label: "WT",  value: formatWeight(profile.weight, units) },
+          { label: "HT",  value: formatHeight(profile.heightFt, profile.heightIn, units) },
           { label: "AGE", value: `${profile.age}` },
           { label: "SEX", value: profile.sex === "male" ? "♂" : "♀" }
         ].map(p => (
@@ -1857,7 +1859,7 @@ function EidolonHero({
       {projection && (() => {
         const cells = [
           { k: "BODY FAT", cur: `${profile.bodyFat}%`, proj: `${projection.projectedBodyFat}%`, delta: projection.bfChange, good: "down", unit: "%" },
-          { k: "WEIGHT", cur: `${profile.weight}lb`, proj: `${projection.projectedWeight}lb`, delta: projection.weightChange, good: "down", unit: "lb" },
+          { k: "WEIGHT", cur: formatWeight(profile.weight, units), proj: formatWeight(projection.projectedWeight, units), delta: projection.weightChange, good: "down", unit: "lb" },
           { k: "LEAN MASS", cur: null, proj: projection.muscleChange === 0 ? "—" : `${projection.muscleChange > 0 ? "+" : ""}${projection.muscleChange}%`, delta: projection.muscleChange, good: "up", unit: "" },
         ];
         const col = (d, good) => (!d || d === 0) ? "rgba(255,255,255,0.4)" : ((good === "up" ? d > 0 : d < 0) ? "#22d68a" : "#ef4444");
@@ -1882,7 +1884,7 @@ function EidolonHero({
   );
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onBackToHome, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   // #9166e05e — bumped on each "Reset Avatar" press to re-center the 3D orbit.
@@ -2430,10 +2432,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             />
             <StatTile
               label="Weight"
-              current={`${profile.weight} lbs`}
-              projected={`${projectedChanges.projectedWeight} lbs`}
-              delta={projectedChanges.weightChange}
-              unit=" lbs"
+              current={formatWeight(profile.weight, units)}
+              projected={formatWeight(projectedChanges.projectedWeight, units)}
+              delta={units === "metric" ? Math.round(lbToKg(projectedChanges.weightChange) * 10) / 10 : projectedChanges.weightChange}
+              unit={units === "metric" ? " kg" : " lbs"}
               goodDirection="down"
               note="Est. at projected body fat (lean mass held)"
             />
@@ -2609,6 +2611,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           <button onClick={onQA} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Q&amp;A
           </button>
+          {onSettings && (
+            <button onClick={onSettings} title="Profile & Settings" aria-label="Profile and Settings" style={{ background: "none", border: "none", color: S.accent, fontSize: 17, cursor: "pointer", fontFamily: "inherit", lineHeight: 1, padding: 0 }}>
+              ⚙
+            </button>
+          )}
           {onSignOut && (
             <button onClick={onSignOut} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
               Sign Out
@@ -2638,6 +2645,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         showAvatarDebug={showAvatarDebug}
         pulse={dosePulse}
         glowLevel={doseProgress}
+        units={units}
         projection={editing && selectedCompounds.length > 0 ? projectedChanges : null}
       />
 
@@ -3321,13 +3329,15 @@ async function loadProfile(userId) {
         weight: data.weight,
         bodyFat: data.body_fat,
         goals: data.goals || [],
-        adv: data.adv || {}
+        adv: data.adv || {},
+        trainingStatus: data.training_status || null
       },
       selectedCompounds: data.selected_compounds || [],
       avatarUrl: data.avatar_url || null,
       activeProtocol: data.active_protocol || null,
       eidolons: data.eidolons || [],
-      activeEidolonId: data.active_eidolon_id || null
+      activeEidolonId: data.active_eidolon_id || null,
+      preferences: data.preferences || null
     };
   } catch (e) {
     console.error("loadProfile error:", e);
@@ -3335,7 +3345,7 @@ async function loadProfile(userId) {
   }
 }
 
-async function saveProfile(userId, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId) {
+async function saveProfile(userId, profile, selectedCompounds, avatarUrl, activeProtocol, eidolons, activeEidolonId, preferences) {
   if (!supabase || !profile) return;
   try {
     const { error } = await supabase
@@ -3350,11 +3360,13 @@ async function saveProfile(userId, profile, selectedCompounds, avatarUrl, active
         body_fat: profile.bodyFat,
         goals: profile.goals,
         adv: profile.adv || {},
+        training_status: profile.trainingStatus || null,
         selected_compounds: selectedCompounds || [],
         avatar_url: avatarUrl || null,
         active_protocol: activeProtocol || null,
         eidolons: eidolons || [],
         active_eidolon_id: activeEidolonId || null,
+        preferences: preferences || {},
         updated_at: new Date().toISOString()
       });
     if (error) console.error("saveProfile error:", error);
@@ -3688,6 +3700,11 @@ export default function AlkiApp() {
   // #64 — lightweight nav stack for the dashboard's sub-screens. Drives both
   // one-level Back and a persistent Home button once the user is 2+ deep.
   const [navHistory, setNavHistory] = useState([]);
+  // Sprint 5.4 — display preferences (unit system + future toggles). localStorage
+  // is the universal layer (instant, offline, works for no-account users); the
+  // profiles.preferences column is the cross-device sync layer for signed-in
+  // users (merged in on profile load below).
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const saveTimeout = useRef(null);
 
   // ── Load saved avatar (URL + headshot PNG) from localStorage on mount ──
@@ -3705,6 +3722,21 @@ export default function AlkiApp() {
   const persistTrainingInputs = useCallback((inputs) => {
     setTrainingInputs(inputs);
     try { localStorage.setItem("alki_training_inputs", JSON.stringify(inputs)); } catch (_) {}
+  }, []);
+  // #5.4 — load display preferences from localStorage on mount (universal layer).
+  // A signed-in user's DB preferences are merged in when their profile loads.
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem("alki_preferences");
+      if (p) setPreferences(prev => ({ ...prev, ...JSON.parse(p) }));
+    } catch (_) {}
+  }, []);
+  // Single writer for preferences: updates state AND mirrors to localStorage so
+  // the choice survives reloads even without an account. The debounced profile
+  // auto-save (below) carries it to Supabase when signed in.
+  const updatePreferences = useCallback((next) => {
+    setPreferences(next);
+    try { localStorage.setItem("alki_preferences", JSON.stringify(next)); } catch (_) {}
   }, []);
 
   useEffect(() => {
@@ -3779,6 +3811,9 @@ export default function AlkiApp() {
             setActiveProtocol(saved.activeProtocol || null);
             setEidolons(saved.eidolons || []);
             setActiveEidolonId(saved.activeEidolonId || null);
+            if (saved.preferences && Object.keys(saved.preferences).length) {
+              updatePreferences({ ...DEFAULT_PREFERENCES, ...saved.preferences });
+            }
             setScreen("dashboard");
           } else {
             setScreen("onboarding");
@@ -3809,10 +3844,10 @@ export default function AlkiApp() {
       // The live base is derived from the profile via selectBaseMesh(), so we
       // must NOT write the selected base path here, or the future override
       // read would treat it as a custom mesh and re-break selection.
-      saveProfile(user.id, profile, selectedCompounds, null, activeProtocol, eidolons, activeEidolonId);
+      saveProfile(user.id, profile, selectedCompounds, null, activeProtocol, eidolons, activeEidolonId, preferences);
     }, 1500);
     return () => clearTimeout(saveTimeout.current);
-  }, [user, profile, selectedCompounds, activeProtocol, eidolons, activeEidolonId]);
+  }, [user, profile, selectedCompounds, activeProtocol, eidolons, activeEidolonId, preferences]);
 
   const cultivationState = useMemo(() => {
     // Filter progress logs to the active eidolon for cultivation state
@@ -3868,6 +3903,124 @@ export default function AlkiApp() {
     setScreen("splash");
   };
 
+  // ── Sprint 5 — Settings handlers ─────────────────────────────────────────
+  // 5.1 — biometric save. Re-runs the SAME derivation path onboarding uses:
+  // setProfile feeds the memoized recommendation engine + avatar params, and we
+  // re-select the base mesh (the one piece that isn't reactive) so a weight/BF
+  // change that crosses a lean/heavy or sex band swaps the body too. The active
+  // eidolon's goals mirror the profile's, so keep them in lock-step.
+  const handleSettingsProfileSave = useCallback((updated) => {
+    setProfile(updated);
+    setAvatarUrl(selectBaseMesh(updated));
+    if (activeEidolonId) {
+      setEidolons(prev => (prev || []).map(e => e.id === activeEidolonId ? { ...e, goals: updated.goals } : e));
+    }
+  }, [activeEidolonId]);
+
+  // 5.2 — switch the active eidolon from Settings. Root-level clean swap that
+  // mirrors the Dashboard's switchToEidolon, minus the builder-flush (the
+  // builder is unmounted on the Settings screen, so there's no dirty state).
+  const switchActiveEidolon = useCallback((eidId) => {
+    const eid = (eidolons || []).find(e => e.id === eidId);
+    if (!eid) return;
+    setActiveEidolonId(eidId);
+    setProfile(prev => ({ ...prev, goals: eid.goals || [] }));
+    if (eid.lockedAt && eid.compounds?.length) {
+      setActiveProtocol({ compounds: [...eid.compounds], lockedAt: eid.lockedAt });
+      setSelectedCompounds([...eid.compounds]);
+    } else {
+      setActiveProtocol(null);
+      setSelectedCompounds(eid.compounds ? [...eid.compounds] : []);
+    }
+    setShowTransform(false);
+  }, [eidolons]);
+
+  const renameEidolon = useCallback((eidId, name) => {
+    setEidolons(prev => (prev || []).map(e => e.id === eidId ? { ...e, name } : e));
+  }, []);
+
+  // 5.2 — delete an eidolon. Eidolons are JSONB on the profile, so there's no DB
+  // cascade: a deleted eidolon would ORPHAN its progress_logs (they carry an
+  // eidolon_id). Handle that deliberately — delete those rows (when signed in)
+  // and drop the eidolon's local dose log — then remove it from the array and,
+  // if it was active, fall back to another eidolon's full state.
+  const deleteEidolon = useCallback((eidId) => {
+    const remaining = (eidolons || []).filter(e => e.id !== eidId);
+    if (remaining.length === (eidolons || []).length) return; // not found
+    if (supabase && user) {
+      supabase.from("progress_logs").delete().eq("user_id", user.id).eq("eidolon_id", eidId)
+        .then(({ error }) => { if (error) console.error("delete eidolon logs:", error); });
+    }
+    setProgressLogs(prev => (prev || []).filter(l => l.eidolon_id !== eidId));
+    setDoseLog(prev => { const next = { ...prev }; delete next[eidId]; return next; });
+    setEidolons(remaining);
+    if (eidId === activeEidolonId) {
+      const fallback = remaining[0];
+      if (fallback) {
+        setActiveEidolonId(fallback.id);
+        setProfile(prev => ({ ...prev, goals: fallback.goals || [] }));
+        if (fallback.lockedAt && fallback.compounds?.length) {
+          setActiveProtocol({ compounds: [...fallback.compounds], lockedAt: fallback.lockedAt });
+          setSelectedCompounds([...fallback.compounds]);
+        } else {
+          setActiveProtocol(null);
+          setSelectedCompounds(fallback.compounds ? [...fallback.compounds] : []);
+        }
+        setShowTransform(false);
+      } else {
+        setActiveEidolonId(null);
+        setActiveProtocol(null);
+        setSelectedCompounds([]);
+      }
+    }
+  }, [eidolons, activeEidolonId, user]);
+
+  // 5.3 — change password via the existing recovery flow: a reset email whose
+  // link re-enters the app on the SetNewPassword screen. Returns the
+  // confirmation string for the Settings UI (throws on error).
+  const handleChangePassword = useCallback(async () => {
+    if (!supabase || !user?.email) throw new Error("No account email on file.");
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: SITE_URL });
+    if (error) throw error;
+    return `Password reset link sent to ${user.email}. Check your inbox (and spam).`;
+  }, [user]);
+
+  // 5.3 — delete account (GDPR/CCPA + App Store). delete_user() removes the
+  // auth.users row, which CASCADEs to profiles (incl. the eidolons JSONB) and
+  // progress_logs. Then sign out and wipe all client state + local storage.
+  const handleDeleteAccount = useCallback(async () => {
+    if (!supabase) throw new Error("Account deletion is unavailable.");
+    // Cancel any pending debounced profile save so it can't re-insert the row
+    // we're about to delete.
+    clearTimeout(saveTimeout.current);
+    const { error } = await supabase.rpc("delete_user");
+    if (error) throw error;
+    // The auth user is gone; sign-out may itself error on the now-invalid
+    // session — that must not surface as a "delete failed" message.
+    try { await supabase.auth.signOut(); } catch (_) {}
+    try {
+      localStorage.removeItem("alki_dose_log");
+      localStorage.removeItem("alki_training_inputs");
+      localStorage.removeItem("alki_preferences");
+      localStorage.removeItem("alki_avatar_url");
+      localStorage.removeItem("alki_avatar_headshot");
+      localStorage.removeItem("alki_remember_email");
+    } catch (_) {}
+    setUser(null);
+    setProfile(null);
+    setSelectedCompounds([]);
+    setShowTransform(false);
+    setActiveProtocol(null);
+    setEidolons([]);
+    setActiveEidolonId(null);
+    setDoseLog({});
+    setProgressLogs([]);
+    setPreferences(DEFAULT_PREFERENCES);
+    setNavHistory([]);
+    setAvatarUrl(DEFAULT_AVATAR_URL);
+    setScreen("splash");
+  }, []);
+
   const handleAuthComplete = async (authUser) => {
     setUser(authUser);
     const saved = await loadProfile(authUser.id);
@@ -3880,6 +4033,9 @@ export default function AlkiApp() {
       setActiveProtocol(saved.activeProtocol || null);
       setEidolons(saved.eidolons || []);
       setActiveEidolonId(saved.activeEidolonId || null);
+      if (saved.preferences && Object.keys(saved.preferences).length) {
+        updatePreferences({ ...DEFAULT_PREFERENCES, ...saved.preferences });
+      }
       setScreen("dashboard");
     } else {
       setScreen("onboarding");
@@ -4019,6 +4175,8 @@ export default function AlkiApp() {
           onCaptureAvatar={() => setShowAvatarCapture(true)}
           onResetAvatar={handleResetAvatar}
           onSignOut={supabase ? handleSignOut : null}
+          onSettings={() => navTo("settings")}
+          units={preferences?.units || "imperial"}
           userEmail={user?.email || null}
           eidolons={eidolons}
           setEidolons={setEidolons}
@@ -4092,6 +4250,25 @@ export default function AlkiApp() {
           onBack={navBack}
           initialInputs={trainingInputs}
           onPersist={persistTrainingInputs}
+        />
+      )}
+      {screen === "settings" && profile && (
+        <SettingsView
+          profile={profile}
+          onSaveProfile={handleSettingsProfileSave}
+          eidolons={eidolons}
+          activeEidolonId={activeEidolonId}
+          onSwitchEidolon={switchActiveEidolon}
+          onRenameEidolon={renameEidolon}
+          onDeleteEidolon={deleteEidolon}
+          preferences={preferences}
+          onSetPreferences={updatePreferences}
+          goalOptions={GOALS}
+          userEmail={user?.email || null}
+          hasAccount={!!(supabase && user)}
+          onChangePassword={handleChangePassword}
+          onSignOut={handleSignOut}
+          onDeleteAccount={handleDeleteAccount}
         />
       )}
 
