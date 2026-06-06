@@ -350,7 +350,14 @@ export function simulate(profile, stack = [], options = {}) {
   let lbmLossDelta = 0; // kg of catabolic/GLP-1 LBM loss (≤ 0, relaxation)
   let dVAT = 0, dECW = 0, dICW = 0, dColl = 0, dTan = 0;
 
-  const baseline = snapshot(0, FM0, LBM0, W0, BF0, 0, 0, 0, 0, 0, FM0, LBM0, der, vasodilatorBoost, androgenTone);
+  // Week-0 baseline is the UNTOUCHED, drug-free body: pass 0/0 for the
+  // vasodilator boost and androgen tone rather than the stack-wide projected
+  // scalars. Seeding the baseline with the selected stack's androgenTone bled
+  // the projected upper-body androgen bias (chest/shoulders/arms/back) and
+  // vasodilator vascularity into the "current" eidolon, so the starting body
+  // read more built than it is. Those scalars still drive every week>0 snapshot
+  // (the on-protocol state) via the loop below — only the baseline is neutral.
+  const baseline = snapshot(0, FM0, LBM0, W0, BF0, 0, 0, 0, 0, 0, FM0, LBM0, der, 0, 0);
   const timeline = [baseline];
 
   const steps = Math.round(weeks / DT);

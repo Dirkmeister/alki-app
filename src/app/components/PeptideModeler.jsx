@@ -6,6 +6,9 @@ import { buildProfile, simulate, estimateMonthlyCost, kgToLbs, lbsToKg, calcFFMI
 // body-fat numbers are cohesive app-wide (#47dc1758 / #86132d26). The
 // week-by-week charts below stay on peptideEngine (deferred engine reconciliation).
 import { projectBodyFat, projectWeight, bfCategory } from "../lib/bodyComposition";
+// Read-only cycle length, calculated from the stack's compounds — the same source
+// the Cycle Timeline uses. The protocol duration is a projection, not user-editable.
+import { suggestedCycleLength } from "./CycleTimeline";
 
 /**
  * ============================================================
@@ -196,15 +199,21 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
   const [sleepQuality, setSleepQuality]             = useState(initialInputs.sleepQuality || "average");
   const [caloricContext, setCaloricContext]          = useState(initialInputs.caloricContext || "deficit");
   const [aggressiveness, setAggressiveness]         = useState(initialInputs.aggressiveness || "moderate");
-  const [protocolWeeks, setProtocolWeeks]           = useState(initialInputs.protocolWeeks ?? 12);
+  // Protocol duration is READ-ONLY — calculated from the selected compounds (the
+  // same suggestedCycleLength the Cycle Timeline uses), never edited. The old +/-
+  // stepper here was the last reachable control that could change a timeline value.
+  const protocolWeeks = useMemo(
+    () => suggestedCycleLength(selectedCompounds, compoundCatalog, { fallback: 12 }),
+    [selectedCompounds, compoundCatalog]
+  );
   const [showTable, setShowTable]                   = useState(false);
   const [showFFMI, setShowFFMI]                     = useState(false); // #34 — FFMI explainer
 
   // #33 — persist inputs whenever they change (debounced write happens upstream).
   useEffect(() => {
     if (!onPersist) return;
-    onPersist({ activityLevel, trainingExperience, trainingFrequency, sleepQuality, caloricContext, aggressiveness, protocolWeeks });
-  }, [activityLevel, trainingExperience, trainingFrequency, sleepQuality, caloricContext, aggressiveness, protocolWeeks]);
+    onPersist({ activityLevel, trainingExperience, trainingFrequency, sleepQuality, caloricContext, aggressiveness });
+  }, [activityLevel, trainingExperience, trainingFrequency, sleepQuality, caloricContext, aggressiveness]);
 
   // ── Build enriched profile ──
   const enrichedProfile = useMemo(() => {
@@ -370,10 +379,11 @@ export default function PeptideModeler({ profile, selectedCompounds, compoundCat
         </div>
         <div style={{ marginTop: 12 }}>
           <label style={label}>Protocol Duration</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={() => setProtocolWeeks(w => Math.max(4, w - 1))} disabled={protocolWeeks <= 4} style={{ width: 36, height: 36, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 18, cursor: "pointer", fontFamily: FONT, opacity: protocolWeeks <= 4 ? 0.3 : 1 }}>−</button>
-            <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 600, minWidth: 80, textAlign: "center" }}>{protocolWeeks} weeks</span>
-            <button onClick={() => setProtocolWeeks(w => Math.min(52, w + 1))} disabled={protocolWeeks >= 52} style={{ width: 36, height: 36, background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 18, cursor: "pointer", fontFamily: FONT, opacity: protocolWeeks >= 52 ? 0.3 : 1 }}>+</button>
+          {/* Read-only — the duration is a projection calculated from the stack's
+              compounds (matches the Cycle Timeline), not an editable value. */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 600 }}>{protocolWeeks} weeks</span>
+            <span style={{ fontSize: 11, color: C.textFaint }}>Calculated from your stack</span>
           </div>
         </div>
       </div>

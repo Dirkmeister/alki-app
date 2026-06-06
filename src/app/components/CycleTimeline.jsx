@@ -1426,7 +1426,7 @@ export default function CycleTimeline({
 // NAMED EXPORTS — useful for parent components
 // ============================================================
 
-export { CYCLE_PROFILES, PCT_PROTOCOLS, buildTimeline, calculateSuppressionLevel };
+export { CYCLE_PROFILES, PCT_PROTOCOLS, buildTimeline, calculateSuppressionLevel, suggestedCycleLength };
 
 // ============================================================
 // FALLBACK PROFILE GENERATOR

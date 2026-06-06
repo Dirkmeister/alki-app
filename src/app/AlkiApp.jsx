@@ -2061,6 +2061,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     }
     setEditing(false);
     setShowTransform(false);
+    // Reset to the original dashboard load state: committed home, default
+    // Projection tab, scrolled to the top so the centered avatar greets the user —
+    // not wherever they happened to be (e.g. the Timeline tab, scrolled down) when
+    // they locked in. The builder-home lock-in path never toggles showTransform, so
+    // the scroll-reset effect wouldn't fire on its own; reset it here for both paths.
+    setTransformTab("projection");
+    try { window.scrollTo(0, 0); } catch (_) {}
   }, [activeEidolon]);
 
   // 4.3 — re-enter the builder on the committed stack to adjust it. Surfaced on
@@ -2171,6 +2178,25 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     const adv = profile.adv || {};
     const advProjections = [];
 
+    // #72dc3952 — the lean rows below (Fat-Free Mass, Muscle Mass) are anchored
+    // to the user's manually-entered InBody figures and bumped by the muscle
+    // effect sum — a SEPARATE track from projectWeight() (which is the
+    // weight×(1−bf)-derived frame). Without a guard a muscle stack can project
+    // lean ABOVE projected total weight, violating spec §2.1 (FM = W − LBM ⇒
+    // LBM ≤ W). Compute projected weight up front and clamp each lean row to it.
+    const projectedBodyFat = projectBodyFat(profile, selectedCompounds, COMPOUNDS) ?? profile.bodyFat;
+    const projectedWeight = projectWeight(profile, selectedCompounds, COMPOUNDS) ?? (profile.weight ?? null);
+    const weightChange = profile.weight ? projectedWeight - profile.weight : 0;
+    // Clamp a projected lean value to projected total weight (§2.1) and re-derive
+    // the delta so the row stays internally consistent (current + delta = projected).
+    const capLeanToWeight = (base, projected) => {
+      if (projectedWeight != null && projected > projectedWeight) {
+        const capped = projectedWeight;
+        return { projected: capped, delta: Math.round((capped - base) * 10) / 10 };
+      }
+      return { projected, delta: Math.round((projected - base) * 10) / 10 };
+    };
+
     const skelBase = parseFloat(adv.skelMuscle);
     if (!isNaN(skelBase) && skelBase > 0) {
       // GH axis raises skeletal muscle %; GLP-1 without GH support lowers it
@@ -2194,13 +2220,15 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       let delta = muscleChange * 0.9;
       if (hasGLP1 && !hasGHAxis) delta -= 4;
       delta = Math.round(delta * 10) / 10;
+      // §2.1 cap: muscle mass is lean tissue and cannot exceed projected weight.
+      const capped = capLeanToWeight(muscleMassBase, Math.round((muscleMassBase + delta) * 10) / 10);
       advProjections.push({
         label: "Muscle Mass",
         unit: "lbs",
         current: muscleMassBase,
-        delta,
-        projected: Math.round((muscleMassBase + delta) * 10) / 10,
-        positive: delta > 0
+        delta: capped.delta,
+        projected: capped.projected,
+        positive: capped.delta > 0
       });
     }
 
@@ -2242,13 +2270,15 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       let delta = muscleChange * 0.7;
       if (hasGLP1 && !hasGHAxis) delta -= 3;
       delta = Math.round(delta * 10) / 10;
+      // §2.1 cap: fat-free mass (lean) cannot exceed projected total weight.
+      const capped = capLeanToWeight(ffmBase, Math.round((ffmBase + delta) * 10) / 10);
       advProjections.push({
         label: "Fat-Free Mass",
         unit: "lbs",
         current: ffmBase,
-        delta,
-        projected: Math.round((ffmBase + delta) * 10) / 10,
-        positive: delta > 0
+        delta: capped.delta,
+        projected: capped.projected,
+        positive: capped.delta > 0
       });
     }
 
@@ -2274,15 +2304,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     if (muscleChange > 1)  muscleNote.push(`+${muscleChange}% lean mass`);
     if (muscleChange < 0)  muscleNote.push(`${muscleChange}% lean mass risk`);
 
-    // #47dc1758/#86132d26 — projected body fat & weight come from the shared
-    // lib/bodyComposition helper so the dashboard, the hero projection summary,
-    // and the Modeler headline all display the SAME number (no more per-page
-    // divergence). The helper keeps the #bf clamp (never below essential fat,
-    // never above an already-leaner user's current BF) and the #68 constant-lean
-    // weight re-solve. Deep engines are untouched — see the lib file's scope note.
-    const projectedBodyFat = projectBodyFat(profile, selectedCompounds, COMPOUNDS) ?? profile.bodyFat;
-    const projectedWeight = projectWeight(profile, selectedCompounds, COMPOUNDS) ?? (profile.weight ?? null);
-    const weightChange = profile.weight ? projectedWeight - profile.weight : 0;
+    // #47dc1758/#86132d26 — projectedBodyFat / projectedWeight / weightChange are
+    // computed once at the top of this block (above the advanced-biomarker rows,
+    // which now clamp lean to projectedWeight per spec §2.1). They come from the
+    // shared lib/bodyComposition helper so the dashboard, the hero projection
+    // summary, and the Modeler headline all display the SAME number. The helper
+    // keeps the #bf clamp and the #68 constant-lean weight re-solve. Deep engines
+    // are untouched — see the lib file's scope note.
 
     return {
       bfChange,
@@ -2451,11 +2479,28 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   if (showTransform) {
     return (
       <div style={S.inner}>
-        <div style={{ padding: "16px 0 8px" }}>
-          <button onClick={() => setShowTransform(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 14, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-            ← Back to Research
-          </button>
-        </div>
+        {/* ef1083fa — the projection surface now uses the SAME persistent HOME
+            chrome as every other inner screen (fixed top-right ALKI⌂ pill), not a
+            back arrow. The pill collapses the projection back to the dashboard home
+            — identical to the dashboard wordmark's home action. */}
+        <button
+          onClick={() => { setShowTransform(false); if (activeProtocol) setEditing(false); }}
+          title="Home"
+          aria-label="Home"
+          style={{
+            position: "fixed", top: 12, right: 14, zIndex: 901,
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "7px 13px", borderRadius: 100,
+            background: "rgba(10,10,12,0.82)", border: "1px solid rgba(255,255,255,0.1)",
+            cursor: "pointer", fontFamily: "'Syne', 'DM Sans', sans-serif",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.5)", backdropFilter: "blur(6px)",
+          }}
+        >
+          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+          </span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1 }}>⌂</span>
+        </button>
 
         <div style={{ textAlign: "center", padding: "20px 0 10px" }}>
           <div style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 6 }}>εἰδωλον</div>
