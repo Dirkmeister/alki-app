@@ -1723,8 +1723,11 @@ function EidolonHero({
           animation: pulse ? "alkiDosePulse 1.4s ease" : undefined
         }} />
         <div style={{ position: "relative", width: "100%", maxWidth: 280 }}>
-          {/* Sprint 7 — the interactive 3D Eidolon is Pro; free users get the 2D SVG. */}
-          {isPro && avatarUrl ? (
+          {/* Sprint 7 (corrected) — the 3D BASELINE Eidolon renders for EVERY tier,
+              free included. The 2D SVG is only a fallback when there's no GLB url.
+              The Pro gate is the PROJECTION (before/after) surface, not the baseline
+              avatar — see the gated "View Projection" buttons + showTransform. */}
+          {avatarUrl ? (
             <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="large" interactive={true} debugPanel={showAvatarDebug} resetSignal={avatarResetSignal} />
           ) : (
             <BodyAvatar params={avatarParams.current} label="" maxWidth={280} />
@@ -1732,11 +1735,13 @@ function EidolonHero({
         </div>
       </div>
 
-      {/* Avatar customization chip */}
+      {/* Avatar customization chip. Sprint 7 (corrected) — free users already
+          have the 3D baseline avatar, so this is no longer a "3D" upsell. It now
+          surfaces CUSTOMIZATION (renaming + "Make it me"), which stays Pro. */}
       <div style={{ textAlign: "center", marginBottom: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
         {!isPro ? (
-          <button onClick={() => onUpgrade?.()} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
-            ✦ Unlock 3D Eidolon
+          <button onClick={() => onUpgrade?.("eidolon_customization")} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
+            ✦ Customize · Pro
           </button>
         ) : avatarUrl ? (
           <button onClick={onResetAvatar} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
@@ -2499,11 +2504,12 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </div>
         ) : (
         <>
-        {/* Before / After — SVG free / 3D premium based on avatarUrl */}
+        {/* Before / After — both rendered in 3D. This whole projection surface is
+            Pro-gated (the "View Projection" buttons block free users), so we don't
+            re-check isPro here; the SVG is only a fallback when a GLB url is absent. */}
         <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            {/* Sprint 7 — 3D Eidolon is Pro; free users see the 2D SVG avatar. */}
-            {isPro && avatarUrl ? (
+            {avatarUrl ? (
               <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="Current Eidolon" size="large" interactive={true} />
             ) : (
               <BodyAvatar params={avatarParams.current} label="Current Eidolon" />
@@ -2511,24 +2517,13 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           </div>
           <div style={{ fontSize: 24, color: "rgba(255,255,255,0.15)", paddingBottom: 40 }}>→</div>
           <div style={{ flex: 1, maxWidth: 180 }}>
-            {isPro && avatarUrl ? (
+            {avatarUrl ? (
               <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.projected} label="Projected Eidolon" size="large" interactive={true} glow={true} />
             ) : (
               <BodyAvatar params={avatarParams.projected} label="Projected Eidolon" glow={true} />
             )}
           </div>
         </div>
-        {/* Free-tier nudge to unlock the interactive 3D Eidolon. */}
-        {!isPro && (
-          <div style={{ textAlign: "center", marginTop: -8, marginBottom: 14 }}>
-            <button
-              onClick={() => setPaywall("avatar_3d")}
-              style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}
-            >
-              ✦ Unlock 3D Eidolon
-            </button>
-          </div>
-        )}
 
         {/* Stats — core projections. D5 — the tiles are data-driven and ordered so
             the stack's actually-targeted outcomes (a non-zero projected change) lead,
@@ -2748,7 +2743,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         units={units}
         projection={editing && selectedCompounds.length > 0 ? projectedChanges : null}
         isPro={isPro}
-        onUpgrade={(feat) => setPaywall(feat || "avatar_3d")}
+        onUpgrade={(feat) => setPaywall(feat || "eidolon_customization")}
       />
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}

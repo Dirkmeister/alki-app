@@ -426,7 +426,7 @@ export default function SettingsView({
       </Section>
 
       {/* ───────────── SPRINT 7 — SUBSCRIPTION ───────────── */}
-      <Section title="Subscription" hint="Alki Pro unlocks your projected transformation, 3D Eidolon, the protocol guide, progress tracking, and the cycle timeline.">
+      <Section title="Subscription" hint="Alki Pro unlocks your projected transformation, eidolon customization, the protocol guide, progress tracking, and the cycle timeline.">
         {!hasAccount ? (
           <div style={{ ...S.card, fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
             Subscriptions are tied to an account. Create one from the start screen to go Pro and sync across devices.

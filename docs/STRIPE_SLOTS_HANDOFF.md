@@ -64,10 +64,15 @@ curl -i -X POST localhost:3000/api/stripe/buy-slot \
   -H "Authorization: Bearer <JWT>"
 #    Expect: HTTP/1.1 403  {"error":"An active Alki Pro subscription is required..."}
 
-# 3. Happy path — as a Pro user, tap "+ New Eidolon" at the cap → "Add a
-#    permanent slot — $10" → Checkout. Pay with 4242 4242 4242 4242, any future
-#    expiry/CVC. On return (?slot=success) the dashboard re-reads the profile and
-#    the new slot appears (cap goes up by 1).
+# 3. Happy path — as a Pro user with 2 eidolons (the Pro base cap), tap
+#    "+ New Eidolon" at the cap → "Add a permanent slot — $10" → Checkout. Pay
+#    with 4242 4242 4242 4242, any future expiry/CVC. On return (?slot=success)
+#    the dashboard re-reads the profile:
+#      select eidolon_slots_purchased from profiles where id = '<user-uuid>';
+#      -> exactly 1 (incremented by 1, not more)
+#    maxEidolons is now (2 base + 1 purchased) = 3, so "+ New Eidolon" now CREATES
+#    a third eidolon instead of opening the slot prompt. Confirm a third eidolon
+#    is creatable; a fourth re-opens the slot prompt.
 
 # 4. IDEMPOTENCY — the critical test. Capture a real slot Checkout Session id
 #    (cs_...) from the dashboard or `stripe events list`, then deliver the same
@@ -92,6 +97,13 @@ stripe events resend evt_XXXXXXXX   # the checkout.session.completed for the slo
 #    in Supabase. Reload: eidolon_slots_purchased is UNCHANGED (slots persist),
 #    base allowance drops, and any Eidolons over the new cap show as 🔒 LOCKED in
 #    the switcher (visible, not deleted). Tapping a locked one makes it active.
+
+# 7. Tier-gating confirmation (the two corrected gates):
+#    a. FREE user, dashboard: the hero shows the interactive 3D BASELINE avatar
+#       (Body3DAvatar), NOT the flat 2D SVG. (SVG only appears if the GLB fails.)
+#    b. FREE user, builder: tapping "View Projection · Before / After" opens the
+#       Pro UPGRADE modal (feature "See Your Projection") — the projected avatar /
+#       before-after surface is NEVER rendered for free. Pro users see the surface.
 ```
 
 ## What changed (code)
@@ -104,12 +116,14 @@ stripe events resend evt_XXXXXXXX   # the checkout.session.completed for the slo
 - `src/app/api/_lib/stripe.js` — `PRICE_SLOT` export.
 - `supabase/migrations/007_subscriptions.sql` — amended (see checklist step 3).
 - `src/app/lib/subscription.js` — `maxEidolons()` + `lockedEidolonIds()` (pure);
-  new `projection` / `extra_eidolon` / `eidolon_customization` feature keys;
-  `browse_all` removed (library un-gated).
+  `projection` / `extra_eidolon` / `eidolon_customization` feature keys;
+  `browse_all` removed (library un-gated); `avatar_3d` removed (3D un-gated).
 - `src/app/AlkiApp.jsx` — `eidolonSlotsPurchased` threaded onto the profile;
   `startBuySlot`; `?slot=success` return handling; creation gated at the cap;
-  `promoteEidolon`; projection surface Pro-gated (the #1 fix); rename gated;
-  naming gate is Pro-only; library un-gated.
+  `promoteEidolon`; projection surface Pro-gated (Correction B); 3D BASELINE
+  avatar now renders for EVERY tier on the dashboard hero AND inside the
+  Pro-only projection surface (Correction A); rename gated; naming gate Pro-only;
+  library un-gated.
 - `src/app/components/SlotPurchasePrompt.jsx` — NEW (Pro-at-cap $10 prompt).
 - `src/app/components/EidolonSwitcherModal.jsx` — locked-Eidolon display + promote.
 - `src/app/screens/SettingsView.jsx` — rename gated for free; Pro-perks copy fixed.

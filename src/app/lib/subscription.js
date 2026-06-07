@@ -37,10 +37,6 @@ export const PRO_FEATURES = {
     title: "See Your Projection",
     blurb: "Watch your Eidolon transform — a full before/after of your projected physique, the stat-by-stat breakdown, and your cycle timeline.",
   },
-  avatar_3d: {
-    title: "3D Eidolon",
-    blurb: "See your Eidolon in full 3D — rotate it, zoom in, and watch your projected transformation render in real time.",
-  },
   stack_lock_in: {
     title: "Lock In Your Protocol",
     blurb: "Commit your stack to begin cultivation — unlock progress tracking, your timeline, and your personalized protocol guide.",
@@ -63,7 +59,7 @@ export const PRO_FEATURES = {
   },
   eidolon_customization: {
     title: "Customize Your Eidolon",
-    blurb: "Rename your Eidolon and make it yours. Customization — including renaming and the editable 3D avatar — is part of Alki Pro.",
+    blurb: "Rename your Eidolon and personalize its avatar. Renaming and avatar customization are part of Alki Pro.",
   },
 };
 

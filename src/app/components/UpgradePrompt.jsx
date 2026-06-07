@@ -100,7 +100,7 @@ export default function UpgradePrompt({
         {feature ? feature.title : heading}
       </h2>
       <p style={{ fontSize: 13.5, color: "rgba(255,255,255,0.55)", lineHeight: 1.55, margin: "0 0 18px" }}>
-        {feature ? feature.blurb : "Unlock the full Eidolon: your projected transformation, 3D avatar, protocol guide, progress tracking, and cycle timeline."}
+        {feature ? feature.blurb : "Unlock the full Eidolon: your projected transformation, eidolon customization, protocol guide, progress tracking, and cycle timeline."}
       </p>
 
       {error && (
