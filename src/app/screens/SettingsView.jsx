@@ -177,6 +177,7 @@ export default function SettingsView({
   onDeleteEidolon,
   preferences,
   onSetPreferences,
+  onReplayTutorial,
   goalOptions = [],
   userEmail,
   hasAccount = false,
@@ -423,6 +424,16 @@ export default function SettingsView({
             })}
           </div>
         </div>
+        {/* Sprint 6.5 — replay the first-run intro tutorial on demand. */}
+        {onReplayTutorial && (
+          <div style={S.card}>
+            <label style={S.label}>Intro Tutorial</label>
+            <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, margin: "0 0 12px" }}>
+              Watch the quick walkthrough of Alki, your Eidolon, and the core flow again.
+            </p>
+            <button onClick={onReplayTutorial} style={S.btnOutline}>Show intro again</button>
+          </div>
+        )}
       </Section>
 
       {/* ───────────── SPRINT 7 — SUBSCRIPTION ───────────── */}

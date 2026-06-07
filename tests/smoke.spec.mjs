@@ -185,6 +185,16 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } }); // mobile (Austin tests on mobile)
+  // Sprint 6.5 — the first-run intro overlay blocks the dashboard. Pre-set its
+  // per-device "seen" flag (and the projection nudge flag) before any page
+  // script runs so the sweep reaches the dashboard cleanly. addInitScript runs
+  // before page load on every navigation in this context.
+  await context.addInitScript(() => {
+    try {
+      localStorage.setItem('alki_tutorial_seen', '1');
+      localStorage.setItem('alki_nudge_projection_seen', '1');
+    } catch (e) { /* ignore */ }
+  });
   const page = await context.newPage();
   page.setDefaultTimeout(8000); // never hang 30s on a missing/disabled control
 

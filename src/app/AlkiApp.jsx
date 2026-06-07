@@ -27,6 +27,8 @@ import { DISCLAIMER } from "./lib/disclaimer";
 import { isProUser, maxEidolons, lockedEidolonIds } from "./lib/subscription";
 import UpgradePrompt from "./components/UpgradePrompt";
 import SlotPurchasePrompt from "./components/SlotPurchasePrompt";
+import TutorialOverlay from "./components/TutorialOverlay";
+import { TUTORIAL_SLIDES, TUTORIAL_SEEN_KEY, NUDGE_PROJECTION_KEY } from "./lib/tutorial";
 import { simulate } from "./engine/simulate";
 import { mapToMorphs } from "./engine/mapToMorphs";
 import FeedbackFAB from "./components/utilities/FeedbackFAB";
@@ -1877,6 +1879,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const [transformTab, setTransformTab] = useState("projection");
   // #6 — builder lane: null (chooser) | "recommend" | "build".
   const [builderPath, setBuilderPath] = useState(null);
+  // Sprint 6.5 (optional nudge) — one-time, dismissable callout pointing at the
+  // View Projection / Start Protocol CTA the first time a stack has compounds in
+  // it, so a new user discovers the payoff. Own localStorage flag, fired once.
+  const [showProjectionNudge, setShowProjectionNudge] = useState(false);
+  const projectionNudgeChecked = useRef(false);
 
   const activeEidolon = eidolons?.find(e => e.id === activeEidolonId) || eidolons?.[0] || null;
   const isModifying = editing && activeEidolon?.lockedAt != null;
@@ -1904,6 +1911,20 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   selectedCompoundsRef.current = selectedCompounds;
   const activeProtocolRef = useRef(activeProtocol);
   activeProtocolRef.current = activeProtocol;
+
+  // Sprint 6.5 (optional nudge) — surface the callout the first time the user
+  // has a non-empty stack in the builder, once per device.
+  useEffect(() => {
+    if (projectionNudgeChecked.current) return;
+    if (builderView !== null && selectedCompounds.length > 0) {
+      projectionNudgeChecked.current = true;
+      try { if (!localStorage.getItem(NUDGE_PROJECTION_KEY)) setShowProjectionNudge(true); } catch (_) {}
+    }
+  }, [builderView, selectedCompounds.length]);
+  const dismissProjectionNudge = useCallback(() => {
+    setShowProjectionNudge(false);
+    try { localStorage.setItem(NUDGE_PROJECTION_KEY, "1"); } catch (_) {}
+  }, []);
 
   // Persist the current eidolon's working state back to the array.
   // Called before any switch/create so dirty builder state isn't lost.
@@ -3384,14 +3405,35 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           {builderView !== null && selectedCompounds.length > 0 && (
             <>
               {/* Spacer so content isn't hidden behind the fixed bar (taller now
-                  that the bar carries the primary CTA + a secondary action row). */}
-              <div style={{ height: 156 }} />
+                  that the bar carries the primary CTA + a secondary action row).
+                  Bumped while the one-time projection nudge is showing. */}
+              <div style={{ height: showProjectionNudge ? 212 : 156 }} />
               <div style={{
                 position: "fixed", bottom: 0, left: 0, right: 0,
                 padding: "12px 20px 18px", zIndex: 100,
                 background: "linear-gradient(to top, #0a0a0a 82%, transparent)",
               }}>
                 <div style={{ maxWidth: 480, margin: "0 auto" }}>
+                  {/* Sprint 6.5 (optional nudge) — one-time pointer to the payoff. */}
+                  {showProjectionNudge && (
+                    <div style={{
+                      display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10,
+                      padding: "10px 12px", borderRadius: 12,
+                      background: "rgba(26,232,122,0.1)", border: "1px solid rgba(26,232,122,0.25)",
+                    }}>
+                      <span style={{ fontSize: 14, lineHeight: 1.4 }}>✨</span>
+                      <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.45, color: "rgba(255,255,255,0.8)" }}>
+                        Your stack is taking shape. Tap <strong style={{ color: S.accent }}>View Projection</strong> to see your Eidolon's before / after, or <strong style={{ color: S.accent }}>Start Protocol</strong> to lock it in.
+                      </span>
+                      <button
+                        onClick={dismissProjectionNudge}
+                        aria-label="Dismiss"
+                        style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 15, lineHeight: 1, cursor: "pointer", fontFamily: "inherit", padding: "0 2px" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                   {/* #67 — echo the live Stack Safety score so its change is seen
                       without scrolling back up to the analysis. */}
                   {(() => {
@@ -3408,7 +3450,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                       Protocol Timeline is now a tab inside the projection surface, so
                       it's no longer a competing side-by-side button here. */}
                   <button
-                    onClick={() => { if (stackAnalysis.isBlocked) return; if (!isPro) { setPaywall("projection"); return; } setShowTransform(true); }}
+                    onClick={() => { dismissProjectionNudge(); if (stackAnalysis.isBlocked) return; if (!isPro) { setPaywall("projection"); return; } setShowTransform(true); }}
                     disabled={stackAnalysis.isBlocked}
                     style={{ ...S.btnOutline, width: "100%", padding: "13px 12px", marginBottom: 10, ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}
                   >
@@ -3904,6 +3946,13 @@ export default function AlkiApp() {
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const saveTimeout = useRef(null);
 
+  // Sprint 6.5 — first-run intro tutorial. Shown once on the first dashboard
+  // load (localStorage flag, per-device — no DB column). `tutorialChecked` makes
+  // the first-run check fire exactly once per session so re-entering the
+  // dashboard after dismissal doesn't re-open it.
+  const [showTutorial, setShowTutorial] = useState(false);
+  const tutorialChecked = useRef(false);
+
   // ── Load saved avatar (URL + headshot PNG) from localStorage on mount ──
   // ── #16 — load/save daily dose log ──
   useEffect(() => {
@@ -3934,6 +3983,30 @@ export default function AlkiApp() {
   const updatePreferences = useCallback((next) => {
     setPreferences(next);
     try { localStorage.setItem("alki_preferences", JSON.stringify(next)); } catch (_) {}
+  }, []);
+
+  // Sprint 6.5 — open the intro overlay the first time the dashboard mounts when
+  // the per-device flag is absent (brand-new user OR an existing user who
+  // predates the tutorial). Runs once per session via the ref guard.
+  useEffect(() => {
+    if (screen !== "dashboard" || tutorialChecked.current) return;
+    tutorialChecked.current = true;
+    try {
+      if (!localStorage.getItem(TUTORIAL_SEEN_KEY)) setShowTutorial(true);
+    } catch (_) {}
+  }, [screen]);
+
+  // Finish/skip: hide the overlay and set the flag so it never auto-shows again.
+  const dismissTutorial = useCallback(() => {
+    setShowTutorial(false);
+    try { localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch (_) {}
+  }, []);
+
+  // Settings "Show intro again": clear the flag and re-open it immediately so it
+  // can be re-watched (and re-tested). Dismissing re-sets the flag.
+  const replayTutorial = useCallback(() => {
+    try { localStorage.removeItem(TUTORIAL_SEEN_KEY); } catch (_) {}
+    setShowTutorial(true);
   }, []);
 
   useEffect(() => {
@@ -4586,6 +4659,7 @@ export default function AlkiApp() {
           onDeleteEidolon={deleteEidolon}
           preferences={preferences}
           onSetPreferences={updatePreferences}
+          onReplayTutorial={replayTutorial}
           goalOptions={GOALS}
           userEmail={user?.email || null}
           hasAccount={!!(supabase && user)}
@@ -4650,6 +4724,12 @@ export default function AlkiApp() {
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1 }}>⌂</span>
           </button>
         </>
+      )}
+
+      {/* Sprint 6.5 — first-run intro overlay. Sits above all chrome (z 2000);
+          shown once on first dashboard load and replayable from Settings. */}
+      {showTutorial && (
+        <TutorialOverlay slides={TUTORIAL_SLIDES} onClose={dismissTutorial} />
       )}
 
       {/* Dev/testing feedback button — visible on all screens past splash */}
