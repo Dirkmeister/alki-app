@@ -159,3 +159,4 @@ npm-debug.log*
 .agents/skills/impeccable/reference/adapt.md
 .agents/skills/impeccable/agents/impeccable-asset-producer.md
 skills-lock.json
+.claude/worktrees/impeccable-init/
