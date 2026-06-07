@@ -1740,9 +1740,12 @@ function EidolonHero({
           surfaces CUSTOMIZATION (renaming + "Make it me"), which stays Pro. */}
       <div style={{ textAlign: "center", marginBottom: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
         {!isPro ? (
-          <button onClick={() => onUpgrade?.("eidolon_customization")} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
-            ✦ Customize · Pro
-          </button>
+          // HIDDEN FOR NOW (kept as an asset): the free-tier "Customize · Pro"
+          // upsell chip. Re-enable by swapping the `null` below for the button.
+          // <button onClick={() => onUpgrade?.("eidolon_customization")} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
+          //   ✦ Customize · Pro
+          // </button>
+          null
         ) : avatarUrl ? (
           <button onClick={onResetAvatar} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
             ↺ Reset Avatar
