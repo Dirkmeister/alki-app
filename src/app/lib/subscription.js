@@ -29,6 +29,14 @@ export const PRO_PRICING = {
 // user hits the gate. Keep this the single source of truth for "what is Pro" —
 // gates reference these keys instead of hardcoding their own checks.
 export const PRO_FEATURES = {
+  // The #1 gate. Free users see numeric projection deltas in the builder, but
+  // the full before/after transform surface — paired Eidolon avatars, the stat
+  // tiles, and the Timeline tab — is Pro. This is the core "see your projection"
+  // upsell, so it leads the feature list.
+  projection: {
+    title: "See Your Projection",
+    blurb: "Watch your Eidolon transform — a full before/after of your projected physique, the stat-by-stat breakdown, and your cycle timeline.",
+  },
   avatar_3d: {
     title: "3D Eidolon",
     blurb: "See your Eidolon in full 3D — rotate it, zoom in, and watch your projected transformation render in real time.",
@@ -49,9 +57,13 @@ export const PRO_FEATURES = {
     title: "Cycle Timeline",
     blurb: "A week-by-week visualization of your protocol's ramp, peak, and taper phases.",
   },
-  browse_all: {
-    title: "Full Compound Library",
-    blurb: "Browse the entire 70+ compound database — every compound beyond your personalized recommendations.",
+  extra_eidolon: {
+    title: "A Second Eidolon",
+    blurb: "Alki Pro lets you run two Eidolons at once — compare protocols side by side. Need more? Add permanent slots any time.",
+  },
+  eidolon_customization: {
+    title: "Customize Your Eidolon",
+    blurb: "Rename your Eidolon and make it yours. Customization — including renaming and the editable 3D avatar — is part of Alki Pro.",
   },
 };
 
@@ -75,4 +87,30 @@ export function isProUser(profile) {
 export function canAccessFeature(profile, featureKey) {
   if (!isProFeature(featureKey)) return true;
   return isProUser(profile);
+}
+
+// ── EIDOLON SLOTS — how many active Eidolons this profile may run ──────────
+// COMPUTED, never stored: base allowance (Pro = 2, free = 1) plus any
+// one-time PERMANENT slots the user purchased ($10 each). Purchased slots
+// persist across subscription changes (the eidolon_slots_purchased counter
+// lives on the profile and is never decremented), so a lapsed Pro keeps every
+// slot they paid for even though the base drops back to 1.
+export function maxEidolons(profile) {
+  const base = isProUser(profile) ? 2 : 1;
+  const purchased = Math.max(0, Math.floor(Number(profile?.eidolonSlotsPurchased) || 0));
+  return base + purchased;
+}
+
+// Which eidolons are LOCKED (archived) because the profile is over its current
+// allowance — e.g. a Pro lapsed from 2 active back to 1. Returns a Set of ids.
+// We NEVER delete the excess; we lock from the END of the stored array (the
+// most recently created) so the user's earliest/primary eidolons stay active by
+// default. The UI lets the user promote a locked eidolon back into the active
+// window (choosing which stay active), which simply reorders the array. A
+// profile at or under its cap has no locked eidolons.
+export function lockedEidolonIds(eidolons, profile) {
+  const list = Array.isArray(eidolons) ? eidolons : [];
+  const cap = maxEidolons(profile);
+  if (list.length <= cap) return new Set();
+  return new Set(list.slice(cap).map((e) => e.id));
 }

@@ -426,7 +426,7 @@ export default function SettingsView({
       </Section>
 
       {/* ───────────── SPRINT 7 — SUBSCRIPTION ───────────── */}
-      <Section title="Subscription" hint="Alki Pro unlocks your 3D Eidolon, the protocol guide, progress tracking, the cycle timeline, and the full compound library.">
+      <Section title="Subscription" hint="Alki Pro unlocks your projected transformation, 3D Eidolon, the protocol guide, progress tracking, and the cycle timeline.">
         {!hasAccount ? (
           <div style={{ ...S.card, fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
             Subscriptions are tied to an account. Create one from the start screen to go Pro and sync across devices.
@@ -455,6 +455,7 @@ export default function SettingsView({
             eid={eid}
             isActive={eid.id === activeEidolonId}
             canDelete={eidolons.length > 1}
+            isPro={isPro}
             onSwitch={() => onSwitchEidolon(eid.id)}
             onRename={(name) => onRenameEidolon(eid.id, name)}
             onDelete={() => onDeleteEidolon(eid.id)}
@@ -500,7 +501,7 @@ function Row({ label, value, last }) {
 }
 
 // ── 5.2 — one eidolon's row, with inline rename + two-step delete ──
-function EidolonRow({ eid, isActive, canDelete, onSwitch, onRename, onDelete }) {
+function EidolonRow({ eid, isActive, canDelete, isPro = false, onSwitch, onRename, onDelete }) {
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState(eid.name || "");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -563,7 +564,13 @@ function EidolonRow({ eid, isActive, canDelete, onSwitch, onRename, onDelete }) 
             {!isActive && (
               <button onClick={onSwitch} style={pillBtn(S.accent)}>Switch to</button>
             )}
-            <button onClick={() => { setNameInput(eid.name || ""); setRenaming(true); }} style={pillBtn("rgba(255,255,255,0.6)")}>Rename</button>
+            {/* Sprint 7 — renaming is a Pro customization. Free users see a
+                locked control; the Subscription section above is the upgrade path. */}
+            {isPro ? (
+              <button onClick={() => { setNameInput(eid.name || ""); setRenaming(true); }} style={pillBtn("rgba(255,255,255,0.6)")}>Rename</button>
+            ) : (
+              <button disabled title="Renaming is an Alki Pro feature" style={{ ...pillBtn("rgba(255,255,255,0.6)"), opacity: 0.4, cursor: "not-allowed" }}>Rename 🔒</button>
+            )}
             <button
               onClick={() => canDelete && setConfirmingDelete(true)}
               disabled={!canDelete}

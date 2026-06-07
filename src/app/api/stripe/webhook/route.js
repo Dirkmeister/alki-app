@@ -82,7 +82,57 @@ export async function POST(req) {
       case "checkout.session.completed": {
         const session = event.data.object;
         const userId = session.metadata?.user_id || session.client_reference_id;
-        // Pull the subscription to read its price (→ tier) and live status.
+
+        // Branch on what was purchased. A one-time PAYMENT-mode session tagged
+        // purpose 'eidolon_slot' grants slots; everything else is a subscription
+        // checkout (unchanged). We key off mode + metadata, not the presence of
+        // session.subscription alone, so the two paths never cross.
+        const isSlotPurchase =
+          session.mode === "payment" &&
+          session.metadata?.purpose === "eidolon_slot";
+
+        if (isSlotPurchase) {
+          if (!userId) {
+            // No user to credit — don't silently swallow it. 500 → Stripe retries.
+            console.error(
+              "[stripe/webhook] slot session missing user_id",
+              session.id
+            );
+            return NextResponse.json({ error: "Unmapped slot session." }, { status: 500 });
+          }
+          // Slots are an INCREMENT, so a retried delivery would mint free slots.
+          // grant_eidolon_slot() claims this checkout session id and increments
+          // in ONE transaction: the first delivery applies it; any retry (even a
+          // concurrent one) finds the session already claimed and is a no-op.
+          // Quantity comes from the actual line items so it honors the real
+          // purchase rather than assuming 1.
+          let quantity = 1;
+          try {
+            const items = await stripe.checkout.sessions.listLineItems(session.id, { limit: 100 });
+            const summed = (items?.data || []).reduce((n, li) => n + (li.quantity || 0), 0);
+            if (summed > 0) quantity = summed;
+          } catch (e) {
+            // Fall back to 1 if the line-item fetch fails — better to grant the
+            // minimum than to error and risk a retry storm; the claim still
+            // makes it idempotent.
+            console.warn("[stripe/webhook] could not read slot line items:", e?.message || e);
+          }
+          const { data: applied, error: rpcErr } = await supabaseAdmin.rpc(
+            "grant_eidolon_slot",
+            { p_session_id: session.id, p_user_id: userId, p_quantity: quantity }
+          );
+          if (rpcErr) {
+            throw new Error(`grant_eidolon_slot (session=${session.id}): ${rpcErr.message}`);
+          }
+          if (applied === false) {
+            console.log("[stripe/webhook] slot session already processed, skipped", session.id);
+          }
+          break;
+        }
+
+        // Subscription checkout — unchanged. Pull the subscription to read its
+        // price (→ tier) and live status. (Subscription writes SET an absolute
+        // status, so they are naturally idempotent and need no ledger.)
         let tier = null;
         let status = "active";
         if (session.subscription) {

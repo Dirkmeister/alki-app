@@ -23,6 +23,10 @@ export const stripe = new Stripe(secret);
 // in .env.local. Never hardcode a price id — they differ between sandbox/live.
 export const PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || null;
 export const PRICE_ANNUAL = process.env.STRIPE_PRICE_ANNUAL || null;
+// One-time $10 add-on: a permanent extra eidolon slot. Bought in PAYMENT mode
+// (not a subscription), so it has its own price id and never flows through the
+// tier helpers above.
+export const PRICE_SLOT = process.env.STRIPE_PRICE_SLOT || null;
 
 // tier ('monthly' | 'annual') → the configured Stripe price id, or null if the
 // tier is unknown or its env var is missing.

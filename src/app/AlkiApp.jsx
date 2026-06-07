@@ -24,8 +24,9 @@ import { selectBaseMesh } from "./lib/selectBaseMesh";
 import { getStackVectors } from "./lib/compoundMorphVectors";
 import { projectBodyFat, projectWeight } from "./lib/bodyComposition";
 import { DISCLAIMER } from "./lib/disclaimer";
-import { isProUser } from "./lib/subscription";
+import { isProUser, maxEidolons, lockedEidolonIds } from "./lib/subscription";
 import UpgradePrompt from "./components/UpgradePrompt";
+import SlotPurchasePrompt from "./components/SlotPurchasePrompt";
 import { simulate } from "./engine/simulate";
 import { mapToMorphs } from "./engine/mapToMorphs";
 import FeedbackFAB from "./components/utilities/FeedbackFAB";
@@ -1690,8 +1691,10 @@ function EidolonHero({
           />
         ) : (
           <h1
-            onClick={onStartEditName}
-            title="Tap to rename"
+            // Sprint 7 — renaming the Eidolon is a Pro customization. Free users
+            // tapping the name get the upgrade prompt instead of an edit field.
+            onClick={() => { if (isPro) onStartEditName(); else onUpgrade?.("eidolon_customization"); }}
+            title={isPro ? "Tap to rename" : "Renaming is an Alki Pro feature"}
             style={{
               fontSize: 26, fontWeight: 800, color: "#fff", margin: 0,
               fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em", cursor: "pointer",
@@ -1699,7 +1702,7 @@ function EidolonHero({
             }}
           >
             {eidolonName}
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 400 }}>✎</span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 400 }}>{isPro ? "✎" : "🔒"}</span>
           </h1>
         )}
         <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -1819,7 +1822,7 @@ function applyEidolonState(eid, { setActiveEidolonId, setProfile, setActiveProto
   return locked;
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog, isPro = false, onSubscribe }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog, isPro = false, onSubscribe, onBuySlot }) {
   const [animateIn, setAnimateIn] = useState(false);
   // Sprint 7 — the ONE paywall surface for this screen. Set to a PRO_FEATURES
   // key to open the upgrade modal; gates call gatePro(feature, action) so a free
@@ -1827,6 +1830,17 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   // instead of scattering isPro branches across every button.
   const [paywall, setPaywall] = useState(null);
   const gatePro = (feature, action) => { if (isPro) { action?.(); } else { setPaywall(feature); } };
+  // Sprint 7 (slots) — Pro users at their Eidolon cap see this one-time add-on
+  // prompt instead of the (irrelevant) upgrade modal.
+  const [slotPrompt, setSlotPrompt] = useState(false);
+
+  // Eidolon allowance: how many Eidolons this profile may run (computed, never
+  // stored), and which are locked because the profile is over that allowance
+  // (e.g. a lapsed Pro). Locked eidolons are still VISIBLE — they're just not
+  // editable and don't occupy an active slot until promoted.
+  const eidolonCap = maxEidolons(profile);
+  const lockedIds = useMemo(() => lockedEidolonIds(eidolons, profile), [eidolons, profile]);
+  const atEidolonCap = (eidolons?.length || 0) >= eidolonCap;
   const [showOtherCompounds, setShowOtherCompounds] = useState(false);
   // #9166e05e — bumped on each "Reset Avatar" press to re-center the 3D orbit.
   const [avatarResetSignal, setAvatarResetSignal] = useState(0);
@@ -1861,7 +1875,12 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   // G1 — require naming the eidolon before its stack can be built. Only NEW eidolons
   // are flagged `named: false` at creation; eidolons saved before this change have no
   // `named` field (undefined), so they're grandfathered in and never re-gated.
-  const needsNaming = editing && activeEidolon && activeEidolon.named === false;
+  // Sprint 7 — the naming gate is itself a Pro customization, so it only applies
+  // to Pro users. A free user keeps the default name ("Eidolon 1") and is NOT
+  // forced to name before building (naming/renaming is Pro; stack-building is a
+  // free keep) — gating it for free would otherwise deadlock the builder. If a
+  // free user later upgrades, named:false still triggers the prompt then.
+  const needsNaming = isPro && editing && activeEidolon && activeEidolon.named === false;
   // #6 — which builder lane to render. A live selection or a modify-flow skips
   // the chooser and lands in the manual lane; a fresh empty build shows the fork.
   const builderView = (selectedCompounds.length > 0 || isModifying)
@@ -1909,6 +1928,17 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   }, [flushCurrentEidolon, setActiveEidolonId, setProfile, setActiveProtocol, setSelectedCompounds, setShowTransform]);
 
   const createNewEidolon = useCallback(() => {
+    // Sprint 7 (slots) — enforce the Eidolon allowance at the single creation
+    // choke point (both the Manage menu and the switcher modal route here). At
+    // the cap, a Pro user is offered a one-time slot add-on; a free user gets
+    // the Pro upgrade prompt. Either way we DON'T create the eidolon.
+    const count = eidolonsRef.current?.length || 0;
+    if (count >= maxEidolons(profile)) {
+      setShowEidolonSwitcher(false);
+      if (isPro) setSlotPrompt(true);
+      else setPaywall("extra_eidolon");
+      return;
+    }
     // Save current eidolon's state before creating a new one
     flushCurrentEidolon();
     const num = (eidolonsRef.current?.length || 0) + 1;
@@ -1925,7 +1955,21 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
     // field for it. The hero's inline editor is no longer auto-opened on create.
     setNameInput("");
     setEditingName(false);
-  }, [flushCurrentEidolon, profile?.goals]);
+  }, [flushCurrentEidolon, profile, isPro]);
+
+  // Sprint 7 (slots) — promote a LOCKED eidolon back into the active window by
+  // moving it to the front of the array. Locking is computed from array order
+  // (lockedEidolonIds locks the trailing overflow), so a reorder is how the user
+  // "chooses which Eidolons stay active" after a downgrade. Never deletes; the
+  // eidolon that falls past the cap simply becomes the locked one instead.
+  const promoteEidolon = useCallback((eidId) => {
+    setEidolons(prev => {
+      const list = prev || [];
+      const target = list.find(e => e.id === eidId);
+      if (!target) return list;
+      return [target, ...list.filter(e => e.id !== eidId)];
+    });
+  }, [setEidolons]);
 
   const commitEidolonName = useCallback(() => {
     const trimmed = (nameInput || "").trim();
@@ -2704,7 +2748,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         units={units}
         projection={editing && selectedCompounds.length > 0 ? projectedChanges : null}
         isPro={isPro}
-        onUpgrade={() => setPaywall("avatar_3d")}
+        onUpgrade={(feat) => setPaywall(feat || "avatar_3d")}
       />
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
@@ -2963,11 +3007,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               guide drops to a secondary action. Eidolon management (Modify / Switch /
               New) lives in the "Manage ▾" nav dropdown (#62). */}
           <button
-            onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+            onClick={() => { if (stackAnalysis.isBlocked) return; if (!isPro) { setPaywall("projection"); return; } setShowTransform(true); }}
             disabled={stackAnalysis.isBlocked}
             style={{ ...S.btn, marginTop: 8, marginBottom: 10, ...(stackAnalysis.isBlocked ? S.btnDisabled : {}) }}
           >
-            View Projection · Before / After →
+            View Projection · Before / After {isPro ? "→" : "🔒"}
           </button>
           <button onClick={() => gatePro("protocol_guide", onProtocolGuide)} style={{ ...S.btnOutline, marginBottom: 10 }}>
             View Full Protocol{!isPro ? " 🔒" : ""}
@@ -3300,17 +3344,18 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 // A2 — visibility is driven solely by showOtherCompounds so the Hide
                 // toggle always collapses the list; filter-activation auto-opens it via
                 // the one-shot effect above rather than pinning `open` true here.
-                // Sprint 7 — the full catalog only renders for Pro, so a filter
-                // auto-opening showOtherCompounds can't leak it to free users.
-                const open = isPro && showOtherCompounds;
+                // Full compound browsing is a FREE keep (product decision 2026-06-06):
+                // the whole library is open to every tier; the Pro levers are
+                // projection, lock-in, 3D, customization, timeline, and slots.
+                const open = showOtherCompounds;
                 return (
                   <>
                     <button
-                      onClick={() => gatePro("browse_all", () => setShowOtherCompounds(v => !v))}
+                      onClick={() => setShowOtherCompounds(v => !v)}
                       style={{ ...S.btnOutline, marginTop: 20, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", fontSize: 13 }}
                     >
                       <span>{open ? "Hide" : "Browse"} all compounds ({filtersActive ? `${all.length} matching` : `${otherCompounds.length} more`})</span>
-                      <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>{isPro ? "▼" : "🔒"}</span>
+                      <span style={{ fontSize: 11, transition: "transform 0.2s", display: "inline-block", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
                     </button>
                     {open && (
                       <>
@@ -3365,11 +3410,11 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                       Protocol Timeline is now a tab inside the projection surface, so
                       it's no longer a competing side-by-side button here. */}
                   <button
-                    onClick={() => !stackAnalysis.isBlocked && setShowTransform(true)}
+                    onClick={() => { if (stackAnalysis.isBlocked) return; if (!isPro) { setPaywall("projection"); return; } setShowTransform(true); }}
                     disabled={stackAnalysis.isBlocked}
                     style={{ ...S.btnOutline, width: "100%", padding: "13px 12px", marginBottom: 10, ...(stackAnalysis.isBlocked ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}
                   >
-                    View Projection · Before / After
+                    View Projection · Before / After {!isPro && "🔒"}
                   </button>
                   {/* Primary — Start Protocol (or Confirm Changes when modifying a
                       locked stack). Locks in directly via the unchanged handleLockIn. */}
@@ -3408,6 +3453,18 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           onClose={() => setShowEidolonSwitcher(false)}
           onCreate={createNewEidolon}
           goalsCatalog={GOALS}
+          lockedIds={lockedIds}
+          onPromote={(id) => { promoteEidolon(id); switchToEidolon(id); }}
+          atCap={atEidolonCap}
+          maxEidolons={eidolonCap}
+        />
+      )}
+
+      {/* Sprint 7 (slots) — Pro user at the Eidolon cap: offer the $10 add-on. */}
+      {slotPrompt && (
+        <SlotPurchasePrompt
+          onBuy={onBuySlot}
+          onClose={() => setSlotPrompt(false)}
         />
       )}
 
@@ -3450,7 +3507,11 @@ async function loadProfile(userId) {
         subscriptionStatus: data.subscription_status || "free",
         subscriptionTier: data.subscription_tier || null,
         stripeCustomerId: data.stripe_customer_id || null,
-        comped: data.comped === true
+        comped: data.comped === true,
+        // Sprint 7 (slots) — count of purchased permanent eidolon slots. Read
+        // only on the client; written solely by the webhook (guard trigger
+        // blocks client writes). `|| 0` keeps a pre-migration profile at zero.
+        eidolonSlotsPurchased: data.eidolon_slots_purchased || 0
       },
       selectedCompounds: data.selected_compounds || [],
       avatarUrl: data.avatar_url || null,
@@ -4051,6 +4112,16 @@ export default function AlkiApp() {
     else throw new Error("Could not open the billing portal. Please try again.");
   }, [callStripeRoute]);
 
+  // Buy a one-time permanent eidolon slot ($10). The route enforces the
+  // active-Pro requirement server-side; this just starts Checkout (payment mode)
+  // and redirects. On return (?slot=success) the effect above re-reads the
+  // incremented eidolon_slots_purchased so the new slot appears without a reload.
+  const startBuySlot = useCallback(async () => {
+    const { url } = await callStripeRoute("/api/stripe/buy-slot", {});
+    if (url) window.location.href = url;
+    else throw new Error("Could not start checkout. Please try again.");
+  }, [callStripeRoute]);
+
   // Re-read ONLY the subscription columns from Supabase and merge them into the
   // in-memory profile (leaving the user's other fields/edits untouched). This is
   // a plain DB read — NOT a Stripe call — so it's safe to use on the checkout
@@ -4060,7 +4131,7 @@ export default function AlkiApp() {
     if (!supabase || !user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("subscription_status, subscription_tier, stripe_customer_id, comped")
+      .select("subscription_status, subscription_tier, stripe_customer_id, comped, eidolon_slots_purchased")
       .eq("id", user.id)
       .single();
     if (data) {
@@ -4070,6 +4141,7 @@ export default function AlkiApp() {
         subscriptionTier: data.subscription_tier || null,
         stripeCustomerId: data.stripe_customer_id || null,
         comped: data.comped === true,
+        eidolonSlotsPurchased: data.eidolon_slots_purchased || 0,
       } : prev);
     }
   }, [user]);
@@ -4094,14 +4166,16 @@ export default function AlkiApp() {
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get("checkout");
     const portal = params.get("portal");
-    if (!checkout && !portal) return;
+    const slot = params.get("slot"); // slot purchase return (one-time add-on)
+    if (!checkout && !portal && !slot) return;
     try {
       params.delete("checkout");
       params.delete("portal");
+      params.delete("slot");
       const qs = params.toString();
       window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
     } catch (_) {}
-    if (checkout === "success" || portal === "return") {
+    if (checkout === "success" || portal === "return" || slot === "success") {
       refreshSubscriptionFromDb();
       const t1 = setTimeout(refreshSubscriptionFromDb, 2000);
       const t2 = setTimeout(refreshSubscriptionFromDb, 5000);
@@ -4437,6 +4511,7 @@ export default function AlkiApp() {
           setDoseLog={setDoseLog}
           isPro={isPro}
           onSubscribe={startCheckout}
+          onBuySlot={startBuySlot}
         />
       )}
       {screen === "progress" && (
