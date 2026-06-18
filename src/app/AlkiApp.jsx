@@ -65,6 +65,19 @@ const APP_VERSION = "0.2.00";
 // Updates on every deploy with no manual bump; "dev" when running locally.
 const BUILD_SHA = (process.env.NEXT_PUBLIC_COMMIT_SHA || "dev").slice(0, 7);
 
+// ─────────────────────────────────────────────────────────────
+// Single dev-affordance gate. Dev-only shortcuts (the "Baseline User (Dev)"
+// auth-screen seed, the PerfHUD overlay) are rendered ONLY when this is true.
+// Keyed on NODE_ENV (Next inlines it as a literal at build), so a production
+// build constant-folds this to `false` and the bundler dead-code-eliminates
+// the gated branches entirely — they don't just stay hidden, they're not in
+// the production bundle at all. True automatically under `npm run dev`, so the
+// shortcuts are still there for local development. To exercise them against a
+// production-style build, run that build locally with NODE_ENV unset to
+// "production" (i.e. `npm run dev`) — they are intentionally unavailable on
+// the deployed app.
+const ALKI_DEV = process.env.NODE_ENV !== "production";
+
 // Routed inner screens — everything reachable from the dashboard via navTo().
 // Drives the single global navigation chrome (persistent HOME + contextual
 // BACK) rendered at the app root. The dashboard itself is "home" and is NOT
@@ -3831,7 +3844,7 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
           </div>
         )}
 
-        {onBaseline && (
+        {ALKI_DEV && onBaseline && (
           <div style={{ textAlign: "center", marginTop: 12 }}>
             <button onClick={onBaseline} style={{
               background: "none",
@@ -4773,8 +4786,10 @@ export default function AlkiApp() {
         <FeedbackFAB currentScreen={screen} userEmail={user?.email || null} />
       )}
 
-      {/* Dev-only perf HUD — opt-in via ?perf=1 or localStorage alkiPerf=1 */}
-      <PerfHUD screen={screen} />
+      {/* Dev-only perf HUD — gated to dev builds (ALKI_DEV) so it never ships
+          in the production bundle. In dev it's further opt-in via ?perf=1 or
+          localStorage alkiPerf=1. */}
+      {ALKI_DEV && <PerfHUD screen={screen} />}
     </div>
   );
 }
