@@ -157,16 +157,20 @@ function getRecommendations(profile) {
     let score = 0;
     let flags = [];
 
-    // Goal matching — primary ranking signal
-    const goalOverlap = goals.filter(g => compound.suitability.goals.includes(g));
+    // Goal matching — primary ranking signal. Optional-chain the catalog shape:
+    // one malformed entry (missing suitability/contraindications) would otherwise
+    // throw here, and since the caller wraps this in try/catch returning [], the
+    // whole recommended + browse-all list would silently go blank.
+    const compoundContras = compound.contraindications || [];
+    const goalOverlap = goals.filter(g => compound.suitability?.goals?.includes(g));
     score += goalOverlap.length * 25;
 
     // BF-contextual advisories — informational, never blocking
-    if (compound.contraindications.includes("below15bf") && bodyFat < 15) {
+    if (compoundContras.includes("below15bf") && bodyFat < 15) {
       flags.push("At your body fat level, this compound's primary mechanism may yield diminished results. Understand the trade-offs.");
       score -= 5;
     }
-    if (compound.contraindications.includes("below22bf_glp1") && bodyFat < 22) {
+    if (compoundContras.includes("below22bf_glp1") && bodyFat < 22) {
       flags.push("Below 22% BF, GLP-1 compounds carry lean mass depletion risk. Consider pairing with GH peptides if running lean.");
       score -= 10;
     }
@@ -396,7 +400,7 @@ function resolveAvatarParams(profile, selectedCompounds = []) {
 
   for (const cid of selectedCompounds) {
     const c = COMPOUNDS.find(x => x.id === cid);
-    if (c) {
+    if (c && c.effects) {
       fatMod += c.effects.bf / 34;
       muscleMod += c.effects.muscle / 60;
       skinMod += c.effects.skin;
@@ -2130,7 +2134,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
 
     for (const cid of selectedCompounds) {
       const c = COMPOUNDS.find(x => x.id === cid);
-      if (!c) continue;
+      if (!c || !c.effects) continue;
       bfChange       += c.effects.bf       || 0;
       muscleChange   += c.effects.muscle   || 0;
       skinChange     += c.effects.skin     || 0;
@@ -3641,19 +3645,32 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
       if (rememberMe && email) localStorage.setItem("alki_remember_email", email);
       else localStorage.removeItem("alki_remember_email");
     } catch(_) {}
+    // A thrown rejection (e.g. network drop) would otherwise leave `loading`
+    // pinned true — the button stuck on "Working…" with no error and no retry.
+    // Catch it and clear loading in finally.
     if (mode === "signin") {
-      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
-      setLoading(false);
-      if (err) { setError(err.message); }
-      else { onAuth(data.user); }
+      try {
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+        if (err) { setError(err.message); }
+        else { onAuth(data.user); }
+      } catch (e) {
+        setError(e?.message || "Network error. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     } else {
-      const { data, error: err } = await supabase.auth.signUp({ email, password });
-      setLoading(false);
-      if (err) { setError(err.message); }
-      else if (data.user && !data.session) {
-        setMessage("Check your email to confirm your account, then sign in.");
-        setMode("signin"); setPassword(""); setConfirmPw("");
-      } else if (data.user) { onAuth(data.user); }
+      try {
+        const { data, error: err } = await supabase.auth.signUp({ email, password });
+        if (err) { setError(err.message); }
+        else if (data.user && !data.session) {
+          setMessage("Check your email to confirm your account, then sign in.");
+          setMode("signin"); setPassword(""); setConfirmPw("");
+        } else if (data.user) { onAuth(data.user); }
+      } catch (e) {
+        setError(e?.message || "Network error. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -3677,13 +3694,18 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
     setMessage(null);
     if (!email) { setError("Enter your email above, then tap Send reset link."); return; }
     setLoading(true);
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: SITE_URL,
-    });
-    setLoading(false);
-    if (err) { setError(err.message); }
-    else {
-      setMessage("If an account exists for that email, a password reset link is on its way. Check your inbox (and spam).");
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: SITE_URL,
+      });
+      if (err) { setError(err.message); }
+      else {
+        setMessage("If an account exists for that email, a password reset link is on its way. Check your inbox (and spam).");
+      }
+    } catch (e) {
+      setError(e?.message || "Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -3853,10 +3875,15 @@ function SetNewPassword({ onDone }) {
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (password !== confirmPw) { setError("Passwords don't match."); return; }
     setLoading(true);
-    const { error: err } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (err) { setError(err.message); return; }
-    setDone(true);
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password });
+      if (err) { setError(err.message); return; }
+      setDone(true);
+    } catch (e) {
+      setError(e?.message || "Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -4103,11 +4130,19 @@ export default function AlkiApp() {
         if (supabase) {
           supabase.from("progress_logs").select("*").eq("user_id", session.user.id)
             .order("logged_at", { ascending: false }).limit(50)
-            .then(({ data }) => { if (data) setProgressLogs(data); });
+            .then(({ data }) => { if (data) setProgressLogs(data); })
+            .catch((e) => console.error("progress_logs load failed:", e));
         }
       } else {
         setScreen("splash");
       }
+    }).catch((e) => {
+      // getSession can reject on a network failure / unreachable Supabase /
+      // malformed PKCE params. Without this, the unhandled rejection leaves the
+      // app pinned on the "loading" screen forever with no recovery. Fall back
+      // to splash so the user can still proceed.
+      console.error("getSession failed:", e);
+      setScreen("splash");
     });
 
     return () => authListener?.data?.subscription?.unsubscribe();
@@ -4432,7 +4467,8 @@ export default function AlkiApp() {
     if (supabase) {
       supabase.from("progress_logs").select("*").eq("user_id", authUser.id)
         .order("logged_at", { ascending: false }).limit(50)
-        .then(({ data }) => { if (data) setProgressLogs(data); });
+        .then(({ data }) => { if (data) setProgressLogs(data); })
+        .catch((e) => console.error("progress_logs load failed:", e));
     }
   };
 

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DISCLAIMER } from "../lib/disclaimer";
 
 // Sprint 6.5 — first-run tutorial RENDERING shell.
@@ -24,11 +24,13 @@ export default function TutorialOverlay({ slides = [], onClose }) {
   const [i, setI] = useState(0);
 
   // Defensive: an empty slide set should never trap the user behind a blank
-  // overlay — close immediately rather than render nothing dismissable.
-  if (!slides.length) {
-    onClose?.();
-    return null;
-  }
+  // overlay. Close from an effect (NOT during render) — calling the parent's
+  // onClose (a setState) mid-render triggers React's "Cannot update a component
+  // while rendering a different component" warning (and errors under StrictMode).
+  useEffect(() => {
+    if (!slides.length) onClose?.();
+  }, [slides.length, onClose]);
+  if (!slides.length) return null;
 
   const slide = slides[i];
   const isLast = i === slides.length - 1;
