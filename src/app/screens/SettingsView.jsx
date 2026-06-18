@@ -49,11 +49,24 @@ export const TRAINING_STATUSES = [
 //   • free / canceled        → inline upgrade prompt (both prices)
 // "Refresh subscription status" calls the reconciliation route (Stage 4) and is
 // always available so a missed webhook can be corrected on demand.
-function SubscriptionCard({ isPro, subscriptionStatus, subscriptionTier, comped, onSubscribe, onManageBilling, onRefreshSubscription }) {
+function SubscriptionCard({ isPro, subscriptionStatus, subscriptionTier, comped, proUntil, onSubscribe, onManageBilling, onRefreshSubscription }) {
   const [portalBusy, setPortalBusy] = useState(false);
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
+
+  // Promo grant (008): a time-boxed pass, Pro until proUntil. It carries no
+  // Stripe customer, so it's displayed like `comped` (no Manage button) but with
+  // its expiry shown. Only counts while it's the thing granting Pro — a real
+  // active Stripe sub takes precedence.
+  const promoUntil =
+    subscriptionStatus !== "active" && proUntil && new Date(proUntil) > new Date()
+      ? new Date(proUntil)
+      : null;
+  const noStripe = comped || !!promoUntil;
+  const promoExpiry = promoUntil
+    ? promoUntil.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+    : null;
 
   const tierLabel = subscriptionTier === "annual"
     ? `Annual · ${PRO_PRICING.annual.price}${PRO_PRICING.annual.cadence}`
@@ -97,20 +110,22 @@ function SubscriptionCard({ isPro, subscriptionStatus, subscriptionTier, comped,
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", fontFamily: "'Syne',sans-serif" }}>Alki Pro</span>
           <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1ae87a", background: "rgba(26,232,122,0.12)", border: "1px solid rgba(26,232,122,0.25)", borderRadius: 100, padding: "2px 8px" }}>
-            {comped ? "Complimentary" : "Active"}
+            {comped ? "Complimentary" : promoUntil ? "Pro Pass" : "Active"}
           </span>
         </div>
         <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5, margin: "0 0 14px" }}>
           {comped
             ? "You have complimentary Pro access. Enjoy the full Eidolon."
-            : `Your plan: ${tierLabel || "Pro"}. Manage your plan, payment method, or cancel anytime.`}
+            : promoUntil
+              ? `Your Pro pass is active through ${promoExpiry}. Redeem another code to extend it.`
+              : `Your plan: ${tierLabel || "Pro"}. Manage your plan, payment method, or cancel anytime.`}
         </p>
 
         {msg && <Banner kind="ok">{msg}</Banner>}
         {err && <Banner kind="err">{err}</Banner>}
 
-        {/* Comped users have no Stripe customer to manage — only paying subs do. */}
-        {!comped && (
+        {/* Comped + promo-pass users have no Stripe customer to manage — only paying subs do. */}
+        {!noStripe && (
           <button onClick={openPortal} disabled={portalBusy} style={{ ...S.btnOutline, ...(portalBusy ? S.btnDisabled : {}) }}>
             {portalBusy ? "Opening…" : "Manage Subscription"}
           </button>
@@ -142,6 +157,55 @@ function SubscriptionCard({ isPro, subscriptionStatus, subscriptionTier, comped,
       {msg && <Banner kind="ok">{msg}</Banner>}
       <UpgradePrompt variant="inline" onSubscribe={onSubscribe} />
       <div style={{ textAlign: "center" }}>{refreshLink}</div>
+    </div>
+  );
+}
+
+// ── Promo codes (008) — redeem a single-use code for a month of Pro ──
+// Calls onRedeemCode(code) (the AlkiApp redeem handler → server RPC, which
+// burns the code and grants time-boxed Pro, then refreshes the profile so the
+// card above re-renders as Pro). Single field; success/error shown inline.
+function RedeemCodeCard({ onRedeemCode }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const submit = async () => {
+    const trimmed = code.trim();
+    if (!trimmed || busy) return;
+    setBusy(true); setMsg(null); setErr(null);
+    try {
+      await onRedeemCode(trimmed);
+      setMsg("Code redeemed — Alki Pro is unlocked for one month.");
+      setCode("");
+    } catch (e) {
+      setErr(e?.message || "Couldn't redeem that code.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ ...S.card, marginTop: 12 }}>
+      <label style={S.label}>Have a code?</label>
+      <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, margin: "0 0 12px" }}>
+        Redeem a promo code for one month of Alki Pro.
+      </p>
+      {msg && <Banner kind="ok">{msg}</Banner>}
+      {err && <Banner kind="err">{err}</Banner>}
+      <input
+        value={code}
+        onChange={e => setCode(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") submit(); }}
+        placeholder="ALKI-XXXX-XXXX"
+        autoCapitalize="characters"
+        spellCheck={false}
+        style={{ ...S.input, marginBottom: 10, textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em" }}
+      />
+      <button onClick={submit} disabled={!code.trim() || busy} style={{ ...S.btn, ...((!code.trim() || busy) ? S.btnDisabled : {}) }}>
+        {busy ? "Redeeming…" : "Redeem Code"}
+      </button>
     </div>
   );
 }
@@ -189,6 +253,9 @@ export default function SettingsView({
   subscriptionStatus = "free",
   subscriptionTier = null,
   comped = false,
+  // Promo codes (008) — time-boxed Pro expiry + the redeem action.
+  proUntil = null,
+  onRedeemCode,
   onSubscribe,
   onManageBilling,
   onRefreshSubscription,
@@ -443,15 +510,21 @@ export default function SettingsView({
             Subscriptions are tied to an account. Create one from the start screen to go Pro and sync across devices.
           </div>
         ) : (
-          <SubscriptionCard
-            isPro={isPro}
-            subscriptionStatus={subscriptionStatus}
-            subscriptionTier={subscriptionTier}
-            comped={comped}
-            onSubscribe={onSubscribe}
-            onManageBilling={onManageBilling}
-            onRefreshSubscription={onRefreshSubscription}
-          />
+          <>
+            <SubscriptionCard
+              isPro={isPro}
+              subscriptionStatus={subscriptionStatus}
+              subscriptionTier={subscriptionTier}
+              comped={comped}
+              proUntil={proUntil}
+              onSubscribe={onSubscribe}
+              onManageBilling={onManageBilling}
+              onRefreshSubscription={onRefreshSubscription}
+            />
+            {/* Promo codes (008) — redeem a single-use code for a month of Pro.
+                Hidden for comped accounts (already permanent Pro). */}
+            {onRedeemCode && !comped && <RedeemCodeCard onRedeemCode={onRedeemCode} />}
+          </>
         )}
       </Section>
 

@@ -68,14 +68,22 @@ export function isProFeature(featureKey) {
   return Object.prototype.hasOwnProperty.call(PRO_FEATURES, featureKey);
 }
 
-// The core entitlement check. A profile is Pro when its subscription is active
-// OR it has been manually comped (founder/tester grant). Defensive against a
-// null profile or a pre-migration profile missing these fields (→ not Pro).
-// NOTE: 'past_due' and 'canceled' are intentionally NOT Pro — access re-locks
-// when payment fails or the plan ends (Settings shows the recovery prompt).
+// The core entitlement check. A profile is Pro when its subscription is active,
+// it has been manually comped (founder/tester grant), OR it holds an unexpired
+// time-boxed grant from a redeemed promo code (proUntil in the future).
+// Defensive against a null profile or a pre-migration profile missing these
+// fields (→ not Pro). NOTE: 'past_due' and 'canceled' are intentionally NOT Pro
+// — access re-locks when payment fails or the plan ends.
 export function isProUser(profile) {
   if (!profile) return false;
-  return profile.subscriptionStatus === "active" || profile.comped === true;
+  if (profile.subscriptionStatus === "active" || profile.comped === true) return true;
+  // Promo-code grant: Pro while the redeemed window hasn't elapsed. Time-based,
+  // so it lapses on its own with no webhook/cron — the gate just stops matching.
+  if (profile.proUntil) {
+    const t = new Date(profile.proUntil).getTime();
+    if (!Number.isNaN(t) && t > Date.now()) return true;
+  }
+  return false;
 }
 
 // Can this profile access a given feature? True for free features always, and

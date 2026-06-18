@@ -3568,7 +3568,11 @@ async function loadProfile(userId) {
         // Sprint 7 (slots) — count of purchased permanent eidolon slots. Read
         // only on the client; written solely by the webhook (guard trigger
         // blocks client writes). `|| 0` keeps a pre-migration profile at zero.
-        eidolonSlotsPurchased: data.eidolon_slots_purchased || 0
+        eidolonSlotsPurchased: data.eidolon_slots_purchased || 0,
+        // Promo codes (008) — time-boxed Pro expiry. Read-only on the client
+        // (set only by redeem_promo_code(); guard trigger blocks client writes).
+        // isProUser treats an unexpired proUntil as Pro.
+        proUntil: data.pro_until || null
       },
       selectedCompounds: data.selected_compounds || [],
       avatarUrl: data.avatar_url || null,
@@ -4250,7 +4254,7 @@ export default function AlkiApp() {
     if (!supabase || !user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("subscription_status, subscription_tier, stripe_customer_id, comped, eidolon_slots_purchased")
+      .select("subscription_status, subscription_tier, stripe_customer_id, comped, eidolon_slots_purchased, pro_until")
       .eq("id", user.id)
       .single();
     if (data) {
@@ -4261,9 +4265,30 @@ export default function AlkiApp() {
         stripeCustomerId: data.stripe_customer_id || null,
         comped: data.comped === true,
         eidolonSlotsPurchased: data.eidolon_slots_purchased || 0,
+        proUntil: data.pro_until || null,
       } : prev);
     }
   }, [user]);
+
+  // Promo-code redemption (008). Calls the server RPC, which atomically burns a
+  // single-use code and grants time-boxed Pro to the caller (auth.uid()), then
+  // re-reads the subscription fields so isPro flips live with no reload. Throws
+  // a friendly message on a used/invalid code so Settings can surface it.
+  const redeemPromoCode = useCallback(async (code) => {
+    if (!supabase || !user) throw new Error("Sign in to redeem a code.");
+    const { data, error } = await supabase.rpc("redeem_promo_code", { p_code: (code || "").trim() });
+    if (error) throw new Error(error.message || "Couldn't redeem that code. Please try again.");
+    if (!data?.ok) {
+      const reasons = {
+        used: "That code has already been used.",
+        invalid: "That code isn't valid. Check it and try again.",
+        unauth: "Sign in to redeem a code.",
+      };
+      throw new Error(reasons[data?.reason] || "That code isn't valid.");
+    }
+    await refreshSubscriptionFromDb();
+    return data;
+  }, [user, refreshSubscriptionFromDb]);
 
   // Stage 4 — reconciliation. Asks the server to re-fetch the subscription from
   // Stripe and correct the DB (covers a missed webhook), then re-reads the
@@ -4719,9 +4744,11 @@ export default function AlkiApp() {
           subscriptionStatus={profile?.subscriptionStatus || "free"}
           subscriptionTier={profile?.subscriptionTier || null}
           comped={profile?.comped === true}
+          proUntil={profile?.proUntil || null}
           onSubscribe={startCheckout}
           onManageBilling={openBillingPortal}
           onRefreshSubscription={syncSubscription}
+          onRedeemCode={redeemPromoCode}
         />
       )}
 
