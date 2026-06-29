@@ -1,5 +1,7 @@
 "use client";
 
+import { ACCENT } from "../theme";
+
 /**
  * ALKI — PROTOCOL GUIDE (Plan C)
  * ────────────────────────────────────────────────────────────
@@ -29,7 +31,7 @@ const T = {
   text2: "rgba(255,255,255,0.62)",
   text3: "rgba(255,255,255,0.38)",
   faint: "rgba(255,255,255,0.25)",
-  accent: "#22d68a",
+  accent: ACCENT,
   accentDim: "rgba(34,214,138,0.10)",
   accentBorder: "rgba(34,214,138,0.25)",
   warn: "#ff6b6b",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { ACCENT } from "../theme";
 import { buildProfile, simulate, estimateMonthlyCost } from "../lib/peptideEngine";
 // Canonical BF% display helpers — shared with the dashboard so the headline
 // body-fat numbers are cohesive app-wide (#47dc1758 / #86132d26). The
@@ -41,7 +42,7 @@ const C = {
   text: "#e8e8e8",
   textDim: "rgba(255,255,255,0.55)",
   textFaint: "rgba(255,255,255,0.35)",
-  accent: "#22d68a",
+  accent: ACCENT,
   accentDim: "rgba(34,214,138,0.15)",
   accentBorder: "rgba(34,214,138,0.25)",
   blue: "#6366f1",

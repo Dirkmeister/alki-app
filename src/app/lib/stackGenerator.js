@@ -1,5 +1,7 @@
 "use client";
 
+import { ACCENT } from "../theme";
+
 /**
  * ============================================================
  * ALKI — STACK GENERATOR  (v2 — risk-ladder tuning)
@@ -813,7 +815,7 @@ function classifyRisk(compounds, intensity) {
     if (compounds.some((c) => c.category === "SARM")) return { label: "Moderate", color: "#fbbf24" };
     return { label: "Low–Moderate", color: "#a3e635" };
   }
-  return { label: "Low", color: "#22d68a" };
+  return { label: "Low", color: ACCENT };
 }
 
 // ============================================================

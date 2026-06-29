@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { generateStacks, detectPhase } from "../lib/stackGenerator";
 import { DISCLAIMER } from "../lib/disclaimer";
+import { ACCENT } from "../theme";
 
 /**
  * ============================================================
@@ -89,7 +90,7 @@ export default function StackGenerator({ profile, compoundCatalog, onLoadStack, 
       {expanded && (
         <div style={styles.stackList}>
           <div style={styles.phaseNote}>
-            Based on your body fat ({profile.bodyFat}%), goals, and biometrics, Alki identified <span style={{ color: "#22d68a", fontWeight: 600 }}>{phaseLabel}</span> as your primary research phase. Each protocol below uses a different architectural approach.
+            Based on your body fat ({profile.bodyFat}%), goals, and biometrics, Alki identified <span style={{ color: ACCENT, fontWeight: 600 }}>{phaseLabel}</span> as your primary research phase. Each protocol below uses a different architectural approach.
           </div>
 
           {/* E2 — advisory opt-in: the soft cap and risk ceiling are not hard limits.
@@ -294,7 +295,7 @@ const styles = {
   entryTitle: {
     fontSize: 15,
     fontWeight: 700,
-    color: "#22d68a",
+    color: ACCENT,
     letterSpacing: "-0.01em",
   },
   entrySubtitle: {
@@ -416,7 +417,7 @@ const styles = {
     fontWeight: 600,
     padding: "4px 10px",
     background: "rgba(34,214,138,0.1)",
-    color: "#22d68a",
+    color: ACCENT,
     border: "1px solid rgba(34,214,138,0.2)",
     borderRadius: 999,
     whiteSpace: "nowrap",
@@ -451,7 +452,7 @@ const styles = {
   roleName: {
     fontSize: 13,
     fontWeight: 600,
-    color: "#22d68a",
+    color: ACCENT,
     marginBottom: 3,
   },
   roleDescription: {
@@ -519,7 +520,7 @@ const styles = {
     width: "100%",
     padding: "12px 16px",
     background: "rgba(34,214,138,0.12)",
-    color: "#22d68a",
+    color: ACCENT,
     border: "none",
     borderTop: "1px solid rgba(34,214,138,0.2)",
     borderRadius: 0,

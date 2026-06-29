@@ -1,3 +1,5 @@
+import { ACCENT } from "../theme";
+
 // ═══════════════════════════════════════════════════════════
 // ALKI — Eidolon Cultivation State Machine
 // Progression → Stagnation → Regression
@@ -86,12 +88,12 @@ export function getCultivationVisuals(state) {
   switch (state) {
     case "progressing":
       return {
-        glowColor: "#22d68a",
+        glowColor: ACCENT,
         glowOpacity: 0.12,
         glowIntensity: 3,
         overlayOpacity: 0.08,
         statusLabel: "Progressing",
-        statusColor: "#22d68a",
+        statusColor: ACCENT,
         statusIcon: "▲",
         statusBg: "rgba(34,214,138,0.1)",
         statusBorder: "rgba(34,214,138,0.25)"

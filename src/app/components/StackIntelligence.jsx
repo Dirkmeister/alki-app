@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { DISCLAIMER } from "../lib/disclaimer";
+import { ACCENT } from "../theme";
 
 /**
  * ============================================================
@@ -50,7 +51,7 @@ const AXES = {
   gh_axis: {
     label: "GH Axis",
     short: "GH",
-    color: "#22d68a",
+    color: ACCENT,
     desc: "Growth hormone & IGF-1 signaling, recovery, lean mass",
   },
   tissue_repair: {
@@ -895,7 +896,7 @@ function redundancyStrength(intel) {
 // VISUAL COMPONENTS
 // ============================================================
 
-const ACCENT = "#22d68a";
+// ACCENT now imported from ../theme (single source of truth for the brand green)
 const BG_CARD = "rgba(255,255,255,0.04)";
 const BG_CARD_2 = "rgba(255,255,255,0.06)";
 const BORDER = "rgba(255,255,255,0.08)";

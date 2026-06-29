@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect, Fragment } from "react";
 import { DISCLAIMER } from "../lib/disclaimer";
+import { ACCENT } from "../theme";
 
 /**
  * ============================================================
@@ -239,13 +240,13 @@ const TOKENS = {
   textSecondary: "rgba(255,255,255,0.62)",
   textTertiary: "rgba(255,255,255,0.38)",
   textFaint: "rgba(255,255,255,0.25)",
-  accent: "#22d68a",
+  accent: ACCENT,
   accentDim: "rgba(34,214,138,0.15)",
   accentBorder: "rgba(34,214,138,0.25)",
   // Phase colors — semantic
   phase: {
     ramp:     { base: "#5b8def", dim: "rgba(91,141,239,0.16)", label: "Ramp-up" },
-    active:   { base: "#22d68a", dim: "rgba(34,214,138,0.16)", label: "Active" },
+    active:   { base: ACCENT, dim: "rgba(34,214,138,0.16)", label: "Active" },
     taper:    { base: "#f0a848", dim: "rgba(240,168,72,0.16)", label: "Taper" },
     pct:      { base: "#b58bf7", dim: "rgba(181,139,247,0.16)", label: "PCT" },
     recovery: { base: "#6b7280", dim: "rgba(107,114,128,0.18)", label: "Recovery" },

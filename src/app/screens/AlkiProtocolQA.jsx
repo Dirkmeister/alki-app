@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
+import { ACCENT } from "../theme";
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — PROTOCOL Q&A ENGINE
@@ -835,7 +836,7 @@ const GENERAL_FAQS = [
 // ── COMPONENT ──────────────────────────────────────────────
 const TABS = ["Compound", "Goal", "Stack", "General"];
 
-const ACCENT = "#22d68a";
+// ACCENT now imported from ../theme (single source of truth for the brand green)
 const ACCENT_DIM = "rgba(34,214,138,0.08)";
 const ACCENT_BORDER = "rgba(34,214,138,0.2)";
 
@@ -1101,7 +1102,7 @@ export default function AlkiProtocolQA({ activeCompound, activeGoal, contextComp
                   ))
                 : (
                   <>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#22d68a", padding: "2px 4px 8px" }}>Your Stack</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: ACCENT, padding: "2px 4px 8px" }}>Your Stack</div>
                     {/* #c673160a — every stack compound (curated or synthesized) */}
                     {stackEntryNames.map((name) => (
                       <SidebarBtn

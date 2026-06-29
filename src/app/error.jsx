@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ACCENT } from "./theme";
 
 // ── Top-level error boundary (Next.js App Router) ──────────────────
 // Catches render-time throws anywhere in the app so a single bad render
@@ -51,7 +52,7 @@ export default function AppError({ error, reset }) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <button onClick={() => reset()} style={{ width: "100%", padding: "13px 16px", borderRadius: 10, background: "#22d68a", border: "none", color: "#0a0a0a", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={() => reset()} style={{ width: "100%", padding: "13px 16px", borderRadius: 10, background: ACCENT, border: "none", color: "#0a0a0a", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
             Try again
           </button>
           <button onClick={() => { if (typeof window !== "undefined") window.location.href = "/"; }} style={{ width: "100%", padding: "13px 16px", borderRadius: 10, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>

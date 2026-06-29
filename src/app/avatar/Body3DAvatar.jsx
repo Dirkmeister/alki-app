@@ -4,6 +4,7 @@ import { OrbitControls, useGLTF } from "@react-three/drei";
 import { useRef, Suspense, useMemo, useEffect, useState } from "react";
 import * as THREE from "three";
 import { MORPH_KEYS, MORPH_TARGETS } from "../lib/morphTargets";
+import { ACCENT } from "../theme";
 
 /**
  * Body3DAvatar — GLB renderer with shape-key morphing.
@@ -420,7 +421,7 @@ export default function Body3DAvatar({
           <directionalLight position={[-2.5, 2, 2]} intensity={0.5} color="#a8c8ff" />
           <directionalLight position={[0, 3.5, -2]} intensity={0.55} color="#ffffff" />
           {glow && (
-            <directionalLight position={[0, 2, -3]} intensity={1.3} color="#22d68a" />
+            <directionalLight position={[0, 2, -3]} intensity={1.3} color={ACCENT} />
           )}
 
           <Suspense fallback={null}>
@@ -444,7 +445,7 @@ export default function Body3DAvatar({
             fontWeight: 600,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: glow ? "#22d68a" : "rgba(255,255,255,0.5)",
+            color: glow ? ACCENT : "rgba(255,255,255,0.5)",
             marginTop: 6,
           }}
         >
@@ -482,7 +483,7 @@ function MorphDebugPanel({ override, setKey, onReset, onZero }) {
     <div key={m.key} style={{ marginBottom: 8, textAlign: "left" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.85)", fontFamily: "monospace" }}>
         <span>{m.key}</span>
-        <span style={{ color: "#22d68a" }}>{fmt(override[m.key])}</span>
+        <span style={{ color: ACCENT }}>{fmt(override[m.key])}</span>
       </div>
       <input
         type="range"
@@ -491,7 +492,7 @@ function MorphDebugPanel({ override, setKey, onReset, onZero }) {
         step={0.01}
         value={override[m.key] || 0}
         onChange={e => setKey(m.key, parseFloat(e.target.value))}
-        style={{ width: "100%", accentColor: "#22d68a", height: 14 }}
+        style={{ width: "100%", accentColor: ACCENT, height: 14 }}
       />
     </div>
   );
@@ -506,14 +507,14 @@ function MorphDebugPanel({ override, setKey, onReset, onZero }) {
         maxHeight: "82vh",
         overflowY: "auto",
         background: "rgba(12,12,12,0.94)",
-        border: "1px solid #22d68a",
+        border: `1px solid ${ACCENT}`,
         borderRadius: 10,
         padding: 12,
         zIndex: 9999,
         boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#22d68a", letterSpacing: "0.06em", marginBottom: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, letterSpacing: "0.06em", marginBottom: 8 }}>
         MORPH CALIBRATION
       </div>
       <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 10, lineHeight: 1.4 }}>
@@ -540,7 +541,7 @@ function MorphDebugPanel({ override, setKey, onReset, onZero }) {
         readOnly
         value={json}
         onFocus={e => e.target.select()}
-        style={{ width: "100%", height: 70, fontSize: 9, fontFamily: "monospace", background: "#000", color: "#22d68a", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, padding: 6, resize: "vertical" }}
+        style={{ width: "100%", height: 70, fontSize: 9, fontFamily: "monospace", background: "#000", color: ACCENT, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, padding: 6, resize: "vertical" }}
       />
     </div>
   );

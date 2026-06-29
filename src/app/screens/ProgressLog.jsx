@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { getCultivationState, getCultivationVisuals } from "../lib/cultivation";
+import { ACCENT } from "../theme";
 
 // ═══════════════════════════════════════════════════════════
 // ALKI — Progress Log & Eidolon Cultivation Tracker
@@ -9,13 +10,13 @@ import { getCultivationState, getCultivationVisuals } from "../lib/cultivation";
 
 const S = {
   inner: { maxWidth: 480, margin: "0 auto", padding: "0 20px", minHeight: "100vh" },
-  accent: "#22d68a",
+  accent: ACCENT,
   card: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 20, marginBottom: 12 },
   input: { width: "100%", padding: "14px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 16, outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
   label: { fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", marginBottom: 8, display: "block" },
-  btn: { width: "100%", padding: "16px 24px", background: "#22d68a", color: "#0a0a0a", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: "pointer", letterSpacing: "0.02em", fontFamily: "inherit" },
+  btn: { width: "100%", padding: "16px 24px", background: ACCENT, color: "#0a0a0a", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: "pointer", letterSpacing: "0.02em", fontFamily: "inherit" },
   btnDisabled: { opacity: 0.35, cursor: "not-allowed" },
-  btnOutline: { width: "100%", padding: "14px 24px", background: "transparent", color: "#22d68a", border: "2px solid rgba(34,214,138,0.3)", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+  btnOutline: { width: "100%", padding: "14px 24px", background: "transparent", color: ACCENT, border: "2px solid rgba(34,214,138,0.3)", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   disclaimer: { fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5, textAlign: "center", padding: "16px 0" }
 };
 
@@ -222,7 +223,7 @@ export default function ProgressLog({ userId, eidolonId, profile, cultivationSta
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>Day</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#22d68a", fontVariantNumeric: "tabular-nums", marginTop: 1 }}>{cycleDay}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT, fontVariantNumeric: "tabular-nums", marginTop: 1 }}>{cycleDay}</div>
           </div>
         </div>
       )}
@@ -268,7 +269,7 @@ export default function ProgressLog({ userId, eidolonId, profile, cultivationSta
           {trend.bfDelta !== null && (
             <div style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 4 }}>Body Fat Trend</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: trend.bfDelta < 0 ? "#22d68a" : trend.bfDelta > 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: trend.bfDelta < 0 ? ACCENT : trend.bfDelta > 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
                 {trend.bfDelta > 0 ? "+" : ""}{trend.bfDelta.toFixed(1)}%
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ACCENT } from "../theme";
 
 // ALKI — Triage board. Source of truth is the Supabase `feedback` table.
 // Snapshot 2026-05-28 · build line v0.1.99.
@@ -99,7 +100,7 @@ const SEV_COLORS = { P1: "#ff4d4d", P2: "#f0a030", P3: "#888" };
 const CAT_LABELS = { bug: "🐛 Bug", pain_point: "😤 Pain", idea: "💡 Idea" };
 const NOTED_LABELS = { dallas: "Dallas", austin: "Austin", both: "★ Both" };
 const NOTED_COLORS = { dallas: "rgba(100,160,255,0.2)", austin: "rgba(255,180,60,0.2)", both: "rgba(34,214,138,0.2)" };
-const NOTED_TEXT = { dallas: "rgba(100,160,255,0.8)", austin: "rgba(255,180,60,0.8)", both: "#22D68A" };
+const NOTED_TEXT = { dallas: "rgba(100,160,255,0.8)", austin: "rgba(255,180,60,0.8)", both: ACCENT };
 const STATUS_STYLE = {
   open: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)", label: "Open" },
   deferred: { bg: "rgba(140,120,255,0.08)", border: "rgba(140,120,255,0.2)", color: "rgba(140,120,255,0.7)", label: "Deferred" },
@@ -147,18 +148,18 @@ export default function Triage() {
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>ALKI — Triage</h1>
           <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, margin: "6px 0 0" }}>
-            <span style={{ color: "#22D68A" }}>{counts.shipped} shipped</span> · <span style={{ color: "#ff4d4d" }}>{counts.open} open</span> · <span style={{ color: "rgba(140,120,255,0.7)" }}>{counts.deferred} deferred</span> · {total} total
+            <span style={{ color: ACCENT }}>{counts.shipped} shipped</span> · <span style={{ color: "#ff4d4d" }}>{counts.open} open</span> · <span style={{ color: "rgba(140,120,255,0.7)" }}>{counts.deferred} deferred</span> · {total} total
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 12 }}>
             <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: "linear-gradient(90deg, #22D68A, #1ae87a)" }} />
+              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: `linear-gradient(90deg, ${ACCENT}, #1ae87a)` }} />
             </div>
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>{pct}%</span>
           </div>
         </div>
 
         {/* Changelog (shipped work lives here) */}
-        <button onClick={() => setShowChangelog(v => !v)} style={{ background: "rgba(34,214,138,0.06)", border: "1px solid rgba(34,214,138,0.15)", color: "#22D68A", fontSize: 12, fontWeight: 600, padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 20, width: "100%", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
+        <button onClick={() => setShowChangelog(v => !v)} style={{ background: "rgba(34,214,138,0.06)", border: "1px solid rgba(34,214,138,0.15)", color: ACCENT, fontSize: 12, fontWeight: 600, padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 20, width: "100%", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
           <span>📋 Changelog — shipped work ({CHANGELOG.reduce((n, s) => n + s.changes.length, 0)} entries)</span>
           <span style={{ fontSize: 10, color: "rgba(34,214,138,0.5)" }}>{showChangelog ? "▲" : "▼"}</span>
         </button>
@@ -168,12 +169,12 @@ export default function Triage() {
             {CHANGELOG.map((s, si) => (
               <div key={si}>
                 <div style={{ padding: "10px 16px", background: "rgba(34,214,138,0.04)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#22D68A" }}>{s.date}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>{s.date}</span>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginLeft: 12 }}>{s.session}</span>
                 </div>
                 {s.changes.map((ch, ci) => (
                   <div key={ci} style={{ padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.03)", display: "grid", gridTemplateColumns: "56px 1fr", gap: 10 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: ch.rank === "—" ? "rgba(255,255,255,0.2)" : "#22D68A" }}>{ch.rank === "—" ? "DEV" : "#" + ch.rank}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: ch.rank === "—" ? "rgba(255,255,255,0.2)" : ACCENT }}>{ch.rank === "—" ? "DEV" : "#" + ch.rank}</span>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", marginBottom: 2 }}>{ch.title}</div>
                       <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{ch.desc}</div>
@@ -229,7 +230,7 @@ export default function Triage() {
                               <span style={{ textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>{r.screen}</span> · {CAT_LABELS[r.cat]}
                             </div>
                             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.6, marginBottom: 10 }}>{r.desc}</div>
-                            <div style={{ fontSize: 12, color: r.status === "deferred" ? "rgba(140,120,255,0.85)" : "#22D68A", lineHeight: 1.6, padding: "8px 12px", background: r.status === "deferred" ? "rgba(140,120,255,0.06)" : "rgba(34,214,138,0.06)", borderRadius: 8, borderLeft: `3px solid ${r.status === "deferred" ? "rgba(140,120,255,0.3)" : "rgba(34,214,138,0.3)"}` }}>
+                            <div style={{ fontSize: 12, color: r.status === "deferred" ? "rgba(140,120,255,0.85)" : ACCENT, lineHeight: 1.6, padding: "8px 12px", background: r.status === "deferred" ? "rgba(140,120,255,0.06)" : "rgba(34,214,138,0.06)", borderRadius: 8, borderLeft: `3px solid ${r.status === "deferred" ? "rgba(140,120,255,0.3)" : "rgba(34,214,138,0.3)"}` }}>
                               <strong style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: r.status === "deferred" ? "rgba(140,120,255,0.7)" : "rgba(34,214,138,0.7)" }}>{r.status === "deferred" ? "Deferred — plan" : "Proposed fix"}</strong><br />{r.fix}
                             </div>
                           </div>

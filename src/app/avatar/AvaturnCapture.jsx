@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AVATURN_ENABLED, AVATURN_URL } from "./avaturnConfig";
 import AvatarHeadshot from "./AvatarHeadshot";
+import { ACCENT } from "../theme";
 
 /**
  * AvaturnCapture — Embeds the Avaturn iframe to capture a user's
@@ -178,7 +179,7 @@ function RenderingState() {
   return (
     <div style={centerStyle}>
       <div style={{ maxWidth: 280, textAlign: "center" }}>
-        <div style={{ fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", color: "#22d68a", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", color: ACCENT, marginBottom: 12 }}>
           Finalizing your avatar
         </div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
@@ -213,7 +214,7 @@ function ErrorState({ message, onCancel }) {
           style={{
             marginTop: 20,
             padding: "12px 22px",
-            background: "#22d68a",
+            background: ACCENT,
             color: "#0a0a0a",
             border: "none",
             borderRadius: 10,
@@ -246,7 +247,7 @@ function SetupNotice({ onCancel }) {
         <h3 style={{ color: "#fff", fontSize: 19, fontWeight: 700, margin: 0 }}>Avatar capture setup required</h3>
         <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, lineHeight: 1.7, marginTop: 12 }}>
           To enable photoreal avatar capture, sign up for a free Avaturn developer account at{" "}
-          <span style={{ color: "#22d68a" }}>developer.avaturn.me</span>, then paste your subdomain into{" "}
+          <span style={{ color: ACCENT }}>developer.avaturn.me</span>, then paste your subdomain into{" "}
           <code style={{ background: "rgba(255,255,255,0.07)", padding: "2px 6px", borderRadius: 4, color: "#e8e8e8", fontSize: 12 }}>
             src/app/avaturnConfig.js
           </code>.
@@ -259,7 +260,7 @@ function SetupNotice({ onCancel }) {
           style={{
             marginTop: 22,
             padding: "12px 24px",
-            background: "#22d68a",
+            background: ACCENT,
             color: "#0a0a0a",
             border: "none",
             borderRadius: 10,

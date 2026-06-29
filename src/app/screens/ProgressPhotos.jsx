@@ -1,5 +1,7 @@
 "use client";
 
+import { ACCENT } from "../theme";
+
 /**
  * ALKI — PROGRESS PHOTOS (Plan E)
  * ────────────────────────────────────────────────────────────
@@ -18,7 +20,7 @@ const T = {
   text: "#e8e8e8", text2: "rgba(255,255,255,0.6)", text3: "rgba(255,255,255,0.38)",
   faint: "rgba(255,255,255,0.25)", surface: "rgba(255,255,255,0.04)",
   border: "rgba(255,255,255,0.08)", borderStrong: "rgba(255,255,255,0.12)",
-  accent: "#22d68a", accentDim: "rgba(34,214,138,0.10)", accentBorder: "rgba(34,214,138,0.25)",
+  accent: ACCENT, accentDim: "rgba(34,214,138,0.10)", accentBorder: "rgba(34,214,138,0.25)",
   warn: "#f0a848", danger: "#ff6b6b",
 };
 const FONT = "'DM Sans', 'Helvetica Neue', sans-serif";
