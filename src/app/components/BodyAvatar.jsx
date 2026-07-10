@@ -82,8 +82,8 @@ export default function BodyAvatar({ params, label, glow = false, maxWidth = 180
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
             <linearGradient id="glowOverlay" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1ae87a" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#1ae87a" stopOpacity="0.02" />
+              <stop offset="0%" stopColor="#22D68A" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#22D68A" stopOpacity="0.02" />
             </linearGradient>
           </defs>
         )}
@@ -366,7 +366,7 @@ export default function BodyAvatar({ params, label, glow = false, maxWidth = 180
         fontWeight: 600,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: glow ? "#1ae87a" : "rgba(255,255,255,0.5)",
+        color: glow ? "#22D68A" : "rgba(255,255,255,0.5)",
         marginTop: 4
       }}>{label}</div>
     </div>

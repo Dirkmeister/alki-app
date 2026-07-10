@@ -75,11 +75,11 @@ export default function Onboarding({ onComplete, onExitHome, prefill = null, ini
   // don't prescribe a goal or protocol. The recommendation engine still ranks
   // compounds by body fat — this copy is here to teach, not to steer.
   const bfFeedback = !isNaN(bfNum) && bfNum > 0 ? (
-    bfNum < 8 ? { text: "Competition-level lean — at or below the essential-fat margin for most men. Very lean ranges are where much GH-axis and recovery research is focused.", color: "#1ae87a" } :
-    bfNum < 15 ? { text: "Athletic range. Lean and within healthy limits. For context, GLP-1 research notes elevated lean-mass-loss risk the leaner you are.", color: "#1ae87a" } :
-    bfNum < 22 ? { text: "Healthy range — typical for an active adult.", color: "#1ae87a" } :
-    bfNum < 30 ? { text: "Above-average body fat — the range most published GLP-1 weight-loss trials were conducted in.", color: "#1ae87a" } :
-    { text: "High body fat — where the strongest documented GLP-1 weight-loss results come from in the clinical literature.", color: "#1ae87a" }
+    bfNum < 8 ? { text: "Competition-level lean — at or below the essential-fat margin for most men. Very lean ranges are where much GH-axis and recovery research is focused.", color: "#22D68A" } :
+    bfNum < 15 ? { text: "Athletic range. Lean and within healthy limits. For context, GLP-1 research notes elevated lean-mass-loss risk the leaner you are.", color: "#22D68A" } :
+    bfNum < 22 ? { text: "Healthy range — typical for an active adult.", color: "#22D68A" } :
+    bfNum < 30 ? { text: "Above-average body fat — the range most published GLP-1 weight-loss trials were conducted in.", color: "#22D68A" } :
+    { text: "High body fat — where the strongest documented GLP-1 weight-loss results come from in the clinical literature.", color: "#22D68A" }
   ) : null;
 
   const steps = [
@@ -279,7 +279,7 @@ export default function Onboarding({ onComplete, onExitHome, prefill = null, ini
                 <span>⚗️</span>
                 <span>Advanced body stats</span>
                 {filledCount > 0 && (
-                  <span style={{ background: "rgba(26,232,122,0.15)", color: "#1ae87a", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
+                  <span style={{ background: "rgba(34,214,138,0.15)", color: "#22D68A", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
                     {filledCount}/8
                   </span>
                 )}

@@ -10,7 +10,7 @@ import { PRO_PRICING, PRO_FEATURES } from "../lib/subscription";
 // Shows both prices with annual marked best value, and drives checkout via the
 // passed onSubscribe(tier) handler (which redirects to Stripe Checkout).
 
-const ACCENT = "#1ae87a";
+const ACCENT = "#22D68A";
 
 function PlanButton({ plan, onPick, busy, pickedTier }) {
   const isPicked = pickedTier === plan.tier;
@@ -28,8 +28,8 @@ function PlanButton({ plan, onPick, busy, pickedTier }) {
         borderRadius: 14,
         cursor: busy ? "wait" : "pointer",
         fontFamily: "inherit",
-        background: best ? "rgba(26,232,122,0.10)" : "rgba(255,255,255,0.04)",
-        border: `1.5px solid ${best ? "rgba(26,232,122,0.45)" : "rgba(255,255,255,0.12)"}`,
+        background: best ? "rgba(34,214,138,0.10)" : "rgba(255,255,255,0.04)",
+        border: `1.5px solid ${best ? "rgba(34,214,138,0.45)" : "rgba(255,255,255,0.12)"}`,
         opacity: busy && !isPicked ? 0.5 : 1,
         transition: "opacity 0.2s ease",
       }}
@@ -38,7 +38,7 @@ function PlanButton({ plan, onPick, busy, pickedTier }) {
         <span style={{
           position: "absolute", top: -9, right: 14,
           fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase",
-          color: "#060608", background: ACCENT, borderRadius: 100, padding: "3px 9px",
+          color: "#000000", background: ACCENT, borderRadius: 100, padding: "3px 9px",
           fontFamily: "'JetBrains Mono', monospace",
         }}>Best value</span>
       )}
@@ -89,7 +89,7 @@ export default function UpgradePrompt({
     <div style={{
       maxWidth: 380, width: "100%", margin: "0 auto",
       background: variant === "modal" ? "#0e0e12" : "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(26,232,122,0.25)",
+      border: "1px solid rgba(34,214,138,0.25)",
       borderRadius: 18, padding: 24,
       boxShadow: variant === "modal" ? "0 20px 60px rgba(0,0,0,0.6)" : "none",
     }}>

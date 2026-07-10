@@ -18,7 +18,7 @@ import { DISCLAIMER } from "../lib/disclaimer";
 //   onClose  — called when the user finishes the last slide OR skips. The caller
 //              is responsible for setting the "seen" flag; this shell is dumb.
 
-const ACCENT = "#1ae87a";
+const ACCENT = "#22D68A";
 
 export default function TutorialOverlay({ slides = [], onClose }) {
   const [i, setI] = useState(0);
@@ -46,7 +46,7 @@ export default function TutorialOverlay({ slides = [], onClose }) {
       aria-label="Alki introduction"
       style={{
         position: "fixed", inset: 0, zIndex: 2000,
-        background: "#060608",
+        background: "#0a0a0a",
         // Scroll the whole panel on short viewports rather than clipping it.
         overflowY: "auto",
         display: "flex", flexDirection: "column",
@@ -57,7 +57,7 @@ export default function TutorialOverlay({ slides = [], onClose }) {
       }}
     >
       {/* Atmospheric orb to match the splash mood (purely decorative). */}
-      <div style={{ position: "absolute", top: "8%", left: "15%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,232,122,0.06) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: "8%", left: "15%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(34,214,138,0.06) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
 
       {/* ── Top bar: progress dots + always-visible Skip ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, position: "relative", zIndex: 1 }}>
@@ -118,7 +118,7 @@ export default function TutorialOverlay({ slides = [], onClose }) {
         )}
 
         {slide.signoff && (
-          <p style={{ fontSize: 14, color: "rgba(26,232,122,0.45)", marginTop: 18, fontStyle: "italic", letterSpacing: "0.06em" }}>
+          <p style={{ fontSize: 14, color: "rgba(34,214,138,0.45)", marginTop: 18, fontStyle: "italic", letterSpacing: "0.06em" }}>
             {slide.signoff}
           </p>
         )}
@@ -143,10 +143,10 @@ export default function TutorialOverlay({ slides = [], onClose }) {
           onClick={next}
           style={{
             flex: 1, padding: "17px 24px", borderRadius: 14,
-            background: ACCENT, color: "#060608", border: "none",
+            background: ACCENT, color: "#000000", border: "none",
             fontSize: 15, fontWeight: 700, cursor: "pointer", letterSpacing: "0.03em",
             fontFamily: "'Syne', 'DM Sans', sans-serif",
-            boxShadow: "0 0 20px rgba(26,232,122,0.15), 0 2px 8px rgba(0,0,0,0.3)",
+            boxShadow: "0 0 20px rgba(34,214,138,0.15), 0 2px 8px rgba(0,0,0,0.3)",
           }}
         >
           {isLast ? "Get started" : "Next"}

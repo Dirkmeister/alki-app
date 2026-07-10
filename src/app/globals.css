@@ -4,7 +4,7 @@
 
 :root {
   /* ── Core palette ── */
-  --bg-base: #060608;
+  --bg-base: #0a0a0a;
   --bg-elevated: rgba(255, 255, 255, 0.03);
   --bg-surface: rgba(255, 255, 255, 0.045);
   --bg-hover: rgba(255, 255, 255, 0.07);
@@ -14,10 +14,10 @@
   --text-tertiary: rgba(255, 255, 255, 0.3);
   --text-ghost: rgba(255, 255, 255, 0.15);
 
-  --accent: #1ae87a;
-  --accent-dim: rgba(26, 232, 122, 0.12);
-  --accent-border: rgba(26, 232, 122, 0.22);
-  --accent-glow: rgba(26, 232, 122, 0.06);
+  --accent: #22D68A;
+  --accent-dim: rgba(34, 214, 138, 0.12);
+  --accent-border: rgba(34, 214, 138, 0.22);
+  --accent-glow: rgba(34, 214, 138, 0.06);
 
   --amber: #f0a830;
   --amber-dim: rgba(240, 168, 48, 0.12);
@@ -80,7 +80,7 @@ body::after {
   height: 80%;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(ellipse at 30% 20%, rgba(26, 232, 122, 0.03) 0%, transparent 60%),
+  background: radial-gradient(ellipse at 30% 20%, rgba(34, 214, 138, 0.03) 0%, transparent 60%),
               radial-gradient(ellipse at 70% 60%, rgba(26, 100, 232, 0.015) 0%, transparent 50%);
 }
 
@@ -101,7 +101,7 @@ select {
 }
 
 ::selection {
-  background: rgba(26, 232, 122, 0.3);
+  background: rgba(34, 214, 138, 0.3);
   color: #fff;
 }
 

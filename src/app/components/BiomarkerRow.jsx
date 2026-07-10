@@ -9,7 +9,7 @@ export default function BiomarkerRow({ projection }) {
   const deltaColor = !hasDelta
     ? "rgba(255,255,255,0.35)"
     : positive
-    ? "#1ae87a"
+    ? "#22D68A"
     : "#ef4444";
   const deltaStr = `${delta > 0 ? "+" : ""}${delta}${unit}`;
 

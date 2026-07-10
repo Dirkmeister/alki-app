@@ -131,8 +131,10 @@ export function getCultivationVisuals(state) {
         statusLabel: "Awaiting First Log",
         statusColor: "rgba(255,255,255,0.4)",
         statusIcon: "○",
-        statusBg: "rgba(255,255,255,0.04)",
-        statusBorder: "rgba(255,255,255,0.1)"
+        // "new" is the one non-semantic cultivation state — no progress to signal —
+        // so it renders as a neutral card rather than a bordered, tinted one.
+        statusBg: "#1a1a1a",
+        statusBorder: "transparent"
       };
   }
 }

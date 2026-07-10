@@ -20,7 +20,7 @@ const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "dallaskrech20@gma
 
 const wrap = {
   minHeight: "100vh",
-  background: "#060608",
+  background: "#0a0a0a",
   color: "#ededed",
   fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
   display: "flex",

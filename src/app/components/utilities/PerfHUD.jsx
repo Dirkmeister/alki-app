@@ -166,7 +166,7 @@ export default function PerfHUD({ screen }) {
     }
   };
 
-  const fpsColor = live && live.fps >= 55 ? "#1ae87a" : live && live.fps >= 40 ? "#f59e0b" : "#ef4444";
+  const fpsColor = live && live.fps >= 55 ? "#22D68A" : live && live.fps >= 40 ? "#f59e0b" : "#ef4444";
   const btnStyle = (bg) => ({
     flex: 1, padding: "5px 0", borderRadius: 6, border: "none", cursor: "pointer",
     fontFamily: "inherit", fontSize: 11, fontWeight: 700, background: bg, color: "#08110d",
@@ -206,7 +206,7 @@ export default function PerfHUD({ screen }) {
       />
       <div style={{ display: "flex", gap: 6 }}>
         {!recording ? (
-          <button onClick={start} style={btnStyle("#1ae87a")}>● Start</button>
+          <button onClick={start} style={btnStyle("#22D68A")}>● Start</button>
         ) : (
           <button onClick={stop} style={btnStyle("#ef4444")}>■ Stop &amp; save</button>
         )}

@@ -8,7 +8,7 @@ import { useState } from "react";
 // and redirects to Stripe; on success the browser leaves and this unmounts.
 // Free users at the cap get the regular UpgradePrompt instead (handled upstream).
 
-const ACCENT = "#1ae87a";
+const ACCENT = "#22D68A";
 
 export default function SlotPurchasePrompt({ onBuy, onClose }) {
   const [busy, setBusy] = useState(false);
@@ -38,7 +38,7 @@ export default function SlotPurchasePrompt({ onBuy, onClose }) {
     >
       <div style={{
         maxWidth: 360, width: "100%", margin: "0 auto",
-        background: "#0e0e12", border: "1px solid rgba(26,232,122,0.25)",
+        background: "#0e0e12", border: "1px solid rgba(34,214,138,0.25)",
         borderRadius: 18, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
       }}>
         <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: ACCENT, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8 }}>
@@ -63,7 +63,7 @@ export default function SlotPurchasePrompt({ onBuy, onClose }) {
           style={{
             width: "100%", padding: "15px 18px", borderRadius: 14,
             cursor: busy ? "wait" : "pointer", fontFamily: "inherit",
-            background: "rgba(26,232,122,0.10)", border: "1.5px solid rgba(26,232,122,0.45)",
+            background: "rgba(34,214,138,0.10)", border: "1.5px solid rgba(34,214,138,0.45)",
             color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between",
           }}
         >

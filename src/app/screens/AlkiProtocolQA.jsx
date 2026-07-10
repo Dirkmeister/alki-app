@@ -1346,7 +1346,7 @@ const S = {
   },
   searchInput: {
     width: "100%",
-    backgroundColor: "#111",
+    backgroundColor: "#1a1a1a",
     border: "1px solid #222",
     borderRadius: 10,
     color: "#e8e8e8",
@@ -1603,7 +1603,7 @@ const S = {
     fontSize: 10,
     color: "#2a2a2a",
     lineHeight: 1.6,
-    borderTop: "1px solid #111",
+    borderTop: "1px solid #1a1a1a",
     textAlign: "center",
     flexShrink: 0,
   },

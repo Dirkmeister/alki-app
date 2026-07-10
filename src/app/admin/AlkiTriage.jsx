@@ -152,7 +152,7 @@ export default function Triage() {
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 12 }}>
             <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: `linear-gradient(90deg, ${ACCENT}, #1ae87a)` }} />
+              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: `linear-gradient(90deg, ${ACCENT}, #22D68A)` }} />
             </div>
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>{pct}%</span>
           </div>

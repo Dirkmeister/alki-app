@@ -13,14 +13,14 @@ export default function AgeGate({ onConfirm, onDeny }) {
           width: 72,
           height: 72,
           borderRadius: 20,
-          background: "rgba(26,232,122,0.06)",
-          border: "1px solid rgba(26,232,122,0.15)",
+          background: "rgba(34,214,138,0.06)",
+          border: "1px solid rgba(34,214,138,0.15)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           margin: "0 auto 24px",
           fontSize: 30,
-          boxShadow: "0 0 30px rgba(26,232,122,0.06)"
+          boxShadow: "0 0 30px rgba(34,214,138,0.06)"
         }}>
           🔒
         </div>
@@ -34,7 +34,7 @@ export default function AgeGate({ onConfirm, onDeny }) {
         <button
           style={S.btn}
           onClick={onConfirm}
-          onMouseEnter={e => { e.target.style.transform = "translateY(-1px)"; e.target.style.boxShadow = "0 0 30px rgba(26,232,122,0.25), 0 4px 12px rgba(0,0,0,0.4)"; }}
+          onMouseEnter={e => { e.target.style.transform = "translateY(-1px)"; e.target.style.boxShadow = "0 0 30px rgba(34,214,138,0.25), 0 4px 12px rgba(0,0,0,0.4)"; }}
           onMouseLeave={e => { e.target.style.transform = "translateY(0)"; e.target.style.boxShadow = S.btn.boxShadow; }}
         >
           I am 18 or older

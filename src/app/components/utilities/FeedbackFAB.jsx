@@ -13,7 +13,10 @@ const CATEGORIES = [
   { id: "idea",       label: "Idea",        icon: "💡", desc: "Feature or improvement" },
 ];
 
-export default function FeedbackFAB({ currentScreen, userEmail }) {
+// `bottomOffset` lifts the FAB clear of anything else pinned to the bottom
+// edge (currently the tab bar, which the FAB would otherwise cover — it
+// outranks the nav at z-index 900).
+export default function FeedbackFAB({ currentScreen, userEmail, bottomOffset = 0 }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState("bug");
   const [description, setDescription] = useState("");
@@ -71,7 +74,7 @@ export default function FeedbackFAB({ currentScreen, userEmail }) {
     setToast(saved ? "Report saved ✓" : "Failed to save — try again");
   };
 
-  const accent = "#1ae87a";
+  const accent = "#22D68A";
 
   return (
     <>
@@ -81,7 +84,7 @@ export default function FeedbackFAB({ currentScreen, userEmail }) {
           onClick={() => setOpen(true)}
           style={{
             position: "fixed",
-            bottom: 24,
+            bottom: 24 + bottomOffset,
             right: 24,
             width: 48,
             height: 48,
@@ -129,7 +132,7 @@ export default function FeedbackFAB({ currentScreen, userEmail }) {
               position: "relative",
               width: "100%",
               maxWidth: 400,
-              background: "#141414",
+              background: "#1a1a1a",
               border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: 16,
               padding: "22px 20px 18px",
@@ -180,7 +183,7 @@ export default function FeedbackFAB({ currentScreen, userEmail }) {
                       flex: 1,
                       padding: "10px 8px",
                       borderRadius: 10,
-                      background: active ? "rgba(26,232,122,0.1)" : "rgba(255,255,255,0.04)",
+                      background: active ? "rgba(34,214,138,0.1)" : "rgba(255,255,255,0.04)",
                       border: `1.5px solid ${active ? accent : "rgba(255,255,255,0.08)"}`,
                       color: active ? "#fff" : "rgba(255,255,255,0.5)",
                       cursor: "pointer",
@@ -218,7 +221,7 @@ export default function FeedbackFAB({ currentScreen, userEmail }) {
                 marginBottom: 14,
                 lineHeight: 1.5,
               }}
-              onFocus={e => { e.target.style.borderColor = "rgba(26,232,122,0.3)"; }}
+              onFocus={e => { e.target.style.borderColor = "rgba(34,214,138,0.3)"; }}
               onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
             />
 
@@ -229,8 +232,8 @@ export default function FeedbackFAB({ currentScreen, userEmail }) {
               style={{
                 width: "100%",
                 padding: "14px 20px",
-                background: !description.trim() || submitting ? "rgba(26,232,122,0.15)" : accent,
-                color: !description.trim() || submitting ? "rgba(255,255,255,0.3)" : "#060608",
+                background: !description.trim() || submitting ? "rgba(34,214,138,0.15)" : accent,
+                color: !description.trim() || submitting ? "rgba(255,255,255,0.3)" : "#000000",
                 border: "none",
                 borderRadius: 12,
                 fontSize: 14,
@@ -256,8 +259,8 @@ export default function FeedbackFAB({ currentScreen, userEmail }) {
           transform: "translateX(-50%)",
           padding: "10px 20px",
           borderRadius: 10,
-          background: "rgba(26,232,122,0.15)",
-          border: "1px solid rgba(26,232,122,0.25)",
+          background: "rgba(34,214,138,0.15)",
+          border: "1px solid rgba(34,214,138,0.25)",
           color: accent,
           fontSize: 13,
           fontWeight: 600,

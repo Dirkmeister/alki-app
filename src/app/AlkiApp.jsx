@@ -38,6 +38,7 @@ import SplashScreen from "./components/SplashScreen";
 import AgeGate from "./components/AgeGate";
 import Onboarding from "./components/Onboarding";
 import BodyAvatar from "./components/BodyAvatar";
+import BottomNav, { NAV_HEIGHT } from "./components/BottomNav";
 import { ACCENT } from "./theme";
 
 // ─────────────────────────────────────────────────────────────
@@ -87,6 +88,35 @@ const ALKI_DEV = process.env.NODE_ENV !== "production";
 // nav band (≈60px top padding) and no longer renders its own back button —
 // the root chrome is the one consistent nav surface (Sprint 4, item 4.1).
 const INNER_SCREENS = ["modeler", "progress", "qa", "timeline", "protocol_guide", "photos", "settings"];
+
+// ── Bottom tab bar ─────────────────────────────────────────────────
+// The nav shows on the dashboard plus every routed inner screen — i.e. once
+// the user is actually inside the app. It stays dark on splash / age gate /
+// auth / onboarding, which are a linear entry funnel with no destinations to
+// switch between.
+const NAV_SCREENS = ["dashboard", ...INNER_SCREENS];
+
+// Which tab lights up on which screen. Screens absent from this map (modeler,
+// timeline, protocol_guide) are reachable from the dashboard but own no tab —
+// the nav still renders there, with nothing highlighted, rather than lying
+// about where you are. `photos` highlights Progress because that's the only
+// place it's reached from.
+const SCREEN_TO_TAB = {
+  dashboard: "protocol",
+  qa: "research",
+  progress: "progress",
+  photos: "progress",
+  settings: "profile",
+};
+
+// Tab → destination. Progress is Pro-gated at its dashboard call site
+// (gatePro("progress_log")), so the tab must honour the same gate rather than
+// route straight through and hand a free user the paid screen.
+const TAB_TO_SCREEN = {
+  research: "qa",
+  progress: "progress",
+  profile: "settings",
+};
 
 // Baseline test profile — average male, useful neutral starting point
 // for evaluating stacks and testing the new-user flow without creating
@@ -493,8 +523,11 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
     <div style={{
       ...S.card,
       opacity: blocked ? 0.45 : 1,
-      borderColor: isSelected ? S.accent : "rgba(255,255,255,0.08)",
-      background: isSelected ? "rgba(26,232,122,0.06)" : "rgba(255,255,255,0.04)"
+      // Unselected is a neutral card (no visible border); selection is carried
+      // entirely by the accent border + tint, which reads far more clearly than
+      // the old faint-white-border-to-green-border transition.
+      borderColor: isSelected ? S.accent : "transparent",
+      background: isSelected ? "rgba(34,214,138,0.06)" : "#1a1a1a"
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
         <div>
@@ -511,7 +544,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
             width: 36, height: 36, borderRadius: 10, border: `2px solid ${isSelected ? S.accent : "rgba(255,255,255,0.15)"}`,
             background: isSelected ? S.accent : "transparent",
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, color: isSelected ? "#060608" : "rgba(255,255,255,0.3)", flexShrink: 0
+            fontSize: 18, color: isSelected ? "#000000" : "rgba(255,255,255,0.3)", flexShrink: 0
           }}>
             {isSelected ? "✓" : "+"}
           </button>
@@ -592,7 +625,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <div>
-              <div style={{ ...S.label, marginBottom: 6, color: "#1ae87a" }}>Documented Advantages</div>
+              <div style={{ ...S.label, marginBottom: 6, color: "#22D68A" }}>Documented Advantages</div>
               {c.pros.map((p, i) => (
                 <div key={i} style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "3px 0", lineHeight: 1.5 }}>+ {p}</div>
               ))}
@@ -605,7 +638,7 @@ function CompoundCard({ rec, isSelected, onToggle, compact = false }) {
             </div>
           </div>
           {rec.stackNotes.length > 0 && (
-            <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(26,232,122,0.06)", border: "1px solid rgba(26,232,122,0.15)", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+            <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(34,214,138,0.06)", border: "1px solid rgba(34,214,138,0.15)", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
               🔗 {rec.stackNotes[0]}
             </div>
           )}
@@ -632,8 +665,22 @@ function EidolonHero({
   onCaptureAvatar, onResetAvatar, showAvatarDebug,
   avatarResetSignal = 0,
   pulse = false, glowLevel = 0, projection = null, units = "imperial",
-  isPro = false, onUpgrade,
+  isPro = false, onUpgrade, locked = false,
 }) {
+  // The 🔒 on the name line means THE PROTOCOL IS COMMITTED — not "renaming is
+  // Pro" (its previous meaning). A locked eidolon can't be renamed by anyone;
+  // unlock by modifying the protocol. While unlocked the line shows ✎: Pro taps
+  // it to rename, free taps it into the upgrade prompt.
+  const nameGlyph = locked ? "🔒" : "✎";
+  const nameTitle = locked
+    ? "Protocol locked — modify it to rename"
+    : isPro ? "Tap to rename" : "Renaming is an Alki Pro feature";
+  const onNameClick = () => {
+    if (locked) return;
+    if (isPro) onStartEditName();
+    else onUpgrade?.("eidolon_customization");
+  };
+
   return (
     <>
       {/* Completion flourish is scale-only — opacity is driven by glowLevel so the
@@ -641,7 +688,7 @@ function EidolonHero({
       <style>{`@keyframes alkiDosePulse { 0% { transform: translateX(-50%) scale(1); } 35% { transform: translateX(-50%) scale(1.22); } 100% { transform: translateX(-50%) scale(1); } }`}</style>
 
       {/* Name — large, centered, inline-editable */}
-      <div style={{ textAlign: "center", marginTop: 6, marginBottom: 0 }}>
+      <div style={{ textAlign: "center", marginTop: 10, marginBottom: 0 }}>
         {editingName ? (
           <input
             autoFocus
@@ -655,42 +702,48 @@ function EidolonHero({
             }}
             maxLength={30}
             style={{
-              fontSize: 26, fontWeight: 800, background: "transparent", border: "none",
-              borderBottom: `1.5px solid ${S.accent}`, color: "#fff", textAlign: "center",
-              outline: "none", fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em",
+              fontSize: 24, fontWeight: 700, background: "transparent", border: "none",
+              borderBottom: `1.5px solid ${ACCENT}`, color: "#fff", textAlign: "center",
+              outline: "none", fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em",
               padding: "4px 14px", minWidth: 220, maxWidth: "90%"
             }}
           />
         ) : (
           <h1
-            // Sprint 7 — renaming the Eidolon is a Pro customization. Free users
-            // tapping the name get the upgrade prompt instead of an edit field.
-            onClick={() => { if (isPro) onStartEditName(); else onUpgrade?.("eidolon_customization"); }}
-            title={isPro ? "Tap to rename" : "Renaming is an Alki Pro feature"}
+            onClick={onNameClick}
+            title={nameTitle}
             style={{
-              fontSize: 26, fontWeight: 800, color: "#fff", margin: 0,
-              fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em", cursor: "pointer",
-              display: "inline-flex", alignItems: "center", gap: 8, padding: "2px 8px"
+              fontSize: 24, fontWeight: 700, color: "#fff", margin: 0,
+              fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em",
+              cursor: locked ? "default" : "pointer",
+              display: "inline-flex", alignItems: "center", gap: 9, padding: "2px 8px"
             }}
           >
             {eidolonName}
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 400 }}>{isPro ? "✎" : "🔒"}</span>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)", fontWeight: 400, lineHeight: 1 }}>
+              {nameGlyph}
+            </span>
           </h1>
         )}
-        <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
-          εἰδωλον
+        <div style={{ fontSize: 10, letterSpacing: "0.28em", textIndent: "0.28em", textTransform: "uppercase", color: "#666666", marginTop: 6, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>
+          ΕΙΔΩΛΟΝ
         </div>
       </div>
 
       {/* Hero avatar with radial glow that intensifies as today's protocol is
           checked off (#16): faint at none → full green when all doses are logged. */}
-      <div style={{ position: "relative", display: "flex", justifyContent: "center", padding: "10px 0 4px", width: "100%" }}>
+      <div style={{ position: "relative", display: "flex", justifyContent: "center", padding: "18px 0 6px", width: "100%" }}>
         <div style={{
           position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)",
           width: 300, height: 300, borderRadius: "50%",
-          background: "radial-gradient(circle at center, rgba(26,232,122,0.22) 0%, rgba(26,232,122,0.08) 40%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(34,214,138,0.15) 0%, transparent 70%)",
           pointerEvents: "none", filter: "blur(6px)",
-          opacity: 0.22 + Math.max(0, Math.min(1, glowLevel)) * 0.78,
+          // glowLevel (today's dose completion) drives the glow from resting to full —
+          // the mechanic, not decoration. The floor is 0.55, not the old 0.22: against
+          // this gradient's 0.15 peak alpha, 0.22 multiplies out to ~3% and the "subtle
+          // glow" simply isn't there at rest. 0.55 reads while leaving real headroom
+          // for the checklist to brighten it.
+          opacity: 0.55 + Math.max(0, Math.min(1, glowLevel)) * 0.45,
           transition: "opacity 0.45s ease",
           animation: pulse ? "alkiDosePulse 1.4s ease" : undefined
         }} />
@@ -714,7 +767,7 @@ function EidolonHero({
         {!isPro ? (
           // HIDDEN FOR NOW (kept as an asset): the free-tier "Customize · Pro"
           // upsell chip. Re-enable by swapping the `null` below for the button.
-          // <button onClick={() => onUpgrade?.("eidolon_customization")} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
+          // <button onClick={() => onUpgrade?.("eidolon_customization")} style={{ background: "rgba(34,214,138,0.08)", border: "1px solid rgba(34,214,138,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
           //   ✦ Customize · Pro
           // </button>
           null
@@ -723,23 +776,23 @@ function EidolonHero({
             ↺ Reset Avatar
           </button>
         ) : (
-          <button onClick={onCaptureAvatar} style={{ background: "rgba(26,232,122,0.08)", border: "1px solid rgba(26,232,122,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={onCaptureAvatar} style={{ background: "rgba(34,214,138,0.08)", border: "1px solid rgba(34,214,138,0.22)", color: S.accent, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 16px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit" }}>
             {AVATURN_ENABLED ? "✦ Make it me" : "Make it me · setup"}
           </button>
         )}
       </div>
 
-      {/* Stat pills */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 14 }}>
+      {/* Stat pills — every value read from `profile`, never hardcoded. Weight and
+          height run through the unit formatters so metric users see kg / cm. */}
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", justifyContent: "center", marginBottom: 26 }}>
         {[
           { label: "BF",  value: `${profile.bodyFat}%` },
           { label: "WT",  value: formatWeight(profile.weight, units) },
           { label: "HT",  value: formatHeight(profile.heightFt, profile.heightIn, units) },
           { label: "AGE", value: `${profile.age}` },
-          { label: "SEX", value: profile.sex === "male" ? "♂" : "♀" }
         ].map(p => (
-          <div key={p.label} style={{ padding: "5px 11px", borderRadius: 100, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", fontFamily: "'JetBrains Mono', monospace" }}>{p.label}</span>
+          <div key={p.label} style={{ padding: "6px 13px", borderRadius: 100, background: "#1a1a1a", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: "#666666", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", fontFamily: "'JetBrains Mono', monospace" }}>{p.label}</span>
             <span style={{ color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value}</span>
           </div>
         ))}
@@ -802,7 +855,7 @@ function applyEidolonState(eid, { setActiveEidolonId, setProfile, setActiveProto
   return locked;
 }
 
-function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog, isPro = false, onSubscribe, onBuySlot }) {
+function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompounds, showTransform, setShowTransform, onReset, onLockIn, activeProtocol, setActiveProtocol, onQA, onTimeline, onModeler, onProgress, onProtocolGuide, onPhotos, cultivationState, progressLogs, avatarUrl, avatarHeadshot, onCaptureAvatar, onResetAvatar, onSignOut, onSettings, units = "imperial", userEmail, eidolons, setEidolons, activeEidolonId, setActiveEidolonId, doseLog, setDoseLog, isPro = false, onSubscribe, onBuySlot, onBuilderActiveChange }) {
   const [animateIn, setAnimateIn] = useState(false);
   // Sprint 7 — the ONE paywall surface for this screen. Set to a PRO_FEATURES
   // key to open the upgrade modal; gates call gatePro(feature, action) so a free
@@ -871,6 +924,14 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   const builderView = (selectedCompounds.length > 0 || isModifying)
     ? (builderPath || "build")
     : builderPath;
+
+  // The builder's fixed CTA bar (Start Protocol / View Projection) claims the
+  // bottom edge. Mirror EXACTLY the condition that renders it, and report it up
+  // so the app root stands the bottom nav down rather than stacking two fixed
+  // bars. Note this is narrower than `editing`: a fresh eidolon sitting on the
+  // two-path fork is editing but has no CTA bar yet, so it keeps its nav.
+  const ctaBarVisible = editing && !needsNaming && builderView !== null && selectedCompounds.length > 0;
+  useEffect(() => { onBuilderActiveChange?.(ctaBarVisible); }, [ctaBarVisible, onBuilderActiveChange]);
 
   // ── Eidolon helpers ──
   // Ref keeps the latest eidolons accessible inside callbacks without
@@ -1416,6 +1477,30 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
   }, [profile, activeProtocol, editing, progressLogs]);
 
   if (showTransform) {
+    // Lock-in CTA. Defined once and rendered inside BOTH tabs (it used to sit
+    // outside the tab switch, so it showed on either one). The spec places it
+    // directly under the outcome grid; the Timeline tab gets the same button at
+    // the foot of its own content so committing never requires switching tabs.
+    // Hidden when merely viewing a locked protocol — the `editing` guard is the
+    // existing conditional, unchanged.
+    const lockInCta = editing ? (
+      <button
+        onClick={() => handleLockIn(selectedCompounds)}
+        style={{
+          width: "100%", padding: "17px 24px", marginTop: 4, marginBottom: 28,
+          background: ACCENT, color: "#000000", border: "none", borderRadius: 14,
+          fontSize: 15, fontWeight: 700, letterSpacing: "0.02em",
+          fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          boxShadow: "0 0 24px rgba(34,214,138,0.18)",
+        }}
+      >
+        {isModifying
+          ? `Confirm Changes (${selectedCompounds.length}) →`
+          : `Start Protocol (${selectedCompounds.length}) →`}
+      </button>
+    ) : null;
+
     return (
       <div style={S.inner}>
         {paywall && (
@@ -1444,18 +1529,23 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1 }}>⌂</span>
         </button>
 
-        <div style={{ textAlign: "center", padding: "20px 0 10px" }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 6 }}>εἰδωλον</div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}>Projected Research Outcome</h2>
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, marginTop: 6 }}>
-            {projectedChanges.timeline}-week protocol · Based on published research literature
-          </p>
+        {/* Top padding clears the fixed ALKI⌂ home pill (top:12, ~32px tall). The
+            old header had a Greek eyebrow above the heading that happened to do
+            this; without it the heading collides with the pill. */}
+        <div style={{ textAlign: "center", padding: "56px 0 18px" }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700, margin: 0, fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em", color: "#fff" }}>
+            Projected Outcome
+          </h2>
+          {/* Cycle length is read from the engine, not hardcoded to "12". */}
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", textIndent: "0.18em", textTransform: "uppercase", color: "#666666", marginTop: 10, fontFamily: "'DM Sans', sans-serif" }}>
+            {projectedChanges.timeline}-Week Protocol
+          </div>
         </div>
 
         {/* D3 — Projection / Timeline tabs. The projection (before/after) is the
             selling point and is the default; the cycle timeline lives behind a tab
             on the SAME surface instead of being buried as a separate screen. */}
-        <div style={{ display: "flex", gap: 4, padding: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 100, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "#1a1a1a", borderRadius: 100, marginBottom: 24 }}>
           {[["projection", "Projection"], ["timeline", "Timeline"]].map(([id, lbl]) => {
             const active = transformTab === id;
             return (
@@ -1467,10 +1557,10 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                   setTransformTab(id); try { window.scrollTo(0, 0); } catch (_) {}
                 }}
                 style={{
-                  flex: 1, padding: "9px 12px", borderRadius: 100, border: "none", cursor: "pointer",
-                  fontFamily: "inherit", fontSize: 13, fontWeight: 700, letterSpacing: "0.02em",
-                  background: active ? S.accent : "transparent",
-                  color: active ? "#060608" : "rgba(255,255,255,0.6)",
+                  flex: 1, padding: "10px 12px", borderRadius: 100, border: "none", cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.02em",
+                  background: active ? ACCENT : "transparent",
+                  color: active ? "#000000" : "#ffffff",
                   transition: "background 0.15s ease, color 0.15s ease",
                 }}
               >
@@ -1495,41 +1585,76 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                 return a === b;
               })()}
             />
+            {lockInCta}
           </div>
         ) : (
         <>
-        {/* Before / After — both rendered in 3D. This whole projection surface is
-            Pro-gated (the "View Projection" buttons block free users), so we don't
-            re-check isPro here; the SVG is only a fallback when a GLB url is absent. */}
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "flex-end", padding: "10px 0 20px" }}>
-          <div style={{ flex: 1, maxWidth: 180 }}>
-            {avatarUrl ? (
-              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="Current Eidolon" size="large" interactive={true} />
-            ) : (
-              <BodyAvatar params={avatarParams.current} label="Current Eidolon" />
-            )}
-          </div>
-          <div style={{ fontSize: 24, color: "rgba(255,255,255,0.15)", paddingBottom: 40 }}>→</div>
-          <div style={{ flex: 1, maxWidth: 180 }}>
-            {avatarUrl ? (
-              <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.projected} label="Projected Eidolon" size="large" interactive={true} glow={true} />
-            ) : (
-              <BodyAvatar params={avatarParams.projected} label="Projected Eidolon" glow={true} />
-            )}
-          </div>
-        </div>
+        {/* Current → Projected comparison. Numbers lead, avatar below each column.
+            Both avatars render in 3D; the SVG is only a fallback when a GLB url is
+            absent. This whole surface is Pro-gated by the "View Projection" buttons,
+            so there's no isPro re-check here.
+
+            The avatars carry no label of their own — the column heading names the
+            side, and a second caption under the body just repeated it. */}
+        {(() => {
+          const colLabel = {
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textIndent: "0.14em",
+            textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif", marginBottom: 12,
+          };
+          const statRow = (k, v, accentValue) => (
+            <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 7, marginBottom: 4 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "#666666", fontFamily: "'JetBrains Mono', monospace" }}>{k}</span>
+              <span style={{ fontSize: 17, fontWeight: 700, color: accentValue ? ACCENT : "#fff", fontVariantNumeric: "tabular-nums", fontFamily: "'JetBrains Mono', monospace" }}>{v}</span>
+            </div>
+          );
+          return (
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", alignItems: "flex-start", padding: "4px 0 24px" }}>
+              <div style={{ flex: 1, maxWidth: 170, textAlign: "center" }}>
+                <div style={{ ...colLabel, color: "#666666" }}>Current</div>
+                {statRow("BF", `${profile.bodyFat}%`, false)}
+                {statRow("WT", formatWeight(profile.weight, units), false)}
+                <div style={{ marginTop: 14 }}>
+                  {avatarUrl ? (
+                    <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.current} label="" size="large" interactive={true} />
+                  ) : (
+                    <BodyAvatar params={avatarParams.current} label="" />
+                  )}
+                </div>
+              </div>
+
+              <div style={{ fontSize: 22, color: "rgba(255,255,255,0.2)", alignSelf: "center", paddingTop: 30 }}>→</div>
+
+              <div style={{ flex: 1, maxWidth: 170, textAlign: "center" }}>
+                <div style={{ ...colLabel, color: ACCENT }}>Projected</div>
+                {statRow("BF", `${projectedChanges.projectedBodyFat}%`, true)}
+                {statRow("WT", formatWeight(projectedChanges.projectedWeight, units), true)}
+                <div style={{ marginTop: 14 }}>
+                  {avatarUrl ? (
+                    <Body3DAvatar avatarUrl={avatarUrl} params={avatarParams.projected} label="" size="large" interactive={true} glow={true} />
+                  ) : (
+                    <BodyAvatar params={avatarParams.projected} label="" glow={true} />
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Stats — core projections. D5 — the tiles are data-driven and ordered so
             the stack's actually-targeted outcomes (a non-zero projected change) lead,
             with untouched categories ("No change") falling to the end, so the
             projection reads as "here's what this stack moves" first. */}
         {(() => {
+          // Deltas only — the absolute current→projected figures for body fat and
+          // weight are the comparison columns above.
           const tiles = [
-            { id: "bf", label: "Body Fat", current: `${profile.bodyFat}%`, projected: `${projectedChanges.projectedBodyFat}%`, delta: projectedChanges.bfChange, unit: "%", goodDirection: "down" },
-            { id: "wt", label: "Weight", current: formatWeight(profile.weight, units), projected: formatWeight(projectedChanges.projectedWeight, units), delta: units === "metric" ? Math.round(lbToKg(projectedChanges.weightChange) * 10) / 10 : projectedChanges.weightChange, unit: units === "metric" ? " kg" : " lbs", goodDirection: "down", note: "Est. at projected body fat (lean mass held)" },
+            { id: "bf", label: "Body Fat", delta: projectedChanges.bfChange, unit: "%", goodDirection: "down" },
+            { id: "wt", label: "Weight", delta: units === "metric" ? Math.round(lbToKg(projectedChanges.weightChange) * 10) / 10 : projectedChanges.weightChange, unit: units === "metric" ? " kg" : " lbs", goodDirection: "down", note: "Est. at projected body fat (lean mass held)" },
             { id: "lean", label: "Lean Mass", delta: projectedChanges.muscleChange, unit: " pts", isScore: true, goodDirection: "up", note: projectedChanges.muscleChange === 0 ? "No change" : "Relative effect score, not a percentage" },
-            { id: "skin", label: "Skin Quality", delta: projectedChanges.skinChange, unit: "pts", isScore: true, goodDirection: "up", note: projectedChanges.skinChange === 0 ? "No change" : "Relative improvement score (0–20 scale)" },
-            { id: "rec", label: "Recovery", delta: projectedChanges.recoveryChange, unit: "pts", isScore: true, goodDirection: "up", note: projectedChanges.recoveryChange === 0 ? "No change" : "Relative improvement score (0–20 scale)" },
+            // Unit strings carry their own leading space so the headline reads
+            // "+1.5 pts", not "+1.5pts". Skin and Recovery were missing it.
+            { id: "skin", label: "Skin Quality", delta: projectedChanges.skinChange, unit: " pts", isScore: true, goodDirection: "up", note: projectedChanges.skinChange === 0 ? "No change" : "Relative improvement score (0–20 scale)" },
+            { id: "rec", label: "Recovery", delta: projectedChanges.recoveryChange, unit: " pts", isScore: true, goodDirection: "up", note: projectedChanges.recoveryChange === 0 ? "No change" : "Relative improvement score (0–20 scale)" },
           ];
           const isTargeted = (t) => typeof t.delta === "number" && t.delta !== 0;
           const ordered = tiles
@@ -1538,21 +1663,27 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             .map(x => x.t);
           const targetedCount = tiles.filter(isTargeted).length;
           return (
-            <div style={S.card}>
-              <div style={{ ...S.label, marginBottom: 12 }}>Projected Outcomes · {projectedChanges.timeline}-week protocol</div>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textIndent: "0.14em", textTransform: "uppercase", color: "#666666", fontFamily: "'DM Sans', sans-serif", marginBottom: 14 }}>
+                Key Outcomes
+              </div>
+              {/* Five tiles, not four: Recovery stays. D5 ordering also stays — the
+                  outcomes this stack actually moves lead, untouched ones fall last. */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {ordered.map(({ id, ...props }) => (
                   <StatTile key={id} {...props} />
                 ))}
               </div>
               {targetedCount > 0 && targetedCount < tiles.length && (
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 10, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 12, lineHeight: 1.5 }}>
                   Outcomes this stack targets are shown first; categories it doesn't act on follow.
                 </div>
               )}
             </div>
           );
         })()}
+
+        {lockInCta}
 
         {/* Advanced biomarker projections — only when user provided baselines */}
         {projectedChanges.advProjections.length > 0 && (
@@ -1597,25 +1728,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         </>
         )}
 
-        {/* D3 — the Protocol Timeline is now the "Timeline" tab above, not a
-            separate in-page CTA. The lock-in action stays below, shared by both tabs. */}
-
-        {/* Lock In / Confirm Changes — only when actively building or modifying. Hidden when just viewing a locked protocol. */}
-        {editing && (
-          <button
-            onClick={() => handleLockIn(selectedCompounds)}
-            style={{
-              ...S.btn,
-              marginBottom: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8
-            }}
-          >
-            {isModifying ? 'Confirm Changes →' : 'Start Protocol →'}
-          </button>
-        )}
+        {/* D3 — the Protocol Timeline is the "Timeline" tab above, not a separate
+            in-page CTA. The lock-in button (`lockInCta`) now renders inside each
+            tab, directly under that tab's content, rather than once down here. */}
 
         {/* A1 — the canonical DISCLAIMER renders once on this surface, inside the
             StackIntelligence analysis above (<Disclaimer/>). This footer keeps ONLY
@@ -1623,7 +1738,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         <p style={S.disclaimer}>
           Projected research outcome based on published literature. Individual results are not guaranteed.
         </p>
-        <p style={{ fontSize: 12, color: "rgba(26,232,122,0.35)", textAlign: "center", paddingBottom: 20, fontStyle: "italic", letterSpacing: "0.06em" }}>
+        <p style={{ fontSize: 12, color: "rgba(34,214,138,0.35)", textAlign: "center", paddingBottom: 20, fontStyle: "italic", letterSpacing: "0.06em" }}>
           Happy Researching.
         </p>
       </div>
@@ -1637,16 +1752,16 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         <UpgradePrompt featureKey={paywall} onSubscribe={onSubscribe} onClose={() => setPaywall(null)} />
       )}
       {/* Header */}
-      <div style={{ padding: "16px 0 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "18px 0 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           {/* #3F — ALKI wordmark doubles as a home shortcut: collapses the
               projection / exits the builder back to the committed home view. */}
           <span
             onClick={() => { setShowTransform(false); if (activeProtocol) setEditing(false); }}
             title="Home"
-            style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", fontFamily: "'Syne', sans-serif", cursor: "pointer" }}
+            style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", fontFamily: "'DM Sans', sans-serif", cursor: "pointer", color: "#fff" }}
           >
-            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent }}>KI</span>
+            ALKI
           </span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -1659,48 +1774,41 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
               Discard Changes
             </button>
           )}
-          {/* #62 — committed-home eidolon management lives here now (was the bottom action grid) */}
-          {!editing && activeProtocol && (
-            // B2 — inline-flex + center so the Manage button aligns with its
-            // sibling header controls. As a plain block-div wrapper its button sat
-            // on the div's text baseline (descender space below), nudging it out of
-            // line with Analytics/Q&A, which are flex-centered direct children.
-            <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-              <button onClick={() => setShowManageMenu(v => !v)} style={{ background: "none", border: "none", color: showManageMenu ? '#fff' : S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                Manage ▾
-              </button>
-              {showManageMenu && (
-                <>
-                  <div onClick={() => setShowManageMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-                  <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 91, background: "#141414", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: 6, minWidth: 168, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-                    {[
-                      ["Modify protocol", startModify],
-                      ["Switch eidolon", () => setShowEidolonSwitcher(true)],
-                      ["+ New eidolon", createNewEidolon],
-                    ].map(([mLabel, fn]) => (
-                      <button
-                        key={mLabel}
-                        onClick={() => { fn(); setShowManageMenu(false); }}
-                        style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", padding: "9px 12px", borderRadius: 6, whiteSpace: "nowrap" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "none")}
-                      >
-                        {mLabel}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          <button onClick={onModeler} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Analytics
-          </button>
-          <button onClick={onQA} style={{ background: "none", border: "none", color: S.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Q&amp;A
-          </button>
+          {/* #62 — eidolon management lives here. The standalone Analytics and Q&A
+              header buttons are gone: Q&A is now the bottom nav's Research tab, and
+              Analytics folds into this menu (it has no other entry point — dropping
+              it outright would strand the Modeler screen). "Modify protocol" only
+              appears when there's a committed protocol to modify. */}
+          <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+            <button onClick={() => setShowManageMenu(v => !v)} style={{ background: "none", border: "none", color: showManageMenu ? '#fff' : "#666666", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              Manage ▾
+            </button>
+            {showManageMenu && (
+              <>
+                <div onClick={() => setShowManageMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 91, background: "#1a1a1a", border: "1px solid #333", borderRadius: 10, padding: 6, minWidth: 168, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                  {[
+                    ...(!editing && activeProtocol ? [["Modify protocol", startModify]] : []),
+                    ["Switch eidolon", () => setShowEidolonSwitcher(true)],
+                    ["+ New eidolon", createNewEidolon],
+                    ["Analytics", onModeler],
+                  ].map(([mLabel, fn]) => (
+                    <button
+                      key={mLabel}
+                      onClick={() => { fn(); setShowManageMenu(false); }}
+                      style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", padding: "9px 12px", borderRadius: 6, whiteSpace: "nowrap" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                    >
+                      {mLabel}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           {onSettings && (
-            <button onClick={onSettings} title="Profile & Settings" aria-label="Profile and Settings" style={{ background: "none", border: "none", color: S.accent, fontSize: 17, cursor: "pointer", fontFamily: "inherit", lineHeight: 1, padding: 0 }}>
+            <button onClick={onSettings} title="Profile & Settings" aria-label="Profile and Settings" style={{ background: "none", border: "none", color: "#666666", fontSize: 17, cursor: "pointer", fontFamily: "inherit", lineHeight: 1, padding: 0 }}>
               ⚙
             </button>
           )}
@@ -1738,6 +1846,9 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
         projection={editing && selectedCompounds.length > 0 ? projectedChanges : null}
         isPro={isPro}
         onUpgrade={(feat) => setPaywall(feat || "eidolon_customization")}
+        // 🔒 on the name = protocol committed. True only on the committed home;
+        // the builder is by definition unlocked, so it keeps the ✎ affordance.
+        locked={!editing && !!activeProtocol}
       />
 
       {/* Inline Goals Editor — collapsible (builder mode only; goals lock once a protocol is committed — #17) */}
@@ -1760,7 +1871,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
           color: active ? '#fff' : 'rgba(255,255,255,0.5)',
         });
         return (
-          <div style={{ ...S.card, borderColor: 'rgba(26,232,122,0.2)', padding: 16 }}>
+          <div style={{ ...S.card, borderColor: 'rgba(34,214,138,0.2)', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: goalsOpen || goals.length ? 10 : 0 }}>
               <div style={{ ...S.label, marginBottom: 0 }}>
                 Goals for {activeEidolon?.name || 'Eidolon 1'}
@@ -1789,7 +1900,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                   const goal = GOALS.find(x => x.id === gid);
                   if (!goal) return null;
                   return (
-                    <span key={gid} style={{ fontSize: 12, padding: '5px 11px', borderRadius: 100, background: 'rgba(26,232,122,0.08)', border: '1px solid rgba(26,232,122,0.18)', color: S.accent, fontWeight: 600 }}>
+                    <span key={gid} style={{ fontSize: 12, padding: '5px 11px', borderRadius: 100, background: 'rgba(34,214,138,0.08)', border: '1px solid rgba(34,214,138,0.18)', color: S.accent, fontWeight: 600 }}>
                       {goal.icon} {goal.label}
                     </span>
                   );
@@ -1804,7 +1915,62 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       {!editing && activeProtocol && (
         <>
           {/* Hero (name + avatar + stat pills) now renders above the mode split
-              via <EidolonHero>. Committed home continues straight to status. */}
+              via <EidolonHero>. */}
+
+          {/* 3. Goals — a plain section, not a card: the avatar is the hero and
+              chrome around the goals would compete with it. Still tap-to-edit
+              (re-enters the builder), so the Edit affordance stays visible. */}
+          <div onClick={startModify} title="Edit goals & protocol" style={{ cursor: "pointer", marginBottom: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textIndent: "0.14em", textTransform: "uppercase", color: "#666666", fontFamily: "'DM Sans', sans-serif" }}>
+                Goals for {activeEidolon?.name || "Eidolon 1"}
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#666666", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>Edit ✎</span>
+            </div>
+            {(profile.goals || []).length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {(profile.goals || []).map(gid => {
+                  const goal = GOALS.find(x => x.id === gid);
+                  if (!goal) return null;
+                  return (
+                    <span key={gid} style={{
+                      display: "inline-flex", alignItems: "center", gap: 7,
+                      fontSize: 12.5, fontWeight: 500,
+                      padding: "8px 14px", borderRadius: 100,
+                      background: "#1a1a1a", border: "1px solid #333",
+                      color: "#fff",
+                    }}>
+                      <span style={{ fontSize: 13, lineHeight: 1 }}>{goal.icon}</span>
+                      {goal.label}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+                No goals set. Tap <span style={{ color: "#fff", fontWeight: 600 }}>Edit ✎</span> to choose goals — they lock while a protocol is active.
+              </div>
+            )}
+          </div>
+
+          {/* 3b. Switch / New — the one bottom action of the hero block. */}
+          <button
+            onClick={() => setShowEidolonSwitcher(true)}
+            style={{
+              width: "100%", padding: "14px 20px", marginBottom: 28,
+              background: "#1a1a1a", border: "1px solid #333", borderRadius: 14,
+              color: "#666666", fontSize: 13, fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+            }}
+          >
+            <span style={{ fontSize: 14, lineHeight: 1 }}>≡</span>
+            Switch / New
+          </button>
+
+          {/* Everything below frames the hero: today's state, the stack, the payoff. */}
+          <div style={{ height: 1, background: "#1a1a1a", marginBottom: 26 }} />
+
           {/* 4. Cultivation status */}
           {(() => {
             const cv = getCultivationVisuals(cultivationState?.state || "new");
@@ -1873,7 +2039,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                   </div>
                 </div>
                 <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden", marginBottom: 14 }}>
-                  <div style={{ width: `${(doneCount / total) * 100}%`, height: "100%", borderRadius: 2, background: `linear-gradient(90deg,${ACCENT},#1ae87a)`, transition: "width 0.3s ease" }} />
+                  <div style={{ width: `${(doneCount / total) * 100}%`, height: "100%", borderRadius: 2, background: `linear-gradient(90deg,${ACCENT},#22D68A)`, transition: "width 0.3s ease" }} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {compIds.map(cid => {
@@ -1956,39 +2122,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
             )}
           </div>
 
-          {/* 6. Goals. 4.3 — tap-to-edit; goals become editable again inside the
-              builder (they lock only while committed). */}
-          <div onClick={startModify} title="Edit goals & protocol" style={{ ...S.card, cursor: "pointer" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ ...S.label, marginBottom: 0 }}>Goals</div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: S.accent, letterSpacing: "0.04em" }}>Edit ✎</span>
-            </div>
-            {(profile.goals || []).length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {(profile.goals || []).map(gid => {
-                  const goal = GOALS.find(x => x.id === gid);
-                  if (!goal) return null;
-                  return (
-                    <span key={gid} style={{
-                      fontSize: 12,
-                      padding: "5px 12px",
-                      borderRadius: 100,
-                      background: "rgba(26,232,122,0.08)",
-                      border: "1px solid rgba(26,232,122,0.18)",
-                      color: S.accent,
-                      fontWeight: 600
-                    }}>
-                      {goal.icon} {goal.label}
-                    </span>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-                No goals set. Tap <span style={{ color: S.accent, fontWeight: 600 }}>Edit ✎</span> to choose goals — they lock while a protocol is active.
-              </div>
-            )}
-          </div>
+          {/* Goals moved up, directly under the hero (section 3). */}
 
           {/* 7. Primary actions. D3 — the projection is the selling point, so
               "View Projection" is the prominent primary CTA here; the cycle timeline
@@ -2389,7 +2523,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
                     <div style={{
                       display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10,
                       padding: "10px 12px", borderRadius: 12,
-                      background: "rgba(26,232,122,0.1)", border: "1px solid rgba(26,232,122,0.25)",
+                      background: "rgba(34,214,138,0.1)", border: "1px solid rgba(34,214,138,0.25)",
                     }}>
                       <span style={{ fontSize: 14, lineHeight: 1.4 }}>✨</span>
                       <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.45, color: "rgba(255,255,255,0.8)" }}>
@@ -2481,7 +2615,7 @@ function Dashboard({ profile, setProfile, selectedCompounds, setSelectedCompound
       <p style={{ ...S.disclaimer, paddingBottom: 8 }}>
         {DISCLAIMER}
       </p>
-      <p style={{ fontSize: 12, color: "rgba(26,232,122,0.3)", textAlign: "center", paddingBottom: 32, fontStyle: "italic", letterSpacing: "0.06em" }}>
+      <p style={{ fontSize: 12, color: "rgba(34,214,138,0.3)", textAlign: "center", paddingBottom: 32, fontStyle: "italic", letterSpacing: "0.06em" }}>
         Alki · ἀλκή · Happy Researching.
       </p>
     </div>
@@ -2690,7 +2824,7 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "safe center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <h1 style={{ fontSize: 40, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
-            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(26,232,122,0.2)" }}>KI</span>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(34,214,138,0.2)" }}>KI</span>
           </h1>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 8 }}>
             {mode === "signin" ? "Welcome back, researcher." : "Create your research account."}
@@ -2698,7 +2832,7 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
         </div>
 
         {message && (
-          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(26,232,122,0.1)", border: "1px solid rgba(26,232,122,0.2)", fontSize: 13, color: "#1ae87a", marginBottom: 16, lineHeight: 1.5 }}>
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(34,214,138,0.1)", border: "1px solid rgba(34,214,138,0.2)", fontSize: 13, color: "#22D68A", marginBottom: 16, lineHeight: 1.5 }}>
             {message}
           </div>
         )}
@@ -2777,7 +2911,7 @@ function AuthScreen({ onAuth, onBack, onSkip, onBaseline }) {
                 transition: "all 0.15s ease", cursor: "pointer",
               }}
             >
-              {rememberMe && <span style={{ color: "#060608", fontSize: 12, fontWeight: 800, lineHeight: 1 }}>✓</span>}
+              {rememberMe && <span style={{ color: "#000000", fontSize: 12, fontWeight: 800, lineHeight: 1 }}>✓</span>}
             </div>
             <span onClick={() => setRememberMe(v => !v)}>Remember me</span>
           </label>
@@ -2861,7 +2995,7 @@ function SetNewPassword({ onDone }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "safe center", maxWidth: 360, margin: "0 auto", width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <h1 style={{ fontSize: 40, fontWeight: 800, margin: 0, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.03em" }}>
-            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(26,232,122,0.2)" }}>KI</span>
+            <span style={{ color: "#fff" }}>AL</span><span style={{ color: S.accent, textShadow: "0 0 30px rgba(34,214,138,0.2)" }}>KI</span>
           </h1>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 8 }}>
             {done ? "Password updated." : "Set a new password."}
@@ -2876,7 +3010,7 @@ function SetNewPassword({ onDone }) {
 
         {done ? (
           <>
-            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(26,232,122,0.1)", border: "1px solid rgba(26,232,122,0.2)", fontSize: 13, color: "#1ae87a", marginBottom: 20, lineHeight: 1.5 }}>
+            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(34,214,138,0.1)", border: "1px solid rgba(34,214,138,0.2)", fontSize: 13, color: "#22D68A", marginBottom: 20, lineHeight: 1.5 }}>
               Your password has been changed. You can use it to sign in from now on.
             </div>
             <button onClick={onDone} style={S.btn}>Continue</button>
@@ -2929,6 +3063,13 @@ export default function AlkiApp() {
   // Plan E — progress photos, in-memory ONLY (deliberately not in saveProfile/auto-save;
   // Supabase Storage is a future task). { [eidolonId]: [{ id, dataUrl, ts }] }
   const [photos, setPhotos] = useState({});
+  // Bottom nav — `builderCtaVisible` mirrors the Dashboard builder's fixed CTA
+  // bar (reported up via onBuilderActiveChange) and is only ever read while
+  // screen === "dashboard", so a stale value from a previous visit can't affect
+  // the nav on any other screen. `navPaywall` is the nav's own upgrade prompt,
+  // kept separate from Dashboard's so the two can't fight over one modal.
+  const [builderCtaVisible, setBuilderCtaVisible] = useState(false);
+  const [navPaywall, setNavPaywall] = useState(null);
   const [activeProtocol, setActiveProtocol] = useState(null);
   const [eidolons, setEidolons] = useState([]);
   const [activeEidolonId, setActiveEidolonId] = useState(null);
@@ -3481,6 +3622,25 @@ export default function AlkiApp() {
   };
   const goHome = () => { setNavHistory([]); setScreen("dashboard"); };
 
+  // ── Bottom nav ───────────────────────────────────────────────────
+  // Visible once the user is inside the app, EXCEPT where a screen already
+  // claims the bottom edge: the builder's fixed CTA bar and the projection
+  // view. Dashboard also needs a profile to render at all.
+  const navTab = SCREEN_TO_TAB[screen] || null;
+  const navVisible =
+    NAV_SCREENS.includes(screen) &&
+    !(screen === "dashboard" && (builderCtaVisible || showTransform || !profile));
+
+  const onNavSelect = (tab) => {
+    if (tab === "protocol") { goHome(); return; }
+    // Progress is Pro. Route a free user to the upgrade prompt rather than
+    // silently handing over a paid screen — same gate the dashboard card uses.
+    if (tab === "progress" && !isPro) { setNavPaywall("progress_log"); return; }
+    const target = TAB_TO_SCREEN[tab];
+    if (!target || target === screen) return; // don't stack duplicate history
+    navTo(target);
+  };
+
   const afterAgeGate = supabase ? "auth" : "onboarding";
   // 6.7-a — passing the gate records the attestation in client state (carried
   // to Supabase by the next profile save) and routes onward. pendingAfterGate
@@ -3492,7 +3652,9 @@ export default function AlkiApp() {
   };
 
   return (
-    <div style={S.app}>
+    // A fixed bar takes no layout space, so reserve its height on the shell —
+    // otherwise the last row of every screen sits underneath the nav.
+    <div style={{ ...S.app, paddingBottom: navVisible ? NAV_HEIGHT : 0 }}>
       {AVATURN_ENABLED && showAvatarCapture && (
         <AvaturnCapture
           onAvatarCreated={handleAvatarCreated}
@@ -3610,6 +3772,7 @@ export default function AlkiApp() {
           isPro={isPro}
           onSubscribe={startCheckout}
           onBuySlot={startBuySlot}
+          onBuilderActiveChange={setBuilderCtaVisible}
         />
       )}
       {screen === "progress" && (
@@ -3755,15 +3918,42 @@ export default function AlkiApp() {
         </>
       )}
 
+      {/* Bottom tab bar. Sits below the top chrome (z 901) and the tutorial
+          overlay (z 2000), above page content. Hidden wherever another surface
+          owns the bottom edge — see navVisible. */}
+      {navVisible && (
+        <BottomNav
+          active={navTab}
+          onSelect={onNavSelect}
+          lockedTabs={isPro ? [] : ["progress"]}
+        />
+      )}
+
+      {/* The nav's own upgrade prompt, for a free user tapping the Progress tab. */}
+      {navPaywall && (
+        <UpgradePrompt
+          featureKey={navPaywall}
+          onSubscribe={startCheckout}
+          onClose={() => setNavPaywall(null)}
+        />
+      )}
+
       {/* Sprint 6.5 — first-run intro overlay. Sits above all chrome (z 2000);
           shown once on first dashboard load and replayable from Settings. */}
       {showTutorial && (
         <TutorialOverlay slides={TUTORIAL_SLIDES} onClose={dismissTutorial} />
       )}
 
-      {/* Dev/testing feedback button — visible on all screens past splash */}
-      {screen !== "loading" && (
-        <FeedbackFAB currentScreen={screen} userEmail={user?.email || null} />
+      {/* Dev/testing feedback button — now gated to dev builds (ALKI_DEV), matching
+          PerfHUD, so the 🐛 affordance never ships. NOTE: this also means bug reports
+          can no longer be filed from the deployed Vercel build — the Supabase
+          `feedback` table will only receive reports from local dev. */}
+      {ALKI_DEV && screen !== "loading" && (
+        <FeedbackFAB
+          currentScreen={screen}
+          userEmail={user?.email || null}
+          bottomOffset={navVisible ? NAV_HEIGHT : 0}
+        />
       )}
 
       {/* Dev-only perf HUD — gated to dev builds (ALKI_DEV) so it never ships

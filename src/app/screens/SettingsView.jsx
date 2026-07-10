@@ -21,13 +21,13 @@ import { PRO_PRICING } from "../lib/subscription";
 
 const S = {
   inner: { maxWidth: 480, margin: "0 auto", padding: "64px 20px 48px", minHeight: "100vh" },
-  accent: "#1ae87a",
+  accent: "#22D68A",
   danger: "#ef4444",
   card: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 18, marginBottom: 14 },
   input: { width: "100%", padding: "13px 15px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 16, outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
   label: { fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 7, display: "block", fontFamily: "'JetBrains Mono', monospace" },
-  btn: { width: "100%", padding: "15px 24px", background: "#1ae87a", color: "#060608", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Syne','DM Sans',sans-serif", letterSpacing: "0.02em" },
-  btnOutline: { width: "100%", padding: "13px 24px", background: "transparent", color: "#1ae87a", border: "1.5px solid rgba(26,232,122,0.25)", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+  btn: { width: "100%", padding: "15px 24px", background: "#22D68A", color: "#000000", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Syne','DM Sans',sans-serif", letterSpacing: "0.02em" },
+  btnOutline: { width: "100%", padding: "13px 24px", background: "transparent", color: "#22D68A", border: "1.5px solid rgba(34,214,138,0.25)", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   btnDisabled: { opacity: 0.35, cursor: "not-allowed" },
   sectionTitle: { fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.02em", margin: "0 0 4px" },
   sectionHint: { fontSize: 12.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, margin: "0 0 12px" },
@@ -109,7 +109,7 @@ function SubscriptionCard({ isPro, subscriptionStatus, subscriptionTier, comped,
       <div style={S.card}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", fontFamily: "'Syne',sans-serif" }}>Alki Pro</span>
-          <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1ae87a", background: "rgba(26,232,122,0.12)", border: "1px solid rgba(26,232,122,0.25)", borderRadius: 100, padding: "2px 8px" }}>
+          <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#22D68A", background: "rgba(34,214,138,0.12)", border: "1px solid rgba(34,214,138,0.25)", borderRadius: 100, padding: "2px 8px" }}>
             {comped ? "Complimentary" : promoUntil ? "Pro Pass" : "Active"}
           </span>
         </div>
@@ -222,7 +222,7 @@ function Section({ title, hint, children }) {
 
 function Banner({ kind = "ok", children }) {
   const styles = kind === "ok"
-    ? { bg: "rgba(26,232,122,0.1)", bd: "rgba(26,232,122,0.25)", fg: "#1ae87a" }
+    ? { bg: "rgba(34,214,138,0.1)", bd: "rgba(34,214,138,0.25)", fg: "#22D68A" }
     : { bg: "rgba(239,68,68,0.1)", bd: "rgba(239,68,68,0.25)", fg: "#fca5a5" };
   return (
     <div style={{ padding: "11px 14px", borderRadius: 10, background: styles.bg, border: `1px solid ${styles.bd}`, color: styles.fg, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
@@ -385,7 +385,7 @@ export default function SettingsView({
                 <button key={s} onClick={() => setF("sex", s)} style={{
                   flex: 1, padding: "12px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
                   textTransform: "capitalize", fontSize: 15, fontWeight: 600,
-                  background: form.sex === s ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.04)",
+                  background: form.sex === s ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
                   border: `1.5px solid ${form.sex === s ? S.accent : "rgba(255,255,255,0.1)"}`,
                   color: form.sex === s ? "#fff" : "rgba(255,255,255,0.6)",
                 }}>{s}</button>
@@ -437,7 +437,7 @@ export default function SettingsView({
                 return (
                   <button key={t.id} onClick={() => setF("trainingStatus", active ? "" : t.id)} style={{
                     padding: "10px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                    background: active ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.04)",
+                    background: active ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
                     border: `1.5px solid ${active ? S.accent : "rgba(255,255,255,0.1)"}`,
                   }}>
                     <div style={{ fontSize: 13.5, fontWeight: 600, color: active ? "#fff" : "rgba(255,255,255,0.7)" }}>{t.label}</div>
@@ -455,7 +455,7 @@ export default function SettingsView({
                 return (
                   <button key={g.id} onClick={() => toggleGoal(g.id)} style={{
                     padding: "8px 14px", borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                    background: active ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.04)",
+                    background: active ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
                     border: `1.5px solid ${active ? S.accent : "rgba(255,255,255,0.1)"}`,
                     color: active ? "#fff" : "rgba(255,255,255,0.5)",
                   }}>{g.icon ? `${g.icon} ` : ""}{g.label}</button>
@@ -481,7 +481,7 @@ export default function SettingsView({
               return (
                 <button key={id} onClick={() => onSetPreferences({ ...preferences, units: id })} style={{
                   flex: 1, padding: "12px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
-                  background: active ? "rgba(26,232,122,0.12)" : "rgba(255,255,255,0.04)",
+                  background: active ? "rgba(34,214,138,0.12)" : "rgba(255,255,255,0.04)",
                   border: `1.5px solid ${active ? S.accent : "rgba(255,255,255,0.1)"}`,
                 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: active ? "#fff" : "rgba(255,255,255,0.6)" }}>{lbl}</div>
@@ -603,7 +603,7 @@ function EidolonRow({ eid, isActive, canDelete, isPro = false, onSwitch, onRenam
   };
 
   return (
-    <div style={{ ...S.card, borderColor: isActive ? "rgba(26,232,122,0.3)" : "rgba(255,255,255,0.08)", background: isActive ? "rgba(26,232,122,0.05)" : "rgba(255,255,255,0.04)" }}>
+    <div style={{ ...S.card, borderColor: isActive ? "rgba(34,214,138,0.3)" : "rgba(255,255,255,0.08)", background: isActive ? "rgba(34,214,138,0.05)" : "rgba(255,255,255,0.04)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {renaming ? (
@@ -620,7 +620,7 @@ function EidolonRow({ eid, isActive, canDelete, isPro = false, onSwitch, onRenam
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Syne',sans-serif", color: "#fff" }}>{eid.name}</span>
               {isActive && (
-                <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1ae87a", background: "rgba(26,232,122,0.12)", border: "1px solid rgba(26,232,122,0.25)", borderRadius: 100, padding: "2px 8px" }}>Active</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#22D68A", background: "rgba(34,214,138,0.12)", border: "1px solid rgba(34,214,138,0.25)", borderRadius: 100, padding: "2px 8px" }}>Active</span>
               )}
             </div>
           )}
